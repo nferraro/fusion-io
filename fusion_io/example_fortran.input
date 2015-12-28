@@ -1,0 +1,11 @@
+&FIO_EXAMPLE_DATA
+  NFILES = 4
+  FILENAME = 
+    '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=1/C1.h5', 
+    '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=2/C1.h5', 
+    '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=3/C1.h5', 
+    '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=4/C1.h5',
+  FILE_TYPE = 2, 2, 2, 2,   ! 1 = geqdsk, 2 = M3DC1
+  FACTOR = 10
+  TIMESLICE = 1
+/

@@ -1,0 +1,32 @@
+1. Set the following environment variables
+
+* FIO_ROOT should be set to the directory containing this README
+  file
+
+* FIO_ARCH should be set to a string describing the build
+  environment (for example "OSX")
+
+* FIO_INSTALL_DIR should be set to the location where files will be
+  installed.  Files will be installed under
+  $FIO_INSTALL_DIR/include, $FIO_INSTALL_DIR/lib, and
+  $FIO_INSTALL_DIR/bin.
+
+
+2. Create and edit the file $FIO_ROOT/install/make.inc.$FIO_ARCH
+   to specify the proper compilers and library paths.  An example
+   using the gnu compilers can be found in
+   $FIO_ROOT/install/make.inc.OSX .
+
+   You will need an installation of HDF5.
+   You do not need an installation of MPI.
+
+
+3. Run "make" from $FIO_ROOT
+
+
+4. Run "make install" from $FIO_ROOT.  This will install:
+   
+   Executables in     $FIO_INSTALL_DIR/bin/_$FIO_ARCH/
+   Libraries in       $FIO_INSTALL_DIR/lib/_$FIO_ARCH/
+   Headers in         $FIO_INSTALL_DIR/include/
+   Fortran modules in $FIO_INSTALL_DIR/include/_$FIO_ARCH/
