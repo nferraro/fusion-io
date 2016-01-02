@@ -39,10 +39,10 @@ m3dc1_fortran_test : test.o libm3dc1_fortran.a libm3dc1.a
 
 .PHONY: install
 install : 
-	mkdir -p $(FIO_INSTALL_DIR)/bin/_$(FIO_ARCH)
-	mkdir -p $(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)
+	mkdir -p $(FIO_INSTALL_DIR)/bin
+	mkdir -p $(FIO_INSTALL_DIR)/lib
 	-cp libm3dc1.a libm3dc1.so libm3dc1_fortran.a \
-	 $(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)
+	 $(FIO_INSTALL_DIR)/lib
 
 include $(FIO_ROOT)/install/common_footer.mk
 

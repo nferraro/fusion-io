@@ -17,8 +17,7 @@
    using the gnu compilers can be found in
    $FIO_ROOT/install/make.inc.OSX .
 
-   You will need an installation of HDF5.
-   You do not need an installation of MPI.
+   You will need an installation of HDF5, MPI, and LAPACK
 
 
 3. Run "make" from $FIO_ROOT
@@ -26,7 +25,7 @@
 
 4. Run "make install" from $FIO_ROOT.  This will install:
    
-   Executables in     $FIO_INSTALL_DIR/bin/_$FIO_ARCH/
-   Libraries in       $FIO_INSTALL_DIR/lib/_$FIO_ARCH/
+   Executables in     $FIO_INSTALL_DIR/bin/
+   Libraries in       $FIO_INSTALL_DIR/lib/
    Headers in         $FIO_INSTALL_DIR/include/
-   Fortran modules in $FIO_INSTALL_DIR/include/_$FIO_ARCH/
+   Fortran modules in $FIO_INSTALL_DIR/include/

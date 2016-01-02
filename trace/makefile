@@ -26,7 +26,7 @@ OBJS = interpolate.o trace_source.o interpolation_source.o \
 	m3dc1_source.o geqdsk_source.o coil_source.o \
 	diiid_coils.o trace_integrator.o
 
-all : trace
+all : trace plot_dr
 
 trace : main.o libtrace.a
 	$(LD) $(LDFLAGS) $< -L. -ltrace $(LIBS) -o $@
@@ -38,8 +38,8 @@ libtrace.a : $(OBJS)
 	$(ARCH) $@ $(OBJS) 
 
 install : trace plot_dr
-	mkdir -p $(FIO_INSTALL_DIR)/bin/_$(FIO_ARCH)
-	cp plot_dr trace $(FIO_INSTALL_DIR)/bin/_$(FIO_ARCH)
+	mkdir -p $(FIO_INSTALL_DIR)/bin
+	cp plot_dr trace $(FIO_INSTALL_DIR)/bin/
 
 include $(FIO_ROOT)/install/common_footer.mk
 
