@@ -16,3 +16,4 @@ INCLUDE = -I/usr/local/include
 LIBS = -L/usr/lib -lgfortran
 
 HDF5_LIBS = -lhdf5
+LAPACK = -llapack
