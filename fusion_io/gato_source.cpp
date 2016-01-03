@@ -300,7 +300,7 @@ int gato_source::set_element_bounds()
 	if(t[0] < 0) t[0] += 2.*M_PI;
 	if(t[1] < 0) t[1] += 2.*M_PI;
 	if(t[1] < t[0]) t[1] += 2.*M_PI;
-	if(abs(t[1]-t[0]) > .1) 
+	if(fabs(t[1]-t[0]) > .1) 
 	  std::cerr << "Large discrepancy in theta " 
 		    << i << " " 
 		    << t[0] << " " << t[1] << std::endl;

@@ -106,11 +106,11 @@ bool m3dc1_source::load()
     double diff;
     for(int i=0; i<time->size(); i++)
       if(i == 0) {
-	diff = abs(psi->time - time->at(i));
+	diff = fabs(psi->time - time->at(i));
 	index = 0;
       }	else {
-	if(abs(psi->time - time->at(i)) < diff) {
-	  diff = abs(psi->time - time->at(i));
+	if(fabs(psi->time - time->at(i)) < diff) {
+	  diff = fabs(psi->time - time->at(i));
 	  index = i;
 	}
       }
