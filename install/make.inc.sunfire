@@ -16,4 +16,4 @@ LAPACK = -L$(ACML_HOME)/ifort64/lib -lacml
 HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -lz
 HDF5_INCLUDE = -I$(HDF5_HOME)/include
 
-LIBS = -lstdc++ -lifcore -Wl,-rpath,$(M3DC1_INSTALL_DIR)/lib/_$(M3DC1_ARCH)
+LIBS = -lstdc++ -lifcore -Wl,-rpath,$(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)

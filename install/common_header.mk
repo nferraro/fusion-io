@@ -1,6 +1,6 @@
 .SUFFIXES:
 
-OBJDIR := _$(M3DC1_ARCH)
+OBJDIR := _$(FIO_ARCH)
 
 MAKETARGET = $(MAKE) --no-print-directory -C $@ -f $(CURDIR)/makefile \
 	SRCDIR=$(CURDIR) $(MAKECMDGOALS) 
