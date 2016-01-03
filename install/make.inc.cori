@@ -1,22 +1,22 @@
 CC = cc
 CXX = CC
 
-CFLAGS = -O2 -fPIC
+CFLAGS = -fPIC -Wall -Wcheck
 
 F90 = ftn
-#F90FLAGS = -fastsse -Mipa=fast,inline -Mr8 -Minform=warn
-F90FLAGS = -s real64
+F90FLAGS = -r8 -warn all -fPIC
 
 ARCH = ar cr
 
 LD = $(CXX)
-LDFLAGS = -fPIC
+LDFLAGS =
 
-LDD = $(CXX) -shared -fPIC
+LDD = $(CXX) --shared -fPIC
 
 LIBS =
 
-HDF5_LIBS = -L${HDF5_DIR}/lib -lhdf5
-HDF5_INCLUDE = 
+HDF5_LIBS = -L${HDF5_DIR}/lib -lhdf5 -lz
+HDF5_INCLUDE = -I${HDF5_DIR}/include 
 
-LAPACK = -L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_cray
+LAPACK = 
+#-L${CRAY_LIBSCI_PREFIX_DIR}/lib -lsci_cray
