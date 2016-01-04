@@ -20,7 +20,10 @@
    You will need an installation of HDF5, MPI, and LAPACK
 
 
-3. Run "make" from $FIO_ROOT
+3. From $FIO_ROOT
+   make : builds static libraries and executables
+   make shared : builds shared libraries
+   make python : builds fio_py.so
 
 
 4. Run "make install" from $FIO_ROOT.  This will install:

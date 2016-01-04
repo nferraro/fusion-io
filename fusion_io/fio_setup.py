@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension, os
 
-root = os.environ['M3DC1_ROOT']
-arch = os.environ['M3DC1_ARCH']
+root = os.environ['FIO_ROOT']
+arch = os.environ['FIO_ARCH']
 srcdir= os.environ['SRCDIR']
 copt = os.environ['CFLAGS']
 archflags = os.environ['ARCHFLAGS']

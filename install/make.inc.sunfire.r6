@@ -1,3 +1,13 @@
+# ====================================================================
+# Required modules:
+# -----------------
+# intel
+# openmpi
+# hdf5-serial (parallel installation does not have shared libraries)
+# acml (for lapack routines)
+# python
+# ====================================================================
+
 CC = mpicc
 CXX = mpicxx
 CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC
@@ -10,6 +20,8 @@ LDFLAGS =
 
 ARCH = ar cr
 LDD = $(CC) --shared
+
+PYTHON = python
 
 LAPACK = -L$(ACML_HOME)/ifort64/lib -lacml
 
