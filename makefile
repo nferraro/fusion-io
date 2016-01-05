@@ -4,12 +4,12 @@ alldirs = $(libs) $(bins) examples
 
 .PHONY : install clean $(alldirs)
 
-all : $(libs) $(bins)
+all : $(alldirs)
 
-install : $(libs) $(bins)
+install : $(alldirs)
 
 dist :
-	tar c m3dc1_lib/*.h m3dc1_lib/*.cpp m3dc1_lib/makefile fusion_io/*.cpp fusion_io/*.h fusion_io/*.f90 fusion_io/*.F90 fusion_io/makefile install/* makefile > fio.tar
+	tar c */*.h */*.c */*.cpp */makefile */*.f90 */*.F90 */*.py install/* makefile README > fio.tar
 	gzip fio.tar
 
 python : 
@@ -22,5 +22,3 @@ clean : $(alldirs)
 
 $(alldirs) : 
 	cd $@ ; $(MAKE) $(MAKECMDGOALS)
-#	mkdir -p $@/_$(FIO_ARCH)
-#	$(MAKE) -C $@/_$(FIO_ARCH) VPATH=../ SRCDIR=../ -f ../makefile $(MAKECMDGOALS)

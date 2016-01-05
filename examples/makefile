@@ -52,6 +52,11 @@ $(EXAMPLE_FORTRAN_BIN) : $(EXAMPLE_FORTRAN_OBJS)
 $(EXAMPLE_PUSH_BIN) : $(EXAMPLE_PUSH_OBJS)
 	$(F90) $(LDFLAGS) $< -lfio_push $(LIBS) -o $@
 
+.PHONY: install
+install: 
+	mkdir -m 755 -p $(FIO_INSTALL_DIR)/examples
+	cp -r * $(FIO_INSTALL_DIR)/examples
+
 include $(FIO_ROOT)/install/common_footer.mk
 
 endif
