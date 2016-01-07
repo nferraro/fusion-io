@@ -71,7 +71,8 @@ install :
 	mkdir -p $(FIO_INSTALL_DIR)/lib
 	-cp $(LIB) $(DLIB) $(FIO_INSTALL_DIR)/lib
 	mkdir -p $(FIO_INSTALL_DIR)/include/
-	-cp $(SRCDIR)/fusion_io.h $(SRCDIR)/fusion_io_defs.h $(SRCDIR)/fusion_io_c.h $(FIO_INSTALL_DIR)/include/
+	cp $(SRCDIR)/fusion_io_defs.h $(FIO_INSTALL_DIR)/include/
+	cp $(SRCDIR)/fusion_io_c.h $(FIO_INSTALL_DIR)/include/
 	mkdir -p $(FIO_INSTALL_DIR)/include
 	-cp *.mod $(FIO_INSTALL_DIR)/include
 	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py.so $(FIO_INSTALL_DIR)/lib
