@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+//#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +36,11 @@ static void get_spline_values(const int nvals, const double* t, double* r,
 static int least_squares(const int m, const int n, 
 			  double* a, double* b, double* x);
 static void transpose(const int m, const int n, double*);
+
+extern void dgels_(char* trans, const int* m, const int* n, const int* nrhs, 
+	      double* a, int* lda, double* b, int* ldb, 
+	      double* work, int* lwork, int* info );
+
 
 int main(int argc, char* argv[])
 {
