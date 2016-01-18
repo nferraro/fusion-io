@@ -4,15 +4,18 @@
 extern "C" {
   static PyObject* fio_add_field_py(PyObject*, PyObject*);
   static PyObject* fio_close_field_py(PyObject*, PyObject*);
+  static PyObject* fio_close_series_py(PyObject*, PyObject*);
   static PyObject* fio_close_source_py(PyObject*, PyObject*);
   static PyObject* fio_create_compound_field_py(PyObject*, PyObject*);
   static PyObject* fio_eval_scalar_field_py(PyObject*, PyObject*);
+  static PyObject* fio_eval_series_py(PyObject*, PyObject*);
   static PyObject* fio_eval_vector_field_py(PyObject*, PyObject*);
   static PyObject* fio_get_available_fields_py(PyObject*, PyObject*);
   static PyObject* fio_get_field_py(PyObject*, PyObject*);
   static PyObject* fio_get_field_name_py(PyObject*, PyObject*);
   static PyObject* fio_get_option_name_py(PyObject*, PyObject*);
   static PyObject* fio_get_options_py(PyObject*, PyObject*);
+  static PyObject* fio_get_series_py(PyObject*, PyObject*);
   static PyObject* fio_open_source_py(PyObject*, PyObject*);
   static PyObject* fio_set_int_option_py(PyObject*, PyObject*);
   static PyObject* fio_set_str_option_py(PyObject*, PyObject*);
@@ -21,15 +24,18 @@ extern "C" {
   static PyMethodDef fio_methods[] = {
     {"add_field", fio_add_field_py, METH_VARARGS, ""},
     {"close_field", fio_close_field_py, METH_VARARGS, ""},
+    {"close_series", fio_close_series_py, METH_VARARGS, ""},
     {"close_source", fio_close_source_py, METH_VARARGS, ""},
     {"create_compound_field", fio_create_compound_field_py, METH_VARARGS, ""},
     {"eval_scalar_field", fio_eval_scalar_field_py, METH_VARARGS, ""},
+    {"eval_series", fio_eval_series_py, METH_VARARGS, ""},
     {"eval_vector_field", fio_eval_vector_field_py, METH_VARARGS, ""},
     {"get_available_fields", fio_get_available_fields_py, METH_VARARGS, ""},
     {"get_options", fio_get_options_py, METH_VARARGS, ""},
     {"get_field", fio_get_field_py, METH_VARARGS, ""},
     {"get_field_name", fio_get_field_name_py, METH_VARARGS, ""},
     {"get_option_name", fio_get_option_name_py, METH_VARARGS, ""},
+    {"get_series", fio_get_series_py, METH_VARARGS, ""},
     {"open_source", fio_open_source_py, METH_VARARGS, ""},
     {"set_int_option", fio_set_int_option_py, METH_VARARGS, ""},
     {"set_str_option", fio_set_str_option_py, METH_VARARGS, ""},
@@ -101,6 +107,19 @@ PyObject* fio_close_source_py(PyObject* self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+PyObject* fio_close_series_py(PyObject* self, PyObject *args)
+{
+  int isrc;
+
+  if(!PyArg_ParseTuple(args, "i", &isrc))
+    return NULL;
+
+  int ierr = fio_close_series(isrc);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+  Py_RETURN_NONE;
+}
+
 PyObject* fio_create_compound_field_py(PyObject* self, PyObject *args)
 {
   int ifield;
@@ -121,6 +140,22 @@ PyObject* fio_eval_scalar_field_py(PyObject* self, PyObject *args)
 
   double v;
   int ierr = fio_eval_field(ifield, x, &v);
+  if(ierr != FIO_SUCCESS)
+    return NULL; 
+
+  return Py_BuildValue("d", v);
+}
+
+PyObject* fio_eval_series_py(PyObject* self, PyObject *args)
+{
+  int iseries;
+  double x; 
+
+  if(!PyArg_ParseTuple(args, "id", &iseries, &x))
+    return NULL;
+
+  double v;
+  int ierr = fio_eval_series(iseries, x, &v);
   if(ierr != FIO_SUCCESS)
     return NULL; 
 
@@ -220,6 +255,21 @@ PyObject* fio_get_options_py(PyObject* self, PyObject *args)
   if(ierr != FIO_SUCCESS)
     return NULL;
   Py_RETURN_NONE;
+}
+
+PyObject* fio_get_series_py(PyObject* self, PyObject *args)
+{
+  int isrc;
+  int itype;
+  int handle;
+
+  if(!PyArg_ParseTuple(args, "ii", &isrc, &itype))
+    return NULL;
+
+  int ierr = fio_get_series(isrc, itype, &handle);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+  return Py_BuildValue("i", handle);
 }
 
 PyObject* fio_open_source_py(PyObject* self, PyObject *args)
