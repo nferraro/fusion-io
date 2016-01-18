@@ -31,7 +31,7 @@ program fio_example
   integer :: i, j, ierr
 
 !  filename(1) = '/home/ferraro/data/meshrw2_n=3_even_2f/C1.h5'
-  filename(1) = '/home/wingen/c++/d3d/155623/resistive_wall/even_2f/C1.h5'
+  filename(1) = 'C1.h5'
 
 !!$  filename(1) = '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=1/C1.h5'
 !!$  filename(2) = '/Users/ferraro/data/DIII-D/126006/mesh21a_kap6_amu6_n=2/C1.h5'
