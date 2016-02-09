@@ -13,16 +13,24 @@ int mars_field::load(const fio_option_list* opt)
 	      << std::endl;
     linfac = 1.;
   }
+  
 
   return FIO_SUCCESS;
 }
+
 
 int mars_magnetic_field::load(const fio_option_list* opt)
 {
   mars_field::load(opt);
 
+  int result;
+
+  result = source->load_eigdata("BPLASMA.OUT",&(source->bplasma),false);
+  if(result != FIO_SUCCESS) return result;
+
   return FIO_SUCCESS;
 }
+
 
 int mars_magnetic_field::eval(const double* x, double* v)
 {  

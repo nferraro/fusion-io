@@ -8,7 +8,7 @@
 
 class mars_field : public fio_field {
  protected:
-  int part;
+  int part, time;
   double linfac, phase;
   mars_source* source;
  public:

@@ -272,11 +272,11 @@ int mars_source::get_field(const field_type t, fio_field** f,
   case(FIO_FLUID_VELOCITY):
     mf = new mars_fluid_velocity(this);
     break;
-
+    
   case(FIO_MAGNETIC_FIELD):
     mf = new mars_magnetic_field(this);
     break;
-
+    
   default:
     return FIO_UNSUPPORTED;
   };
