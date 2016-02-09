@@ -22,6 +22,11 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
     ierr = (*src)->open(filename);
     break;
 
+  case(FIO_MARS_SOURCE):
+    *src = new mars_source();
+    ierr = (*src)->open(filename);
+    break;
+
   default:
     std::cerr << "Source type " << type << " unsupported." << std::endl;
     return FIO_UNSUPPORTED;

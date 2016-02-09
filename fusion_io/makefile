@@ -32,6 +32,8 @@ OBJS = 	interpolate.o \
 	compound_field.o \
 	m3dc1_source.o \
 	m3dc1_field.o \
+	mars_source.o \
+	mars_field.o \
 	geqdsk_source.o \
 	geqdsk_field.o \
 	gato_source.o \

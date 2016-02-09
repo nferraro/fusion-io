@@ -79,7 +79,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   return FIO_SUCCESS;
 }
 
-int m3dc1_source::get_field(const field_type t,fio_field** f,
+int m3dc1_source::get_field(const field_type t, fio_field** f,
 			    const fio_option_list* opt)
 {
   *f = 0;
