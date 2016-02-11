@@ -7,12 +7,14 @@
 #include "fusion_io_field.h"
 #include "fio_operations.h"
 #include "compound_field.h"
-#include "m3dc1_source.h"
-#include "m3dc1_field.h"
-#include "geqdsk_source.h"
-#include "geqdsk_field.h"
 #include "gato_source.h"
 #include "gato_field.h"
+#include "geqdsk_source.h"
+#include "geqdsk_field.h"
+#include "m3dc1_source.h"
+#include "m3dc1_field.h"
+#include "mars_source.h"
+#include "mars_field.h"
 #include "fusion_io_c.h"
 
 #include <string>
