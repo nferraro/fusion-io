@@ -126,7 +126,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   }
 
   int is_3d = 0;
-  read_parameter("3d", &is_3d);
+  read_parameter("3d", &is_3d);  
   //  std::cerr << "is_3d = " << is_3d << std::endl;
 
   int nfields;
@@ -164,6 +164,18 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   }
   delete[] data;
   
+  // Determine geometry
+  double rzero = 0.;
+  int itor = 0;
+  read_parameter("itor", &itor);
+  mesh->toroidal = (itor==1);
+  if(itor==0) {
+    read_parameter("rzero", &rzero);
+    mesh->period = 2.*M_PI*rzero;
+  } else {
+    mesh->period = 2.*M_PI;
+  }
+
   H5Gclose(mesh_group);
   H5Gclose(time_group);
 

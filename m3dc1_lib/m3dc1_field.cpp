@@ -125,6 +125,7 @@ bool m3dc1_complex_field::eval(const double r, const double phi,
   double val_i[OP_NUM];
   double* temp;
   double co, sn;
+  double kphi = 2.*M_PI*(double)ntor/mesh->period;
 
   // get real values
   if(!m3dc1_field::eval(r,phi,z,new_op,val_r,element))
@@ -140,19 +141,19 @@ bool m3dc1_complex_field::eval(const double r, const double phi,
   if(!result) 
     return false;
 
-  co = cos(phi*ntor);
-  sn = sin(phi*ntor);
+  co = cos(phi*kphi);
+  sn = sin(phi*kphi);
 
   for(int i=0; i<OP_DP; i++)
     val[i] = val_r[i]*co - val_i[i]*sn;
 
   if((op & GET_PVAL) == GET_PVAL)
     for(int i=0; i<OP_DP; i++)
-      val[i+OP_DP] = -ntor*(val_i[i]*co + val_r[i]*sn);
+      val[i+OP_DP] = -kphi*(val_i[i]*co + val_r[i]*sn);
 
   if((op & GET_PPVAL) == GET_PPVAL)
     for(int i=0; i<OP_DP; i++) 
-      val[i+OP_DPP] = -ntor*ntor*val[i];
+      val[i+OP_DPP] = -kphi*kphi*val[i];
 
   return true;
 }
