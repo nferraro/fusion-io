@@ -40,13 +40,14 @@ bool process_line(const std::string& opt, const int argc,
 		  const std::string argv[]);
 void delete_sources();
 
-int my_offset(const int rank, const int size);
-int my_size(const int rank, const int size);
+void partition();
+void gather(const double* in, double* out);
+
+int size, rank;
+int *offset, *local_surfaces;
 
 int main(int argc, char* argv[])
 {
-  int size, rank;
-
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -143,14 +144,11 @@ int main(int argc, char* argv[])
     plotfile.close();
   }
 
-  int* offsets = new int[size];
-  int* local_surfaces = new int[size];
+  offset = new int[size];
+  local_surfaces = new int[size];
 
-  for(int i=0; i<size; i++) {
-    offsets[i] = my_offset(i, size);
-    local_surfaces[i] = my_size(i, size);
-  }
-
+  partition();
+  
   double *my_q_min, *my_q_max, *my_q_mean, *my_r, *my_phase;
   my_r = new double[local_surfaces[rank]];
   my_q_min = new double[local_surfaces[rank]];
@@ -160,7 +158,7 @@ int main(int argc, char* argv[])
 
   time_t t1 = time(0);
   for(int j=0; j<local_surfaces[rank]; j++) {
-    int s = j + offsets[rank];
+    int s = rank + j*size;
     double R = R0 + dR0 + dR*s;
     double Z = Z0 + dZ0 + dZ*s;
     double *rr, *zz;
@@ -251,6 +249,7 @@ int main(int argc, char* argv[])
 
   if(rank==0) {
     total_r = new double[surfaces];
+
     if(qout) {
       total_q_min = new double[surfaces];
       total_q_max = new double[surfaces];
@@ -258,24 +257,34 @@ int main(int argc, char* argv[])
       total_phase = new double[surfaces];
     }
   }
-  
+
+  gather(my_r, total_r);
+  if(qout) {
+    gather(my_q_min, total_q_min);
+    gather(my_q_max, total_q_max);
+    gather(my_q_mean, total_q_mean);
+    gather(my_phase, total_phase);
+  }
+
+  /*
   MPI_Gatherv(my_r, local_surfaces[rank], MPI_DOUBLE, 
-	      total_r, local_surfaces, offsets, MPI_DOUBLE, 
+	      total_r, local_surfaces, offset, MPI_DOUBLE, 
 	      0, MPI_COMM_WORLD);
   if(qout) {
     MPI_Gatherv(my_q_min, local_surfaces[rank], MPI_DOUBLE, 
-		total_q_min, local_surfaces, offsets, MPI_DOUBLE, 
+		total_q_min, local_surfaces, offset, MPI_DOUBLE, 
 		0, MPI_COMM_WORLD);
     MPI_Gatherv(my_q_max, local_surfaces[rank], MPI_DOUBLE, 
-		total_q_max, local_surfaces, offsets, MPI_DOUBLE, 
+		total_q_max, local_surfaces, offset, MPI_DOUBLE, 
 		0, MPI_COMM_WORLD);
     MPI_Gatherv(my_q_mean, local_surfaces[rank], MPI_DOUBLE, 
-		total_q_mean, local_surfaces, offsets, MPI_DOUBLE, 
+		total_q_mean, local_surfaces, offset, MPI_DOUBLE, 
 		0, MPI_COMM_WORLD);
     MPI_Gatherv(my_phase, local_surfaces[rank], MPI_DOUBLE, 
-		total_phase, local_surfaces, offsets, MPI_DOUBLE, 
+		total_phase, local_surfaces, offset, MPI_DOUBLE, 
 		0, MPI_COMM_WORLD);
   }
+  */
 
   if(rank==0) {
     // write data
@@ -308,7 +317,7 @@ int main(int argc, char* argv[])
   delete[] my_q_mean;
   delete[] my_phase;
 
-  delete[] offsets;
+  delete[] offset;
   delete[] local_surfaces;
 
   std::cerr << "Deleting sources." << std::endl;
@@ -383,18 +392,45 @@ bool process_command_line(int argc, char* argv[])
 
 }
 
-int my_offset(const int rank, const int size)
+void partition()
 {
-  return rank*(surfaces/size);
+  for(int i=0; i<size; i++)
+    local_surfaces[i] = 0.;
+
+  int r = 0;
+  for(int i=0; i<surfaces; i++) {
+    local_surfaces[r]++;
+    r = (r+1) % size;
+  }
+
+  offset[0] = 0.;
+  for(int i=1; i<size; i++)
+    offset[i] = offset[i-1]+local_surfaces[i-1];
 }
 
-int my_size(const int rank, const int size)
+void gather(const double* in, double* out)
 {
-  int min = my_offset(rank, size);
-  int max = (rank==size-1) ? surfaces : my_offset(rank+1, size);
-  return max-min;
-}
+  double* buf = new double[surfaces];
 
+  MPI_Gatherv(in, local_surfaces[rank], MPI_DOUBLE, 
+	      buf, local_surfaces, offset, MPI_DOUBLE, 
+	      0, MPI_COMM_WORLD); 
+
+  if(rank == 0) {
+    int n=0;
+    int r=0;
+    for(int i=0; i<surfaces; i++) {
+      out[i] = buf[offset[r]+n];
+      r++;
+      if(r==size) {
+	n++;
+	r = 0;
+      }
+    }
+  }
+
+  delete[] buf;
+}
 
 bool process_line(const std::string& opt, const int argc, const std::string argv[])
 {
