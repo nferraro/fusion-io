@@ -48,6 +48,8 @@ class m3dc1_mesh {
   double* x;
   double* z;
   int* bound;
+  double period;
+  bool toroidal;
 
  public:
   m3dc1_mesh(int n);
@@ -108,8 +110,8 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
 			 double* xi=0, double* zi=0, double* eta=0, 
 			 int guess=-1)
   {
-    while(Phi < 0       ) Phi += 2.*M_PI;
-    while(Phi >= 2.*M_PI) Phi -= 2.*M_PI;
+    while(Phi < 0      ) Phi += period;
+    while(Phi >= period) Phi -= period;
 
     return m3dc1_mesh::in_element(X, Phi, Z, xi, zi, eta, guess);
   }

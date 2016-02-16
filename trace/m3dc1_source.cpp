@@ -179,7 +179,6 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
 
   double phi = phi0 - shift;
   double rr = (itor==1) ? r : 1.;
-  double r0 = (itor==0) ? rzero : 1.;
 
   // B_R   = -(dpsi/dZ)/R - (d2f/dRdphi)
   // B_Z   =  (dpsi/dR)/R - (d2f/dZdphi)
@@ -203,8 +202,8 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
     if(!f->eval(r, phi, z, fget, val))
       return false;
 
-    *b_r -= factor*val[m3dc1_field::OP_DRP]/r0;
-    *b_z -= factor*val[m3dc1_field::OP_DZP]/r0;
+    *b_r -= factor*val[m3dc1_field::OP_DRP];
+    *b_z -= factor*val[m3dc1_field::OP_DZP];
   }
 
   if(extsubtract==1) {
@@ -224,8 +223,8 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
       if(!f_x->eval(r, phi, z, fget, val))
 	return false;
 
-      *b_r -= factor*val[m3dc1_field::OP_DRP]/r0;
-      *b_z -= factor*val[m3dc1_field::OP_DZP]/r0;
+      *b_r -= factor*val[m3dc1_field::OP_DRP];
+      *b_z -= factor*val[m3dc1_field::OP_DZP];
     }
   }
 

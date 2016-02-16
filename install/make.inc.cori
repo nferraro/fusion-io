@@ -6,6 +6,8 @@ CFLAGS = -fPIC -Wall -Wcheck
 F90 = ftn
 F90FLAGS = -r8 -warn all -fPIC
 
+PYTHON = python
+
 ARCH = ar cr
 
 LD = $(CXX)

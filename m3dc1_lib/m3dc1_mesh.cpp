@@ -18,6 +18,7 @@ m3dc1_mesh::m3dc1_mesh(int n)
   next_elm = 0;
   hits = 0;
   misses = 0;
+  period = 2.*M_PI;
 }
 
 m3dc1_mesh::~m3dc1_mesh()
@@ -75,7 +76,7 @@ void m3dc1_mesh::extent(double* X0, double* X1,
   }
 
   *Phi0 = 0.;
-  *Phi1 = 0.;
+  *Phi1 = period;
 }
 
 void m3dc1_mesh::clear_memory()
