@@ -15,6 +15,8 @@ class mars_field : public fio_field {
   mars_field(mars_source* s) 
     { source = s; }
   virtual int load(const fio_option_list*) = 0;
+
+  int get_indices(const double*, int*, int*, double*, double*);
 };
 
 
@@ -34,6 +36,7 @@ class mars_fluid_velocity : public mars_field {
 
 // B
 class mars_magnetic_field : public mars_field {
+  double **b[3];
  public:
   mars_magnetic_field(mars_source* s) 
     : mars_field(s) { }

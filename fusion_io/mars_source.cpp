@@ -5,6 +5,7 @@
 mars_source::mars_eqdata::mars_eqdata(const int nri, const int nci)
 {
   cse = new double[nri];
+  peq = new double[nri];
   t = new double[nri];
   ttp = new double[nri];
   ppeq= new double[nri];
@@ -42,6 +43,7 @@ mars_source::mars_eqdata::~mars_eqdata()
   if(nr==0 || nc==0) return;
   
   delete[] cse;
+  delete[] peq;
   delete[] t;
   delete[] ttp;
   delete[] dpsids;
@@ -104,12 +106,16 @@ mars_source::mars_eigdata::~mars_eigdata()
 }
 
 mars_source::mars_source() 
-  : psiiso(0), eqdata(0), eqdatam(0)
+  : psiiso(0), eqdata(0), eqdatam(0), xplasma(0), vplasma(0), bplasma(0)
 {
 }
 
 mars_source::~mars_source()
 {
+  if(bplasma) delete(bplasma);
+  if(xplasma) delete(xplasma);
+  if(vplasma) delete(vplasma);
+
   close();
 }
 
@@ -142,43 +148,41 @@ int mars_source::open(const char* )
   for(int i=0; i<nrp1; i++) {
     fscanf(fid, "%le", &(eqdatam->cse[i]));
     fscanf(fid, "%le", &psiiso[2*i]);
+    fscanf(fid, "%le", &(eqdatam->peq[i]));
     fscanf(fid, "%le", &(eqdatam->t[i]));
     fscanf(fid, "%le", &(eqdatam->ttp[i]));
     fscanf(fid, "%le", &(eqdatam->ppeq[i]));
     fscanf(fid, "%le", &(eqdatam->dpsids[i]));
-    for(int j=0; j<nchi; j++) {
-      fscanf(fid, "%le", &(eqdatam->req[i][j]));
-      fscanf(fid, "%le", &(eqdatam->zeq[i][j]));
-      fscanf(fid, "%le", &(eqdatam->rja[i][j]));
-      fscanf(fid, "%le", &(eqdatam->g11l[i][j]));
-      fscanf(fid, "%le", &(eqdatam->g22l[i][j]));
-      fscanf(fid, "%le", &(eqdatam->g33l[i][j]));
-      fscanf(fid, "%le", &(eqdatam->g12l[i][j]));
-      fscanf(fid, "%le", &(eqdatam->rdcdz[i][j]));
-      fscanf(fid, "%le", &(eqdatam->rdsdz[i][j]));
-      fscanf(fid, "%le", &(eqdatam->rbz[i][j]));
-    }
-    fscanf(fid, "%le", &(eqdatam->tp[i]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->req[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->zeq[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->rja[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->g11l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->g22l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->g33l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->g12l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->rdcdz[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->rdsdz[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdatam->rbz[i][j]));
+    eqdatam->tp[i] = eqdatam->ttp[i] / eqdatam->t[i];
 
     fscanf(fid, "%le", &(eqdata->cse[i]));
     fscanf(fid, "%le", &psiiso[2*i+1]);
+    fscanf(fid, "%le", &(eqdata->peq[i]));
     fscanf(fid, "%le", &(eqdata->t[i]));
     fscanf(fid, "%le", &(eqdata->ttp[i]));
     fscanf(fid, "%le", &(eqdata->ppeq[i]));
     fscanf(fid, "%le", &(eqdata->dpsids[i]));
-    for(int j=0; j<nchi; j++) {
-      fscanf(fid, "%le", &(eqdata->req[i][j]));
-      fscanf(fid, "%le", &(eqdata->zeq[i][j]));
-      fscanf(fid, "%le", &(eqdata->rja[i][j]));
-      fscanf(fid, "%le", &(eqdata->g11l[i][j]));
-      fscanf(fid, "%le", &(eqdata->g22l[i][j]));
-      fscanf(fid, "%le", &(eqdata->g33l[i][j]));
-      fscanf(fid, "%le", &(eqdata->g12l[i][j]));
-      fscanf(fid, "%le", &(eqdata->rdcdz[i][j]));
-      fscanf(fid, "%le", &(eqdata->rdsdz[i][j]));
-      fscanf(fid, "%le", &(eqdata->rbz[i][j]));
-    }
-    fscanf(fid, "%le", &(eqdata->tp[i]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->req[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->zeq[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->rja[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->g11l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->g22l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->g33l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->g12l[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->rdcdz[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->rdsdz[i][j]));
+    for(int j=0; j<nchi; j++) fscanf(fid, "%le", &(eqdata->rbz[i][j]));
+    eqdata->tp[i] = eqdata->ttp[i] / eqdata->t[i];
   }
   fclose(fid);
 
