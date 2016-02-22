@@ -45,11 +45,15 @@ FIO_DEFINE_INT(FIO_VELOCITY,          1101)
 COMMENT(      tensor fields      )
 FIO_DEFINE_INT(FIO_GRAD_VECTOR_POTENTIAL, 2001)
 
-/* series */
+COMMENT(      series             )
 FIO_DEFINE_INT(FIO_MAGAXIS_PSI,       3001)
 FIO_DEFINE_INT(FIO_LCFS_PSI,          3002)
 FIO_DEFINE_INT(FIO_MAGAXIS_R,         3003)
 FIO_DEFINE_INT(FIO_MAGAXIS_Z,         3004)
+
+COMMENT(      coordinate system             )
+FIO_DEFINE_INT(FIO_CARTESIAN,   0)
+FIO_DEFINE_INT(FIO_CYLINDRICAL, 1)
 
 COMMENT(      field options (integers)      )
 FIO_DEFINE_INT(FIO_INT_OPT_START,     0)

@@ -6,6 +6,7 @@
 #include "options.h"
 
 #include <vector>
+#include <math.h>
 
 typedef int field_type;
 typedef int series_type;
@@ -25,6 +26,16 @@ class fio_source {
   virtual int get_series(const series_type, fio_series**)
   { return FIO_UNSUPPORTED; }
   virtual int get_available_fields(fio_field_list*) const = 0;
+  virtual int get_coordinate_system(int* cs) const
+  { 
+    *cs = FIO_CYLINDRICAL;
+    return FIO_SUCCESS; 
+  }
+  virtual int get_period(double* p) const
+  {
+    *p = 2.*M_PI;
+    return FIO_SUCCESS;
+  }
 };
 
 #endif 

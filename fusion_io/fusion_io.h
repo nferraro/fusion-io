@@ -21,8 +21,10 @@
 
 int fio_close_source(fio_source** source);
 int fio_close_field(fio_field** field);
+int fio_get_coordinate_system(const int, int*);
 int fio_get_field_name(field_type, std::string*);
 int fio_get_option_name(const int, std::string*);
+int fio_get_period(const int, double*);
 int fio_open_source(fio_source** src, const int type, const char* filename);
 
 #endif

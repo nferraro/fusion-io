@@ -9,9 +9,11 @@ extern "C" {
   void fio_eval_field_(const int*, const double*, double*, int*);
   void fio_eval_field_deriv_(const int*, const double*, double*, int*);
   void fio_eval_series_(const int*, const double*, double*, int*);
+  void fio_get_coordinate_system_(const int*, int*, int*);
   void fio_get_options_(const int*, int*);
   void fio_get_field_(const int*, const int*, int*, int*);
   void fio_get_series_(const int*, const int*, int*, int*);
+  void fio_get_period_(const int*, double*, int*);
   void fio_open_source_(const int*, const char*, int*, int*);
   void fio_set_int_option_(const int*, const int*, int*);
   void fio_set_str_option_(const int*, const char*, int*);
@@ -60,6 +62,11 @@ void fio_eval_series_(const int* iseries, const double* x, double* v, int* ierr)
   *ierr = fio_eval_series(*iseries, *x, v);
 }
 
+void fio_get_coordinate_system_(const int* isrc, int* cs, int* ierr)
+{
+  *ierr = fio_get_coordinate_system(*isrc, cs);
+}
+
 void fio_get_field_(const int* isrc, const int* itype,
 		    int* handle, int* ierr)
 {
@@ -69,6 +76,11 @@ void fio_get_field_(const int* isrc, const int* itype,
 void fio_get_options_(const int* isrc, int* ierr)
 {
   *ierr = fio_get_options(*isrc);
+}
+
+void fio_get_period_(const int* isrc, double* p, int* ierr)
+{
+  *ierr = fio_get_period(*isrc, p);
 }
 
 void fio_get_series_(const int* isrc, const int* itype,

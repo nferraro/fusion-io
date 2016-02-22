@@ -82,6 +82,11 @@ int fio_get_available_fields(const int isrc, int* n, int** f)
   return FIO_SUCCESS;
 }
 
+int fio_get_coordinate_system(const int isrc, int* cs)
+{
+  return source_list[isrc]->get_coordinate_system(cs);
+}
+
 int fio_get_field(const int isrc, const int type, int* handle)
 {
   fio_field* f;
@@ -94,6 +99,11 @@ int fio_get_field(const int isrc, const int type, int* handle)
     field_list.push_back(f);
   }
   return ierr;
+}
+
+int fio_get_period(const int isrc, double* p)
+{
+  return source_list[isrc]->get_period(p);
 }
 
 int fio_get_options(const int isrc)

@@ -22,6 +22,14 @@ print 'Available fields:'
 for field in list:
     print ' ', fio_py.get_field_name(field)
 
+cs = fio_py.get_coordinate_system(isrc)
+if cs == fio_py.FIO_CYLINDRICAL:
+    print 'Using CYLINDRICAL coordinate system'
+else :
+    print 'Using CARTESIAN coordinate system'
+
+period = fio_py.get_period(isrc)
+print 'Toroidal period = ', period
 
 ipsi_axis = fio_py.get_series(isrc, fio_py.FIO_MAGAXIS_PSI)
 ipsi_lcfs = fio_py.get_series(isrc, fio_py.FIO_LCFS_PSI)

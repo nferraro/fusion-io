@@ -20,6 +20,7 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("l0_norm", &L0);
   file.read_parameter("b0_norm", &B0);
   file.read_parameter("version", &version);
+  file.read_parameter("itor", &itor);
 
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
@@ -39,7 +40,13 @@ int m3dc1_source::open(const char* filename)
   v0 /= 100.;
   Phi0 /= (1.e8/c);
 
- // determine ion species (assume one proton and no electrons)
+  if(itor==1) {
+    period = 2.*M_PI;
+  } else {
+    period = 2.*M_PI*rzero*L0;
+  }
+
+  // determine ion species (assume one proton and no electrons)
   ion_species = fio_species(ion_mass, 1, 0);
 
   return FIO_SUCCESS;
@@ -75,6 +82,23 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_PRESSURE);
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
+
+  return FIO_SUCCESS;
+}
+
+int m3dc1_source::get_coordinate_system(int* cs) const
+{
+  if(itor==1) {
+    *cs = FIO_CYLINDRICAL;
+  } else {
+    *cs = FIO_CARTESIAN;
+  }
+  return FIO_SUCCESS;
+}
+
+int m3dc1_source::get_period(double* p) const
+{
+  *p = period;
 
   return FIO_SUCCESS;
 }
