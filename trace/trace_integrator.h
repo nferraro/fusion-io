@@ -19,6 +19,7 @@ class trace_integrator : private trace_field_source {
   bool toroidal;
   double period;
   int nplanes;
+  int tpts;
 
   struct integrator_data {
     int toroidal_transits;

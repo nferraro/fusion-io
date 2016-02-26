@@ -15,6 +15,7 @@ trace_integrator tracer;
 int transits = 100;
 int steps_per_transit = 100;
 int surfaces = 11;
+int tpts = 1;
 double dR = 0.;
 double dZ = 0.;
 double dR0 = 0.;
@@ -57,6 +58,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  tracer.tpts = tpts;
   tracer.plane = angle;
   tracer.nplanes = nplanes;
   tracer.set_reverse(reverse);
@@ -346,13 +348,13 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 17;
+  const int num_opts = 18;
   std::string arg_list[num_opts] = 
     { "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0", 
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
-      "-reverse" };
+      "-reverse", "-tavg" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -478,6 +480,9 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
   } else if(opt=="-t") {
     if(argc==1) transits = atoi(argv[0].c_str());
     else argc_err = true;
+  } else if(opt=="-tavg") {
+    if(argc==1) tpts = atoi(argv[0].c_str());
+    else argc_err = true;
   } else if(opt=="-s") {
     if(argc==1) steps_per_transit = atoi(argv[0].c_str());
     else argc_err = true;
@@ -521,7 +526,7 @@ void print_help()
     << "Usage:\n"
     << "\ttrace <sources> -dR <dR> -dZ <dZ> -dR0 <dR0> -dZ0 <dZ0> /\n"
     << "\t   -p <pts> -t <trans> -s <steps> -a <angle> -phi0 <phi0> \n"
-    << "\t   -pplot <pplot> -qplot <qplot> -n <nplanes>\n\n"
+    << "\t   -pplot <pplot> -qplot <qplot> -n <nplanes> -tavg <tavg> \n\n"
     << " <angle>   The toroidal angle of the plane in degrees (default = 0)\n"
     << " <dR>      R-spacing of seed points (default = major radius/(2*pts))\n"
     << " <dR0>     R-distance of first seed point from axis (default = dR)\n"
@@ -533,6 +538,7 @@ void print_help()
     << " <pplot>   If 1, Generate poincare plot data (default = 1)\n"
     << " <qplot>   If 1, Generate q-profile data (default = 1)\n"
     << " <trans>   Toroidal transits per seed point (default = 100)\n"
+    << " <tavg>    Number of toroidal planes for toroidal averaging (default = 1)\n"
     << " <nplanes> Number of toroidal planes for output (default = 1)\n"
     << " <sources> May be one or more of the following:\n"
     << "\n  -m3dc1 <c1_file> <ts> <factor> <shift>\n"

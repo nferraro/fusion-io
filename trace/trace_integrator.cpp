@@ -11,6 +11,7 @@ trace_integrator::trace_integrator()
   period = 2.*M_PI;
   plane = 0.;
   nplanes = 1;
+  tpts = 1;
 }
 
 trace_integrator::~trace_integrator()
@@ -80,18 +81,45 @@ bool trace_integrator::eval(const double r, const double phi, const double z,
   *b_phi = 0.;
   *b_z = 0.;
 
-  trace_source_list::iterator i = sources.begin();
+  if(tpts <= 1) {
+    trace_source_list::iterator i = sources.begin();
 
-  while(i != sources.end()) {
-    if(!(*i)->interpolate)
-      if(!((*i)->eval(r, phi, z, b_r, b_phi, b_z)))
+    while(i != sources.end()) {
+      if(!(*i)->interpolate)
+	if(!((*i)->eval(r, phi, z, b_r, b_phi, b_z)))
+	  return false;
+      i++;
+    }
+    
+    if(interpolate) {
+      if(!interp_source.eval(r, phi, z, b_r, b_phi, b_z))
 	return false;
-    i++;
-  }
+    }
 
-  if(interpolate) {
-    if(!interp_source.eval(r, phi, z, b_r, b_phi, b_z))
-      return false;
+  } else {
+    double dphi = period/(double)tpts;
+
+    for(int t=0; t<tpts; t++) {
+      double y = dphi*(double)t;
+      if(y >= period) y -= period;
+      
+      trace_source_list::iterator i = sources.begin();
+      
+      while(i != sources.end()) {
+	if(!(*i)->interpolate)
+	  if(!((*i)->eval(r, y, z, b_r, b_phi, b_z)))
+	    return false;
+	i++;
+      }
+      
+      if(interpolate) {
+	if(!interp_source.eval(r, y, z, b_r, b_phi, b_z))
+	  return false;
+      }
+    }
+    *b_r   /= (double)tpts;
+    *b_phi /= (double)tpts;
+    *b_z   /= (double)tpts;
   }
 
   return true;
