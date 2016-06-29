@@ -1,0 +1,36 @@
+#%Module1.0
+##
+
+## Required internal variables
+
+set             name            fusion-io
+set             version         1.
+set             root            FIO_INSTALL_DIR
+
+## List conflicting modules here
+
+conflict $name
+
+## List prerequisite modules here
+
+set             fullname        Fusion-IO
+set             externalurl     http://github.com/nferraro/fusion-io
+set             description     "Fusion-IO (FIO) is a set of libraries for reading output of various MHD and equilibrium codes"
+
+## Required for "module help ..."
+
+proc ModulesHelp { } {
+  global description externalurl
+  puts stderr "Description - $description"
+  puts stderr "Other Docs  - $externalurl"
+}
+
+## Required for "module display ..." and SWDB
+
+module-whatis                   "$description"
+
+## Software-specific settings exported to user environment
+
+prepend-path    PATH               $root/bin
+prepend-path    LD_LIBRARY_PATH    $root/lib
+prepend-path    PYTHONPATH         $root/lib

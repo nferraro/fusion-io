@@ -78,6 +78,9 @@ install :
 	mkdir -p $(FIO_INSTALL_DIR)/include
 	-cp *.mod $(FIO_INSTALL_DIR)/include
 	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py.so $(FIO_INSTALL_DIR)/lib
+	mkdir -p $(FIO_INSTALL_DIR)/modules
+	-cp $(SRCDIR)/fusion-io.module $(FIO_INSTALL_DIR)/modules/fusion-io
+	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io
 #	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
 #	$(PYTHON) $(SRCDIR)/fio_setup.py install
 
