@@ -83,6 +83,7 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
   else ts->ntor = 0;
   //  std::cerr << "ntor = " << ts->ntor << std::endl;
 
+  read_parameter("icomplex", &ts->is_complex);
   read_parameter("3d", &ts->is_3d);
   //  std::cerr << "3d = " << ts->is_3d << std::endl;
 
@@ -312,7 +313,7 @@ m3dc1_field* m3dc1_file::load_field(const char* n, const int t,
   }
  
   bool is_3d = (ts->is_3d==1);
-  bool is_complex = (ts->ntor!=0 && !is_3d);
+  bool is_complex = (ts->is_complex==1);
 
   // open time group
   hid_t time_group = open_timeslice(t);
