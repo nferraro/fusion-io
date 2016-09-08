@@ -10,6 +10,7 @@
 
 typedef int field_type;
 typedef int series_type;
+typedef int parameter_type;
 
 class fio_source {
  public:
@@ -26,15 +27,19 @@ class fio_source {
   virtual int get_series(const series_type, fio_series**)
   { return FIO_UNSUPPORTED; }
   virtual int get_available_fields(fio_field_list*) const = 0;
-  virtual int get_coordinate_system(int* cs) const
-  { 
-    *cs = FIO_CYLINDRICAL;
-    return FIO_SUCCESS; 
-  }
-  virtual int get_period(double* p) const
+  virtual int get_int_parameter(const parameter_type t, int* p) const
   {
-    *p = 2.*M_PI;
-    return FIO_SUCCESS;
+    switch(t) {
+    case FIO_GEOMETRY:    *p = FIO_CYLINDRICAL;      return FIO_SUCCESS;
+    default:                                         return FIO_UNSUPPORTED; 
+    }
+  }
+  virtual int get_real_parameter(const parameter_type t, double* p) const
+  { 
+    switch(t) {
+    case FIO_PERIOD:      *p = 2.*M_PI;      return FIO_SUCCESS;
+    default:                                 return FIO_UNSUPPORTED; 
+    }
   }
 };
 

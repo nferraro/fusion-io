@@ -26,9 +26,9 @@ program fio_example
   real :: p(1), ne(1), ni(1), b(3), x(3), curr(3), curr2(3), db(9)
 
   integer, parameter :: ifile = 22
-  integer, parameter :: npts = 100
+  integer, parameter :: npts = 10
   real :: R0, R1, Z0, Z1, phi0, phi1, period
-  integer :: i, j, cs, ierr
+  integer :: i, j, cs, ntime, ierr
 
   filename_m3dc1 = 'C1.h5'
 
@@ -38,8 +38,8 @@ program fio_example
   if(ierr.ne.0) goto 100
 
   ! Print information about coordinate system
-  call fio_get_coordinate_system_f(isrc, cs, ierr)
-  call fio_get_period_f(isrc, period, ierr)
+  call fio_get_int_parameter_f(isrc, FIO_GEOMETRY, cs, ierr)
+  call fio_get_real_parameter_f(isrc, FIO_PERIOD, period, ierr)
   if(cs.eq.FIO_CARTESIAN) then
      print *, 'Using CARTESIAN coordinate system'
      print *, 'Toroidal period (in m) = ', period
@@ -49,6 +49,9 @@ program fio_example
   else 
      print *, 'ERROR: Unrecognized coordinate system'
   end if
+
+  call fio_get_int_parameter_f(isrc, FIO_NUM_TIMESLICES, ntime, ierr)
+  print *, 'Number of timeslices: ', ntime
 
   ! Set options appropriate to this source
   call fio_get_options_f(isrc, ierr)
@@ -106,22 +109,22 @@ program fio_example
 !!$  call fio_get_field_f(isrc_gato, FIO_TOTAL_PRESSURE, ipres_gato, ierr);
 
   ! open mars file
-  filename_mars = ''
-  call fio_open_source_f(FIO_MARS_SOURCE,trim(filename_mars),isrc_mars,ierr)
-  if(ierr.ne.FIO_SUCCESS) then
-     print *, 'Error reading MARS source'
-     goto 100
-  end if
-  call fio_get_field_f(isrc_mars, FIO_MAGNETIC_FIELD, imag_mars, ierr);
-  if(ierr.ne.FIO_SUCCESS) then
-     print *, 'Error reading MARS magnetic field'
-     goto 100
-  end if
+!!$  filename_mars = ''
+!!$  call fio_open_source_f(FIO_MARS_SOURCE,trim(filename_mars),isrc_mars,ierr)
+!!$  if(ierr.ne.FIO_SUCCESS) then
+!!$     print *, 'Error reading MARS source'
+!!$     goto 100
+!!$  end if
+!!$  call fio_get_field_f(isrc_mars, FIO_MAGNETIC_FIELD, imag_mars, ierr);
+!!$  if(ierr.ne.FIO_SUCCESS) then
+!!$     print *, 'Error reading MARS magnetic field'
+!!$     goto 100
+!!$  end if
 
-  x(1) = 1.02
-  x(2) = 0.
-  x(3) = 0.05
-  call fio_eval_field_f(imag_mars, x, b, ierr)
+!!$  x(1) = 1.02
+!!$  x(2) = 0.
+!!$  x(3) = 0.05
+!!$  call fio_eval_field_f(imag_mars, x, b, ierr)
 
   R0 = 0.9;
   R1 = 1.1;
@@ -130,7 +133,7 @@ program fio_example
   phi0 = 0.;
   phi1 = 0.;
 
-  open(ifile, file='b.fio', action='write')
+!!$  open(ifile, file='b.fio', action='write')
 
   do i=1, npts
      do j=1, npts
@@ -140,29 +143,29 @@ program fio_example
 
 !        write(*, '("(",3F12.4,"):")') x
 
-        call fio_eval_field_f(imag_mars, x, b, ierr)
-!        write(*, '("        efit b = ", 1p3E12.4)') b
-     
-        write(ifile, '(6e14.5)') x(1), x(3), x(2), b(1), b(3), b(2)
+!!$        call fio_eval_field_f(imag_mars, x, b, ierr)
+!!$!        write(*, '("        efit b = ", 1p3E12.4)') b
+!!$     
+!!$        write(ifile, '(6e14.5)') x(1), x(3), x(2), b(1), b(3), b(2)
 
-!!$     call fio_eval_field_f(ipres, x, p, ierr)
-!!$     call fio_eval_field_f(ine, x, ne, ierr)
-!!$     call fio_eval_field_f(ini, x, ni, ierr)
-!!$     call fio_eval_field_f(imag, x, b, ierr)
-!!$     call fio_eval_field_f(ij, x, curr, ierr)
-!!$     call fio_eval_field_deriv_f(imag, x, db, ierr)
-
-!!$     write(*, '("        pressure = ",1pE12.4)') p
-!!$     write(*, '("        electron density = ",1pE12.4)') ne
-!!$     write(*, '("        ion density = ",1pE12.4)') ni
-!!$     write(*, '("        total B = ",1p3E12.4)') b
-!!$     write(*, '("        total J = ",1p3E12.4)') curr
-!!$     write(*, '("        dB/dR = ",1p3E12.4)') &
-!!$          db(FIO_DR_R), db(FIO_DR_PHI), db(FIO_DR_Z)
-!!$     write(*, '("        dB/dPhi = ",1p3E12.4)') &
-!!$          db(FIO_DPHI_R), db(FIO_DPHI_PHI), db(FIO_DPHI_Z)
-!!$     write(*, '("        dB/dZ = ",1p3E12.4)') &
-!!$          db(FIO_DZ_R), db(FIO_DZ_PHI), db(FIO_DZ_Z)
+     call fio_eval_field_f(ipres, x, p, ierr)
+     call fio_eval_field_f(ine, x, ne, ierr)
+     call fio_eval_field_f(ini, x, ni, ierr)
+     call fio_eval_field_f(imag, x, b, ierr)
+     call fio_eval_field_f(ij, x, curr, ierr)
+     call fio_eval_field_deriv_f(imag, x, db, ierr)
+!!$
+     write(*, '("        pressure = ",1pE12.4)') p
+     write(*, '("        electron density = ",1pE12.4)') ne
+     write(*, '("        ion density = ",1pE12.4)') ni
+     write(*, '("        total B = ",1p3E12.4)') b
+     write(*, '("        total J = ",1p3E12.4)') curr
+     write(*, '("        dB/dR = ",1p3E12.4)') &
+          db(FIO_DR_R), db(FIO_DR_PHI), db(FIO_DR_Z)
+     write(*, '("        dB/dPhi = ",1p3E12.4)') &
+          db(FIO_DPHI_R), db(FIO_DPHI_PHI), db(FIO_DPHI_Z)
+     write(*, '("        dB/dZ = ",1p3E12.4)') &
+          db(FIO_DZ_R), db(FIO_DZ_PHI), db(FIO_DZ_Z)
 
 !     b = 0.
 !     p = 0.
@@ -179,10 +182,10 @@ program fio_example
 !!$     write(*, '("        gato press = ", 1pE12.4)') p
 !!$     write(*, '("        gato b = ", 1p3E12.4)') b
      end do
-     write(ifile, *)
+!!$     write(ifile, *)
   end do
 
-  close(ifile)
+!!$  close(ifile)
 
 100 continue 
 
@@ -193,8 +196,8 @@ program fio_example
   call fio_close_field_f(ij, ierr)
   call fio_close_source_f(isrc, ierr)
 
-  call fio_close_field_f(imag_mars, ierr)
-  call fio_close_source_f(isrc_mars, ierr)
+!!$  call fio_close_field_f(imag_mars, ierr)
+!!$  call fio_close_source_f(isrc_mars, ierr)
 
 
 !  call fio_close_field_f(imag_efit, ierr)

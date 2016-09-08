@@ -11,17 +11,17 @@ extern "C" {
   static PyObject* fio_eval_series_py(PyObject*, PyObject*);
   static PyObject* fio_eval_vector_field_py(PyObject*, PyObject*);
   static PyObject* fio_get_available_fields_py(PyObject*, PyObject*);
-  static PyObject* fio_get_coordinate_system_py(PyObject*, PyObject*);
   static PyObject* fio_get_field_py(PyObject*, PyObject*);
   static PyObject* fio_get_field_name_py(PyObject*, PyObject*);
   static PyObject* fio_get_option_name_py(PyObject*, PyObject*);
   static PyObject* fio_get_options_py(PyObject*, PyObject*);
-  static PyObject* fio_get_period_py(PyObject*, PyObject*);
   static PyObject* fio_get_series_py(PyObject*, PyObject*);
   static PyObject* fio_open_source_py(PyObject*, PyObject*);
   static PyObject* fio_set_int_option_py(PyObject*, PyObject*);
   static PyObject* fio_set_str_option_py(PyObject*, PyObject*);
   static PyObject* fio_set_real_option_py(PyObject*, PyObject*);
+  static PyObject* fio_get_int_parameter_py(PyObject*, PyObject*);
+  static PyObject* fio_get_real_parameter_py(PyObject*, PyObject*);
 
   static PyMethodDef fio_methods[] = {
     {"add_field", fio_add_field_py, METH_VARARGS, ""},
@@ -33,17 +33,17 @@ extern "C" {
     {"eval_series", fio_eval_series_py, METH_VARARGS, ""},
     {"eval_vector_field", fio_eval_vector_field_py, METH_VARARGS, ""},
     {"get_available_fields", fio_get_available_fields_py, METH_VARARGS, ""},
-    {"get_coordinate_system", fio_get_coordinate_system_py, METH_VARARGS, ""},
     {"get_options", fio_get_options_py, METH_VARARGS, ""},
     {"get_field", fio_get_field_py, METH_VARARGS, ""},
     {"get_field_name", fio_get_field_name_py, METH_VARARGS, ""},
     {"get_option_name", fio_get_option_name_py, METH_VARARGS, ""},
-    {"get_period", fio_get_period_py, METH_VARARGS, ""},
     {"get_series", fio_get_series_py, METH_VARARGS, ""},
     {"open_source", fio_open_source_py, METH_VARARGS, ""},
     {"set_int_option", fio_set_int_option_py, METH_VARARGS, ""},
     {"set_str_option", fio_set_str_option_py, METH_VARARGS, ""},
     {"set_real_option", fio_set_real_option_py, METH_VARARGS, ""},
+    {"get_int_parameter", fio_get_int_parameter_py, METH_VARARGS, ""},
+    {"get_real_parameter", fio_get_real_parameter_py, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}
   };
 
@@ -202,20 +202,6 @@ PyObject* fio_get_available_fields_py(PyObject* self, PyObject *args)
   return list;
 }
 
-PyObject* fio_get_coordinate_system_py(PyObject* self, PyObject *args)
-{
-  int isrc;
-  int cs;
-
-  if(!PyArg_ParseTuple(args, "i", &isrc))
-    return NULL;
-
-  int ierr = fio_get_coordinate_system(isrc, &cs);
-  if(ierr != FIO_SUCCESS)
-    return NULL;
-  return Py_BuildValue("i", cs);
-}
-
 PyObject* fio_get_field_py(PyObject* self, PyObject *args)
 {
   int isrc;
@@ -273,20 +259,36 @@ PyObject* fio_get_options_py(PyObject* self, PyObject *args)
   Py_RETURN_NONE;
 }
 
-PyObject* fio_get_period_py(PyObject* self, PyObject *args)
+PyObject* fio_get_int_parameter_py(PyObject* self, PyObject *args)
 {
-  int isrc;
-  double p;
+  int isrc, t;
+  int p;
 
-  if(!PyArg_ParseTuple(args, "i", &isrc))
+  if(!PyArg_ParseTuple(args, "ii", &isrc, &t))
     return NULL;
 
-  int ierr = fio_get_period(isrc, &p);
+  int ierr = fio_get_int_parameter(isrc, t, &p);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+
+  return Py_BuildValue("i", p);
+}
+
+PyObject* fio_get_real_parameter_py(PyObject* self, PyObject *args)
+{
+  int isrc, t;
+  double p;
+
+  if(!PyArg_ParseTuple(args, "ii", &isrc, &t))
+    return NULL;
+
+  int ierr = fio_get_real_parameter(isrc, t, &p);
   if(ierr != FIO_SUCCESS)
     return NULL;
 
   return Py_BuildValue("d", p);
 }
+
 
 PyObject* fio_get_series_py(PyObject* self, PyObject *args)
 {

@@ -9,6 +9,7 @@ ia = fio_py.get_field(isrc, fio_py.FIO_VECTOR_POTENTIAL)
 imag = fio_py.get_field(isrc, fio_py.FIO_MAGNETIC_FIELD)
 ipres = fio_py.get_field(isrc, fio_py.FIO_TOTAL_PRESSURE)
 ivel = fio_py.get_field(isrc, fio_py.FIO_FLUID_VELOCITY)
+ij = fio_py.get_field(isrc, fio_py.FIO_CURRENT_DENSITY)
 
 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_ELECTRON)
 idens = fio_py.get_field(isrc, fio_py.FIO_DENSITY)
@@ -22,13 +23,16 @@ print 'Available fields:'
 for field in list:
     print ' ', fio_py.get_field_name(field)
 
-cs = fio_py.get_coordinate_system(isrc)
+cs = fio_py.get_int_parameter(isrc, FIO_GEOMETRY)
 if cs == fio_py.FIO_CYLINDRICAL:
     print 'Using CYLINDRICAL coordinate system'
 else :
     print 'Using CARTESIAN coordinate system'
 
-period = fio_py.get_period(isrc)
+ntime = fio_py.get_int_parameter(isrc, FIO_NUM_TIMESLICES)
+print 'Number of time slices: ', ntime
+
+period = fio_py.get_real_parameter(isrc, FIO_PERIOD)
 print 'Toroidal period = ', period
 
 ipsi_axis = fio_py.get_series(isrc, fio_py.FIO_MAGAXIS_PSI)
@@ -42,9 +46,10 @@ print 'Psi at lcfs: ', psi_lcfs
 fio_py.close_series(ipsi_axis)
 fio_py.close_series(ipsi_lcfs)
 
-x = (1.6, 0., 0.)
+x = (10., 0., 0.)
 (ar, aphi, az) = fio_py.eval_vector_field(ia, x)
 (br, bphi, bz) = fio_py.eval_vector_field(imag, x)
+(jr, jphi, jz) = fio_py.eval_vector_field(ij, x)
 p = fio_py.eval_scalar_field(ipres, x)
 pi = fio_py.eval_scalar_field(ipi, x)
 ne = fio_py.eval_scalar_field(idens, x)
@@ -57,6 +62,7 @@ print ' poloidal flux = ', psi, ' Wb'
 print ' normalized poloidal flux = ', psi_norm
 print ' vector potential = ', (ar, aphi, az), ' Wb/m'
 print ' magnetic field = ', (br, bphi, bz), ' T'
+print ' current density = ', (jr, jphi, jz), ' A/m^2'
 print ' fluid velocity = ', (vr, vphi, vz), ' m/s'
 print ' toroidal rotation = ', vphi/x[0], ' rad / s' 
 print ' pressure = ', p, ' Pa'

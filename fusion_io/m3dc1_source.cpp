@@ -21,6 +21,7 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("b0_norm", &B0);
   file.read_parameter("version", &version);
   file.read_parameter("itor", &itor);
+  file.read_parameter("ntime", &ntime);
 
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
@@ -86,21 +87,32 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   return FIO_SUCCESS;
 }
 
-int m3dc1_source::get_coordinate_system(int* cs) const
+int m3dc1_source::get_int_parameter(const parameter_type t, int* p) const
 {
-  if(itor==1) {
-    *cs = FIO_CYLINDRICAL;
-  } else {
-    *cs = FIO_CARTESIAN;
+  switch(t) {
+
+  case FIO_NUM_TIMESLICES:
+    *p = ntime;
+    return FIO_SUCCESS;
+
+  case FIO_GEOMETRY:
+    *p = (itor==1 ? FIO_CYLINDRICAL : FIO_CARTESIAN);
+    return FIO_SUCCESS;
+
+  default:    return FIO_UNSUPPORTED;
   }
-  return FIO_SUCCESS;
 }
 
-int m3dc1_source::get_period(double* p) const
+int m3dc1_source::get_real_parameter(const parameter_type t, double* p) const
 {
-  *p = period;
+  switch(t) {
 
-  return FIO_SUCCESS;
+  case FIO_PERIOD:
+    *p = period;
+    return FIO_SUCCESS;
+
+  default:    return FIO_UNSUPPORTED;
+  }
 }
 
 int m3dc1_source::get_field(const field_type t, fio_field** f,

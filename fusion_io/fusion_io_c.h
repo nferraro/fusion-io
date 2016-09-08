@@ -20,6 +20,8 @@ int fio_open_source(const int, const char*, int*);
 int fio_set_int_option(const int, const int);
 int fio_set_str_option(const int, const char*);
 int fio_set_real_option(const int, const double);
+int fio_get_int_parameter(const int, const int,  int*);
+int fio_get_real_parameter(const int, const int, double*);
 #ifdef __cplusplus
 }
 #endif
