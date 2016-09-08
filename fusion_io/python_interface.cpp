@@ -23,6 +23,7 @@ extern "C" {
   static PyObject* fio_set_real_option_py(PyObject*, PyObject*);
   static PyObject* fio_get_int_parameter_py(PyObject*, PyObject*);
   static PyObject* fio_get_real_parameter_py(PyObject*, PyObject*);
+  static PyObject* fio_get_real_field_parameter_py(PyObject*, PyObject*);
 
   static PyMethodDef fio_methods[] = {
     {"add_field", fio_add_field_py, METH_VARARGS, ""},
@@ -46,6 +47,7 @@ extern "C" {
     {"set_real_option", fio_set_real_option_py, METH_VARARGS, ""},
     {"get_int_parameter", fio_get_int_parameter_py, METH_VARARGS, ""},
     {"get_real_parameter", fio_get_real_parameter_py, METH_VARARGS, ""},
+    {"get_real_field_parameter", fio_get_real_field_parameter_py, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}
   };
 
@@ -291,6 +293,20 @@ PyObject* fio_get_real_parameter_py(PyObject* self, PyObject *args)
   return Py_BuildValue("d", p);
 }
 
+PyObject* fio_get_real_field_parameter_py(PyObject* self, PyObject *args)
+{
+  int ifield, t;
+  double p;
+
+  if(!PyArg_ParseTuple(args, "ii", &ifield, &t))
+    return NULL;
+
+  int ierr = fio_get_real_field_parameter(ifield, t, &p);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+
+  return Py_BuildValue("d", p);
+}
 
 PyObject* fio_get_series_py(PyObject* self, PyObject *args)
 {

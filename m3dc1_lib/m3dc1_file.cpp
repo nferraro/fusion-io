@@ -202,6 +202,40 @@ bool m3dc1_file::read_parameter(const char* n, int* d)
   return true;  
 }
 
+bool m3dc1_file::get_slice_time(const int i, double* t)
+{
+  m3dc1_timeslice* ts = load_timeslice(i);
+  if(ts==NULL) return false;
+  
+  *t = ts->time;
+  return true;
+}
+
+m3dc1_scalar_list* m3dc1_file::get_slice_times()
+{
+  const char name[] = "slice_times";
+
+  m3dc1_scalar_map::iterator i = scalar_map.find(name);
+  if(i != scalar_map.end())
+    return &i->second;
+
+  int ntimes;
+  if(!read_parameter("ntime", &ntimes)) return NULL;
+
+  m3dc1_scalar_list* s = &(scalar_map[name] = m3dc1_scalar_list(ntimes));
+
+  for(int t=0; t<ntimes; t++) {
+    m3dc1_timeslice* ts = load_timeslice(t);
+    if(ts==NULL) {
+      std::cerr << "Error reading timeslice " << t << std::endl;
+      return NULL;
+    }
+    (*s)[t] = ts->time;
+  }
+
+  return s;
+}
+
 m3dc1_scalar_list* m3dc1_file::read_scalar(const char* name)
 {
   m3dc1_scalar_map::iterator i;

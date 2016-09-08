@@ -26,10 +26,11 @@ int m3dc1_source::open(const char* filename)
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
 
-  // define some normalization quantities
+  // define some normalization quantities in cgs
   p0 = B0*B0/(4.*M_PI);
   J0 = B0*c/(4.*M_PI*L0);
   v0 = B0/sqrt(4.*M_PI*ion_mass*m_p*n0);
+  t0 = L0/v0;
   Phi0 = L0*v0*B0/c;
 
   // convert normalization quantities to mks

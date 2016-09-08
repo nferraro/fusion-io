@@ -50,7 +50,6 @@ FIO_DEFINE_INT(FIO_MAGAXIS_PSI,       3001)
 FIO_DEFINE_INT(FIO_LCFS_PSI,          3002)
 FIO_DEFINE_INT(FIO_MAGAXIS_R,         3003)
 FIO_DEFINE_INT(FIO_MAGAXIS_Z,         3004)
-FIO_DEFINE_INT(FIO_TIMESLICE_TIMES,   3005)
 
 COMMENT(      integer parameters         )
 FIO_DEFINE_INT(FIO_NUM_TIMESLICES,    4001)
@@ -58,6 +57,9 @@ FIO_DEFINE_INT(FIO_GEOMETRY,          4002)
 
 COMMENT(      real parameters         )
 FIO_DEFINE_INT(FIO_PERIOD,            5001)
+
+COMMENT(      real field parameters   )
+FIO_DEFINE_INT(FIO_TIME,              7001)
 
 COMMENT(      coordinate system             )
 FIO_DEFINE_INT(FIO_CARTESIAN,   0)

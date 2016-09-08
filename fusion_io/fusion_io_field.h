@@ -5,6 +5,7 @@
 #include <vector>
 
 typedef int field_attribute;
+typedef int field_parameter;
 
 class fio_series {
  public:
@@ -26,6 +27,9 @@ class fio_field {
 
   // partial derivatives (first index = partial deriv, second index = coord)
   virtual int eval_deriv(const double*, double*)
+  {  return FIO_UNSUPPORTED; }
+
+  virtual int get_real_parameter(const field_parameter, double*)
   {  return FIO_UNSUPPORTED; }
 
   fio_field& operator+(const fio_field&);

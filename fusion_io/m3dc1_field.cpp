@@ -96,6 +96,19 @@ int m3dc1_fio_field::load(const fio_option_list* opt)
   return FIO_SUCCESS;
 }
 
+int m3dc1_fio_field::get_real_parameter(const field_parameter t, double* p)
+{
+  switch(t) {
+  case FIO_TIME:  
+    if(!source->file.get_slice_time(time, p))
+      return FIO_NO_DATA;
+    *p *= source->t0;
+    return FIO_SUCCESS;
+
+  default:
+    return FIO_UNSUPPORTED;
+  }
+}
 
 int m3dc1_scalar_field::load(const fio_option_list* opt)
 {

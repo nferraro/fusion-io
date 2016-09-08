@@ -106,6 +106,11 @@ int fio_get_field(const int isrc, const int type, int* handle)
   return ierr;
 }
 
+int fio_get_real_field_parameter(const int ifield, const int t, double* p)
+{
+  return field_list[ifield]->get_real_parameter(t, p);
+}
+
 int fio_get_options(const int isrc)
 {
   return source_list[isrc]->get_field_options(&options);

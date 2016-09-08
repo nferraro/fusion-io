@@ -35,6 +35,7 @@ class m3dc1_fio_field : public fio_field {
   m3dc1_fio_field(m3dc1_source* s) 
     { source = s; }
   virtual int load(const fio_option_list*) = 0;
+  int get_real_parameter(const field_parameter, double*);
 };
 
 

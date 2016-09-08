@@ -34,6 +34,8 @@ class m3dc1_file {
   bool open(const char* filename);
   bool close();
 
+  bool get_slice_time(const int, double*);
+  m3dc1_scalar_list* get_slice_times();
   m3dc1_scalar_list* read_scalar(const char*);
   m3dc1_field* load_field(const char* name, const int time, 
 			  const int options=0);

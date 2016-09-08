@@ -87,6 +87,13 @@ contains
     call fio_get_real_parameter(isrc, t, p, ierr)
   end subroutine fio_get_real_parameter_f
 
+  subroutine fio_get_real_field_parameter_f(ifield, t, p, ierr)
+    integer, intent(in) :: ifield, t
+    real, intent(out) :: p
+    integer, intent(out) :: ierr
+    call fio_get_real_field_parameter(ifield, t, p, ierr)
+  end subroutine fio_get_real_field_parameter_f
+
   subroutine fio_get_series_f(isrc, itype, iseries, ierr)
     integer, intent(in) :: isrc, itype
     integer, intent(out) :: iseries, ierr

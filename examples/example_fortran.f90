@@ -27,7 +27,7 @@ program fio_example
 
   integer, parameter :: ifile = 22
   integer, parameter :: npts = 10
-  real :: R0, R1, Z0, Z1, phi0, phi1, period, tmin, tmax
+  real :: R0, R1, Z0, Z1, phi0, phi1, period, tmin, tmax, time
   integer :: i, j, cs, ntime, ierr
 
   filename_m3dc1 = 'C1.h5'
@@ -74,6 +74,10 @@ program fio_example
   
   call fio_set_int_option_f(FIO_SPECIES, FIO_MAIN_ION, ierr)
   call fio_get_field_f(isrc, FIO_DENSITY, ini,ierr);
+
+  ! Determine time of timeslice
+  call fio_get_real_field_parameter_f(ini, FIO_TIME, time, ierr);
+  print *, 'Density is being evaluated at t = ', time
 
 
   ! Evaluate the flux at the magnetic axis and lcfs

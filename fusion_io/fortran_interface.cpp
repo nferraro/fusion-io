@@ -19,6 +19,7 @@ extern "C" {
   void fio_set_real_option_(const int*, const double*, int*);
   void fio_get_int_parameter_(const int*, const int*, int*, int*);
   void fio_get_real_parameter_(const int*, const int*, double*, int*);
+  void fio_get_real_field_parameter_(const int*, const int*, double*, int*);
 }
 
 void fio_add_field_(const int* icfield, const int* ifield, 
@@ -84,6 +85,12 @@ void fio_get_real_parameter_(const int* isrc, const int* t,
 			     double* p, int* ierr)
 {
   *ierr = fio_get_real_parameter(*isrc, *t, p);
+}
+
+void fio_get_real_field_parameter_(const int* ifield, const int* t, 
+			     double* p, int* ierr)
+{
+  *ierr = fio_get_real_field_parameter(*ifield, *t, p);
 }
 
 void fio_get_series_(const int* isrc, const int* itype,
