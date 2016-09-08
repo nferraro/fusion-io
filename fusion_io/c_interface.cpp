@@ -125,6 +125,11 @@ int fio_get_series(const int isrc, const int type, int* handle)
   return ierr;
 }
 
+int fio_get_series_bounds(const int iseries, double* tmin, double* tmax)
+{
+  return series_list[iseries]->bounds(tmin, tmax);
+}
+
 
 int fio_open_source(const int itype, const char* filename, int* handle)
 {

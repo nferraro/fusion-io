@@ -12,6 +12,7 @@ class fio_series {
     { }
 
   virtual int eval(const double, double*) = 0;
+  virtual int bounds(double*, double*) const = 0;
 };
 
 class fio_field {

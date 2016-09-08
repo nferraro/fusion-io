@@ -20,6 +20,7 @@ class m3dc1_fio_series : public fio_series {
     { source = s; name = n; factor = f; }
   int load();
   int eval(const double, double*);
+  int bounds(double*, double*) const;
 };
 
 

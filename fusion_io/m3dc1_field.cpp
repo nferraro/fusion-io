@@ -17,10 +17,21 @@ int m3dc1_fio_series::load()
   return FIO_SUCCESS;
 }
 
+int m3dc1_fio_series::bounds(double* tmin, double* tmax) const
+{
+  if(time->size() > 0) {
+    *tmin = time->at(0);
+    *tmax = time->at(time->size()-1);
+    return FIO_SUCCESS;
+  } else {
+    return FIO_NO_DATA;
+  }
+}
+
 int m3dc1_fio_series::eval(const double t, double* x)
 {
   if(time->size()==0)
-    return -1;
+    return FIO_NO_DATA;
   
   if(time->size()==1) {
     *x = factor*data->at(0);

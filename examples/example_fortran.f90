@@ -27,13 +27,13 @@ program fio_example
 
   integer, parameter :: ifile = 22
   integer, parameter :: npts = 10
-  real :: R0, R1, Z0, Z1, phi0, phi1, period
+  real :: R0, R1, Z0, Z1, phi0, phi1, period, tmin, tmax
   integer :: i, j, cs, ntime, ierr
 
   filename_m3dc1 = 'C1.h5'
 
   ! read files and fields
-  print *, 'Reading ', filename_m3dc1
+  print *, 'Reading ', trim(filename_m3dc1)
   call fio_open_source_f(FIO_M3DC1_SOURCE, trim(filename_m3dc1), isrc, ierr)
   if(ierr.ne.0) goto 100
 
@@ -84,6 +84,9 @@ program fio_example
   call fio_eval_series_f(ipsi_lcfs, 0., psi_lcfs, ierr)
   print *, 'Psi at magnetic axis: ', psi_axis
   print *, 'Psi at lcfs: ', psi_lcfs
+
+  call fio_get_series_bounds_f(ipsi_axis, tmin, tmax, ierr)
+  print *, 'Time domain bounds for magnetic axis data: ', tmin, tmax
 
   call fio_close_series_f(ipsi_axis, ierr)
   call fio_close_series_f(ipsi_lcfs, ierr)

@@ -16,6 +16,7 @@ extern "C" {
   static PyObject* fio_get_option_name_py(PyObject*, PyObject*);
   static PyObject* fio_get_options_py(PyObject*, PyObject*);
   static PyObject* fio_get_series_py(PyObject*, PyObject*);
+  static PyObject* fio_get_series_bounds_py(PyObject*, PyObject*);
   static PyObject* fio_open_source_py(PyObject*, PyObject*);
   static PyObject* fio_set_int_option_py(PyObject*, PyObject*);
   static PyObject* fio_set_str_option_py(PyObject*, PyObject*);
@@ -38,6 +39,7 @@ extern "C" {
     {"get_field_name", fio_get_field_name_py, METH_VARARGS, ""},
     {"get_option_name", fio_get_option_name_py, METH_VARARGS, ""},
     {"get_series", fio_get_series_py, METH_VARARGS, ""},
+    {"get_series_bounds", fio_get_series_py, METH_VARARGS, ""},
     {"open_source", fio_open_source_py, METH_VARARGS, ""},
     {"set_int_option", fio_set_int_option_py, METH_VARARGS, ""},
     {"set_str_option", fio_set_str_option_py, METH_VARARGS, ""},
@@ -303,6 +305,20 @@ PyObject* fio_get_series_py(PyObject* self, PyObject *args)
   if(ierr != FIO_SUCCESS)
     return NULL;
   return Py_BuildValue("i", handle);
+}
+
+PyObject* fio_get_series_bounds_py(PyObject* self, PyObject *args)
+{
+  int iseries;
+  double tmin, tmax;
+
+  if(!PyArg_ParseTuple(args, "i", &iseries, &iseries))
+    return NULL;
+
+  int ierr = fio_get_series_bounds(iseries, &tmin, &tmax);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+  return Py_BuildValue("dd", tmin, tmax);
 }
 
 PyObject* fio_open_source_py(PyObject* self, PyObject *args)

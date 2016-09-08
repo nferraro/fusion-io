@@ -92,6 +92,12 @@ contains
     integer, intent(out) :: iseries, ierr
     call fio_get_series(isrc, itype, iseries, ierr)
   end subroutine fio_get_series_f
+
+  subroutine fio_get_series_bounds_f(iseries, tmin, tmax, ierr)
+    integer, intent(in) :: iseries
+    real, intent(out) :: tmin, tmax
+    call fio_get_series_bounds(iseries, tmin, tmax, ierr)
+  end subroutine fio_get_series_bounds_f
   
   subroutine fio_open_source_f(type, filename, isrc, ierr)
     integer, intent(in) :: type

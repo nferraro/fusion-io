@@ -12,6 +12,7 @@ extern "C" {
   void fio_get_options_(const int*, int*);
   void fio_get_field_(const int*, const int*, int*, int*);
   void fio_get_series_(const int*, const int*, int*, int*);
+  void fio_get_series_bounds_(const int*, double*, double*, int*);
   void fio_open_source_(const int*, const char*, int*, int*);
   void fio_set_int_option_(const int*, const int*, int*);
   void fio_set_str_option_(const int*, const char*, int*);
@@ -89,6 +90,12 @@ void fio_get_series_(const int* isrc, const int* itype,
 		    int* handle, int* ierr)
 {
   *ierr = fio_get_series(*isrc, *itype, handle);
+}
+
+void fio_get_series_bounds_(const int* iseries, double* tmin, double* tmax, 
+		    int* ierr)
+{
+  *ierr = fio_get_series_bounds(*iseries, tmin, tmax);
 }
 
 void fio_open_source_(const int* type, const char* filename, 
