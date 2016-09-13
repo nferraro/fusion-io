@@ -755,7 +755,7 @@ int m3dc1_current_density::eval(const double* x, double* v)
     v[0] +=  val[m3dc1_field::OP_DRP]/(r*r);
     v[2] +=  val[m3dc1_field::OP_DZP]/(r*r);
     v[1] -= (val[m3dc1_field::OP_DRR] + val[m3dc1_field::OP_DZZ])/r;
-    if(source->itor==1) v[1] += linfac*val[m3dc1_field::OP_DR]/(r*r); 
+    if(source->itor==1) v[1] += val[m3dc1_field::OP_DR]/(r*r); 
 
     if(!i0->eval(x[0], x[1]-phase, x[2], gget, val))
       return FIO_OUT_OF_BOUNDS;
