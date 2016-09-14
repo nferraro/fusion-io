@@ -1,0 +1,357 @@
+\documentclass{article}
+
+\usepackage{times}
+
+%\fontencoding{T1}
+%\fontfamily{times}
+%\fontsize{12}{15}
+%\selectfont
+
+\setcounter{secnumdepth}{0}
+\setcounter{tocdepth}{2}
+
+\newcommand{\parameter}[2]{\noindent \texttt{#1}: #2}
+\newcommand{\function}[4]{
+  \subsection{\uppercase{#1}}
+
+  #2
+
+  \subsubsection{Parameters}
+  #3
+
+  \subsubsection{Description}
+  #4
+}
+
+\title{Fusion-IO Reference}
+\author{Nathaniel Ferraro}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+The Fusion-IO (FIO) library is an interface for extracting data from the
+output of various fluid plasma codes in a code-independent way.  The
+library is built to read data directly from the native output of these
+codes, and therefore no common data format is defined or required.
+This strategy avoids the loss of information incurred by converting
+the native code data into a common format (\textit{e.g.} interpolation
+error), and preserves the properties of the computed solution
+(\textit{e.g.} divergence-free fields) exactly.
+
+FIO provides access to data through several structures:
+\begin{description}
+\item[Source]: provides access to a data file;
+\item[Field]: allows evaluation of a physical field in real space;
+\item[Series]: allows evaluation of a time series
+\item[Parameter]: allows evaluation of specific properties of a field,
+  source, or series.
+\end{description}
+A \textit{source} structure should always be created first to provide
+access to a data source, then \textit{fields}, \textit{series}, and
+\textit{parameters} can be read from that data source and evaluated.
+
+All input and output data representing physical quantities is in SI units.
+
+\section{Field Functions}
+
+\function{fio\_close\_field}{
+\noindent
+int ierr = fio\_close\_field(const int ifield);\\
+
+\noindent
+call fio\_close\_field\_f(ifield, ierr)\\
+integer, intent(in) :: ifield\\
+integer, intent(out) :: ierr
+}
+{
+\parameter{ifield}{Field handle returned by \texttt{fio\_get\_field}.}
+}
+{
+Deallocates data associated with field \texttt{ifield}
+}
+
+
+\function{fio\_eval\_field}{
+\noindent
+int ierr = fio\_eval\_field(const int ifield, const double* x, double* f);\\
+
+\noindent
+call fio\_eval\_field\_f(ifield, x, f, ierr)
+integer, intent(in) :: ifield\\
+real, intent(in), dimension(*) :: x\\
+real, intent(out), dimension(*) :: f\\
+integer, intent(out) :: ierr
+}
+{
+\parameter{ifield}{Field handle returned by \texttt{fio\_get\_field}.}\\
+\parameter{x}{Three-element array containing $(R, \varphi, Z)$ coordinates at which to evaluate field.}\\
+\parameter{f}{Array containing field data.  For scalar fields, this is an array of length 1; for vector fields, this is an array of length 3 containing the $(R, \varphi, Z)$ components of the vector.}
+}
+{
+Evaluates a field at a given $(R, \varphi, Z)$ coordinate.
+}
+
+\function{fio\_eval\_field\_deriv}{
+\noindent
+int ierr = fio\_eval\_field\_deriv(const int ifield, const double* x,
+double* df);\\
+
+\noindent
+call fio\_eval\_field\_deriv\_f(ifield, x, df, ierr)\\
+integer, intent(in) :: ifield\\
+real, intent(in), dimension(*) :: x\\
+real, intent(out), dimension(*) :: df\\
+integer, intent(out) :: ierr
+}
+{
+\parameter{ifield}{Field handle returned by \texttt{fio\_get\_field}.}\\
+\parameter{x}{Three-element array containing $(R, \varphi, Z)$
+  coordinates at which to evaluate field derivatives.}\\
+\parameter{df}{Array containing field derivative data data.  For scalar
+  fields, this is an array of length 3 containing $(\partial_R f,
+  \partial_\varphi f, \partial_Z f)$; for vector fields, this is an
+  array of length 9 containing $(\partial_R f_R, \partial_R
+  f_\varphi, \partial_R f_Z, 
+  \partial_\varphi f_R, \partial_\varphi f_\varphi, \partial_\varphi f_Z,
+  \partial_Z f_R, \partial_Z f_\varphi, \partial_Z f_Z)$.}
+}
+{
+  Evaluates the partial derivatives of a field at a given $(R,
+  \varphi, Z)$ coordinate.  Note that this does NOT return $\nabla f$.
+}
+
+
+
+
+\function{fio\_get\_field}
+{
+\noindent
+int ierr = fio\_get\_field(const int isource, const int ifield\_type, int* ifield);\\
+
+\noindent
+call fio\_get\_field\_f(isource, ifield\_type, ifield, ierr)\\
+integer, intent(in) :: isource\\
+integer, intent(in) :: ifield\_type\\
+integer, intent(out) :: ifield\\
+integer, intent(out) :: ierr
+}
+{
+\parameter{ifield\_type}{Field to open.  Possibilities include:
+
+\paragraph{Scalar Fields}
+\begin{description}
+\item[FIO\_SCALAR\_POTENTIAL]: Scalar potential
+\item[FIO\_TOTAL\_PRESSURE]: Total pressure
+\end{description}
+
+\paragraph{Species-depdentent Scalar Fields}
+\begin{description}
+\item[FIO\_PRESSURE]: Partial pressure of species
+\item[FIO\_DENSITY]: Number density of species
+\end{description}
+
+\paragraph{Vector Fields}
+\begin{description}
+\item[FIO\_ELECTRIC\_FIELD]: Electric field
+\item[FIO\_VECTOR\_POTENTIAL]: Electromagnetic vector potential
+\item[FIO\_MAGNETIC\_FIELD]: Magnetic field
+\item[FIO\_CURRENT\_DENSITY]: Current density
+\item[FIO\_FLUID\_VELOCITY]: Barycentric velocity
+\end{description}
+
+\paragraph{Species-dependent Vector Fields}
+\begin{description}
+\item[FIO\_VELOCITY]: Fluid velocity of species
+\end{description}
+}
+\parameter{ifield}{Field handle returned by \texttt{fio\_get\_field}.}
+}
+{
+Provides a handle to evaluate field data.
+}
+
+
+\section{Series Functions}
+
+\function{fio\_close\_series}
+{
+\noindent
+int ierr = fio\_close\_series(const int iseries);\\
+
+\noindent
+call fio\_close\_series\_f(iseries, ierr)\\
+integer, intent(in) :: iseries\\
+integer, intent(out) :: ierr
+}
+{
+  \parameter{iseries}{Field handle returned by \texttt{fio\_get\_series}.}
+}
+{
+  Deallocates data associated with \texttt{iseries}.
+}
+
+\function{fio\_eval\_series}
+{
+  \noindent
+  int ierr = fio\_eval\_series(const int iseries, const double t,
+  double* s);\\
+
+  \noindent
+  call fio\_eval\_series\_f(iseries, t, s, ierr)\\
+  integer, intent(in) :: iseries\\
+  real, intent(in) :: t\\
+  real, intent(out) :: s\\
+  integer, intent(out) :: ierr
+}
+{
+  \parameter{iseries}{Handle to series returned by
+    \texttt{fio\_get\_series}.}
+
+  \parameter{t}{Time at which to evaluate series.}
+
+  \parameter{s}{Value of series at time \texttt{t}.}
+}
+
+\function{fio\_get\_series}
+{
+\noindent
+int ierr = fio\_get\_series(const int isource, const int
+iseries\_type, int* iseries);\\
+
+\noindent
+call fio\_get\_series\_f(isource, iseries\_type, iseries, ierr)\\
+integer, intent(in) :: isource\\
+integer, intent(in) :: iseries\_type\\
+integer, intent(out) :: iseries\\
+integer, intent(out) :: ierr
+}
+{
+\parameter{isource}{The handle to the source file returned by
+  \texttt{fio\_open\_source}.}
+
+\parameter{iseries\_type}{The series to open.  Choices include:
+\begin{description}
+\item[LCFS\_PSI]: Poloidal flux at the last closed flux surface.
+\item[MAGAXIS\_PSI]: Poloidal flux at the magnetic axis.
+\item[MAGAXIS\_R]: $R$-coordinate of the magnetic axis.
+\item[MAGAXIS\_Z]: $Z$-coordinate of the magnetic axis.
+\end{description}}
+
+\parameter{iseries}{The handle to the series data.}
+}
+{
+  Returns a handle for accessing data for a time series.
+}
+
+\function{fio\_get\_series\_bounds}
+{
+\noindent
+int ierr = fio\_get\_series\_bounds(const int iseries, double* tmin,
+double* tmax);\\
+
+\noindent
+call fio\_get\_series\_bounds\_f(iseries, tmin, tmax, ierr)\\
+integer, intent(in) :: iseries\\
+real, intent(out) :: tmin\\
+real, intent(out) :: tmax\\
+integer, intent(out) :: ierr
+}
+{
+  \parameter{iseries}{Handle to series returned by
+    \texttt{fio\_get\_series}.}
+
+  \parameter{tmin}{Earliest available time in time series}
+
+  \parameter{tmax}{Latest available time in time series}
+}
+{
+  Returns the bounds of the domain of a time series.
+}
+
+
+\section{Source Functions}
+
+\function{fio\_close\_source}
+{
+\noindent
+int ierr = fio\_close\_source(const int isource);\\
+
+\noindent
+call fio\_close\_source\_f(isource, ierr)\\
+integer, intent(in) :: isource\\
+integer, intent(out) :: ierr
+}
+{
+  \parameter{isource}{Source handle returned by \texttt{fio\_open\_source}}.
+}
+{
+  Closes file and deallocates resources associated with open source.
+}
+
+
+\function{fio\_open\_source}
+{
+  \noindent
+  int ierr = fio\_open\_source(const int isource\_type, const char* filename, int* isource);\\
+
+  \noindent
+  call fio\_open\_source\_f(isource\_type, filename, isource, ierr)\\
+  integer, intent(in) :: isource\_type\\
+  character(len=*), intent(in) :: filename\\
+  integer, intent(out) :: ierr
+}
+{
+  \parameter{isource\_type}{The type of data source to open.  Choices include:
+    \begin{description}
+    \item[FIO\_GATO\_SOURCE]: (not yet implemented)
+    \item[FIO\_GEQDSK\_SOURCE]:
+    \item[FIO\_M3DC1\_SOURCE]:
+    \item[FIO\_MARS\_SOURCE]: (not yet implemented)
+    \item[FIO\_NIMROD\_SOURCE]: (not yet implemented)
+    \end{description}
+  }
+
+  \parameter{filename}{The name of the data source file.}
+
+  \parameter{isource}{The handle to the data source.}
+}
+{
+  Opens a data source.
+}
+
+\section{Not Yet Documented}
+
+int fio\_get\_options(const int);
+int fio\_get\_available\_fields(const int, int*, int**);
+
+int fio\_set\_int\_option(const int, const int);
+int fio\_set\_str\_option(const int, const char*);
+int fio\_set\_real\_option(const int, const double);
+int fio\_get\_int\_parameter(const int, const int,  int*);
+int fio\_get\_real\_parameter(const int, const int, double*);
+int fio\_get\_real\_field\_parameter(const int, const int, double*);
+
+\section{Error Codes}
+
+\begin{description}
+  \item[FIO\_SUCCESS (0)]:  Function call returned without errors.
+  \item[FIO\_UNSUPPORTED (10001)]: The requested field, series,
+    parameter is not included in the source data or is not yet
+    implemented in the FIO library.
+  \item[FIO\_OUT\_OF\_BOUNDS (10002)]: The requested coordinates are
+    outside of the domain of the source data.
+  \item[FIO\_FILE\_ERROR (10003)]: The requested source data could not be succesfully read.
+  \item[FIO\_BAD\_DIMENSIONS (10004)]: 
+  \item[FIO\_BAD\_SPECIES (10005)]: Data for requested species is not
+    present in source data.
+  \item[FIO\_NO\_DATA (10006)]: Data expected to be found in the source
+    data was not present.
+\end{description}
+
+
+\end{document}
