@@ -103,6 +103,7 @@ contains
   subroutine fio_get_series_bounds_f(iseries, tmin, tmax, ierr)
     integer, intent(in) :: iseries
     real, intent(out) :: tmin, tmax
+    integer, intent(out) :: ierr
     call fio_get_series_bounds(iseries, tmin, tmax, ierr)
   end subroutine fio_get_series_bounds_f
   

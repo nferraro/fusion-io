@@ -1,6 +1,6 @@
 libs = m3dc1_lib fusion_io
 bins = trace
-alldirs = $(libs) $(bins) examples
+alldirs = $(libs) $(bins) examples doc
 
 .PHONY : install clean dist python $(alldirs)
 
