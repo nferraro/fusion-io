@@ -48,6 +48,7 @@ class m3dc1_mesh {
   double* x;
   double* z;
   int* bound;
+  int* region;
   double period;
   bool toroidal;
 
