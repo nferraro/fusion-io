@@ -174,7 +174,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
 
     if(is_3d) {
       ((m3dc1_3d_mesh*)mesh)->d[i]   =      data[i*nfields+offset];
-      ((m3dc1_3d_mesh*)mesh)->phi[i] =      data[i*nfields+offset];
+      ((m3dc1_3d_mesh*)mesh)->phi[i] =      data[i*nfields+offset+1];
     }
   }
   delete[] data;
