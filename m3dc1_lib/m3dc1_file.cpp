@@ -130,10 +130,13 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   read_parameter("3d", &is_3d);  
   //  std::cerr << "is_3d = " << is_3d << std::endl;
 
-  int nfields;
+  int version = 0;
+  read_parameter("version", &version);
 
+  int nfields;
   if(is_3d) nfields = 9;
   else nfields = 7;
+  if(version>=15) nfields++;
 
   double* data = new double[nfields*nelms];
 
@@ -149,6 +152,12 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   // set default mesh memory depth for searching
   mesh->set_memory_depth(3);
 
+  int offset;
+  if(version >= 15)
+    offset = 8;
+  else 
+    offset = 7;
+
   for(int i=0; i<nelms; i++) {
     mesh->a[i]     =      data[i*nfields  ];
     mesh->b[i]     =      data[i*nfields+1];
@@ -158,9 +167,14 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
     mesh->x[i]     =      data[i*nfields+4];
     mesh->z[i]     =      data[i*nfields+5];
     mesh->bound[i] = (int)data[i*nfields+6];
+    if(version >= 15)
+      mesh->region[i] = (int)data[i*nfields+7];
+    else
+      mesh->region[i] = 0;
+
     if(is_3d) {
-      ((m3dc1_3d_mesh*)mesh)->d[i]   =      data[i*nfields+7];
-      ((m3dc1_3d_mesh*)mesh)->phi[i] =      data[i*nfields+8];
+      ((m3dc1_3d_mesh*)mesh)->d[i]   =      data[i*nfields+offset];
+      ((m3dc1_3d_mesh*)mesh)->phi[i] =      data[i*nfields+offset+1];
     }
   }
   delete[] data;

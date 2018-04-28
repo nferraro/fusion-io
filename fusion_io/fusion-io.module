@@ -31,6 +31,7 @@ module-whatis                   "$description"
 
 ## Software-specific settings exported to user environment
 
+setenv          FIO_PATH           $root
 prepend-path    PATH               $root/bin
 prepend-path    LD_LIBRARY_PATH    $root/lib
 prepend-path    PYTHONPATH         $root/lib

@@ -12,6 +12,7 @@ m3dc1_mesh::m3dc1_mesh(int n)
   x = new double[n];
   z = new double[n];
   bound = new int[n];
+  region = new int[n];
   nelms = n;
   memory_depth = 0;
   last_elm = -1;
@@ -40,6 +41,7 @@ m3dc1_mesh::~m3dc1_mesh()
   delete[] x;
   delete[] z;
   delete[] bound;
+  delete[] region;
   clear_memory();
 }
 
