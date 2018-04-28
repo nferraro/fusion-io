@@ -12,7 +12,6 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("3d", &i3d);
   file.read_parameter("eqsubtract", &eqsubtract);
   file.read_parameter("linear", &linear);
-  file.read_parameter("zeff", &zeff);
   file.read_parameter("ion_mass", &ion_mass);
   file.read_parameter("bzero", &bzero);
   file.read_parameter("rzero", &rzero);
@@ -22,6 +21,11 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("version", &version);
   file.read_parameter("itor", &itor);
   file.read_parameter("ntime", &ntime);
+
+  if(version < 23) 
+    file.read_parameter("zeff", &z_ion);
+  else
+    file.read_parameter("z_ion", &z_ion);
 
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
@@ -132,7 +136,10 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
   switch(t) {
   case(FIO_DENSITY):
     if(s==fio_electron) {
-      mf = new m3dc1_scalar_field(this, "den", n0*zeff);
+      if(version < 23) 
+	mf = new m3dc1_scalar_field(this, "den", n0*z_ion);
+      else
+	mf = new m3dc1_scalar_field(this, "ne", n0);
     } else if(s==ion_species) {
       mf = new m3dc1_scalar_field(this, "den", n0);
     } else {
