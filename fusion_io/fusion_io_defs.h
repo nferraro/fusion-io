@@ -31,6 +31,7 @@ FIO_DEFINE_INT(FIO_TOTAL_PRESSURE,    3)
 COMMENT(      species-dependent scalar fields      )
 FIO_DEFINE_INT(FIO_PRESSURE,          101)
 FIO_DEFINE_INT(FIO_DENSITY,           102)
+FIO_DEFINE_INT(FIO_TEMPERATURE,       103)
 
 COMMENT(      vector fields      )
 FIO_DEFINE_INT(FIO_ELECTRIC_FIELD,    1001)

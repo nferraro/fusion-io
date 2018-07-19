@@ -36,6 +36,7 @@ int m3dc1_source::open(const char* filename)
   v0 = B0/sqrt(4.*M_PI*ion_mass*m_p*n0);
   t0 = L0/v0;
   Phi0 = L0*v0*B0/c;
+  temp0 = p0/n0;
 
   // convert normalization quantities to mks
   n0 /= 1.e-6;
@@ -45,6 +46,7 @@ int m3dc1_source::open(const char* filename)
   J0 /= (c*1e-5);
   v0 /= 100.;
   Phi0 /= (1.e8/c);
+  temp0 /= 1.6022e-12;    // Temperature is output in eV
 
   if(itor==1) {
     period = 2.*M_PI;
@@ -86,6 +88,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_FLUID_VELOCITY);
   fields->push_back(FIO_MAGNETIC_FIELD);
   fields->push_back(FIO_PRESSURE);
+  fields->push_back(FIO_TEMPERATURE);
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
 
@@ -142,6 +145,16 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 	mf = new m3dc1_scalar_field(this, "ne", n0);
     } else if(s==ion_species) {
       mf = new m3dc1_scalar_field(this, "den", n0);
+    } else {
+      result = FIO_BAD_SPECIES;
+    }
+    break;
+
+  case(FIO_TEMPERATURE):
+    if(s==fio_electron) {
+      mf = new m3dc1_scalar_field(this, "te", temp0);
+    } else if(s==ion_species) {
+      mf = new m3dc1_scalar_field(this, "ti", temp0);
     } else {
       result = FIO_BAD_SPECIES;
     }

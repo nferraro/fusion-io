@@ -85,6 +85,7 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_MAGNETIC_FIELD):    *s = "magnetic field";   break;
   case(FIO_PRESSURE):          *s = "pressure";         break;
   case(FIO_SCALAR_POTENTIAL):  *s = "scalar potential"; break;
+  case(FIO_TEMPERATURE):       *s = "temperature";      break;
   case(FIO_TOTAL_PRESSURE):    *s = "total pressure";   break;
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
