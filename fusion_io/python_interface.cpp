@@ -1,6 +1,8 @@
 #include "fusion_io.h"
 #include <Python.h>
 
+#include <iostream>
+
 extern "C" {
   static PyObject* fio_add_field_py(PyObject*, PyObject*);
   static PyObject* fio_close_field_py(PyObject*, PyObject*);
@@ -179,7 +181,11 @@ PyObject* fio_eval_vector_field_py(PyObject* self, PyObject *args)
     return NULL;
 
   double v[3];
+  std::cerr << "ifield = " << ifield << std::endl;
+  std::cerr << "x = " << x[0] << " " << x[1] << " " << x[2] << std::endl;
   int ierr = fio_eval_field(ifield, x, v);
+  std::cerr << "ierr = " << ierr << std::endl;
+  std::cerr << "v = " << v[0] << " " << v[1] << " " << v[2] << std::endl;
   if(ierr != FIO_SUCCESS)
     return NULL; 
 
