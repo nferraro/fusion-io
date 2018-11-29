@@ -1,7 +1,7 @@
 #include "fusion_io.h"
 
 
-int gato_magnetic_field::eval(const double* x, double* b)
+int gato_magnetic_field::eval(const double* x, double* b, void*)
 {
   int e, ierr;
   double psi, f;
@@ -22,7 +22,7 @@ int gato_magnetic_field::eval(const double* x, double* b)
   return FIO_SUCCESS;
 }
 
-int gato_pressure_field::eval(const double* x, double* p)
+int gato_pressure_field::eval(const double* x, double* p, void*)
 {
   double psi, z;
   int ierr;

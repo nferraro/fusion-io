@@ -21,6 +21,11 @@ int fio_add_field(const int icfield, const int ifield,
   return ((fio_compound_field*)f)->add_field(field_list[ifield], op, fac);
 }
 
+int fio_allocate_search_hint(const int isrc, void* s)
+{
+  return source_list[isrc]->allocate_search_hint(s);
+}
+
 int fio_close_field(const int ifield)
 {
   if(field_list[ifield])
@@ -55,14 +60,19 @@ int fio_create_compound_field(int* ifield)
   return FIO_SUCCESS;
 }
 
-int fio_eval_field(const int ifield, const double* x, double* v)
+int fio_deallocate_search_hint(const int isrc, void* s)
 {
-  return field_list[ifield]->eval(x, v);
+  return source_list[isrc]->deallocate_search_hint(s);
 }
 
-int fio_eval_field_deriv(const int ifield, const double* x, double* v)
+int fio_eval_field(const int ifield, const double* x, double* v, void* s=0)
 {
-  return field_list[ifield]->eval_deriv(x, v);
+  return field_list[ifield]->eval(x, v, s);
+}
+
+int fio_eval_field_deriv(const int ifield, const double* x, double* v, void* s=0)
+{
+  return field_list[ifield]->eval_deriv(x, v, s);
 }
 
 int fio_eval_series(const int iseries, const double x, double* v)
@@ -161,5 +171,10 @@ int fio_set_str_option(const int iopt, const char* v)
 int fio_set_real_option(const int iopt, const double v)
 {
   return options.set_option(iopt, v);
+}
+
+int fio_sizeof_search_hint(const int isrc)
+{
+  return source_list[isrc]->sizeof_search_hint();
 }
 

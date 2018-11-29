@@ -46,6 +46,9 @@ example_fortran : example_fortran.o
 example_push : example_push.o
 	$(F90) $(LDFLAGS) $< -lfio_push $(LIBS) -o $@
 
+korc_example : korc_example.cpp
+	mpicxx $< -std=c++11 $(INCLUDE) $(LIBS) -o $@
+
 exmk :
 	echo FIO_DIR=$(FIO_INSTALL_DIR) > $@
 	cat $(FIO_ROOT)/install/make.inc.$(FIO_ARCH) >> $@

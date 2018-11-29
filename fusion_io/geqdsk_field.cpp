@@ -2,7 +2,7 @@
 #include "interpolate.h"
 
 
-int geqdsk_current_density::eval(const double* x, double* j)
+int geqdsk_current_density::eval(const double* x, double* j, void*)
 {
   double psi[6];
   int ierr;
@@ -29,7 +29,7 @@ int geqdsk_current_density::eval(const double* x, double* j)
   return FIO_SUCCESS;
 }
 
-int geqdsk_magnetic_field::eval(const double* x, double* b)
+int geqdsk_magnetic_field::eval(const double* x, double* b, void*)
 {
   double psi[6];
   int ierr;
@@ -47,7 +47,7 @@ int geqdsk_magnetic_field::eval(const double* x, double* b)
   return FIO_SUCCESS;
 }
 
-int geqdsk_pressure_field::eval(const double* x, double* p)
+int geqdsk_pressure_field::eval(const double* x, double* p, void*)
 {
   double psi[6];
   int ierr;

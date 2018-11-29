@@ -14,7 +14,7 @@ class geqdsk_field : public fio_field {
     { }
 
   virtual int dimension() const = 0;
-  virtual int eval(const double*, double*) = 0;
+  virtual int eval(const double*, double*, void* =0) = 0;
 };
 
 class geqdsk_current_density : public geqdsk_field {
@@ -24,7 +24,7 @@ class geqdsk_current_density : public geqdsk_field {
   geqdsk_current_density* clone() const 
   { return new geqdsk_current_density(*this); }
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 class geqdsk_magnetic_field : public geqdsk_field {
@@ -34,7 +34,7 @@ class geqdsk_magnetic_field : public geqdsk_field {
   geqdsk_magnetic_field* clone() const 
   { return new geqdsk_magnetic_field(*this); }
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 class geqdsk_pressure_field : public geqdsk_field {
@@ -44,7 +44,7 @@ class geqdsk_pressure_field : public geqdsk_field {
   geqdsk_pressure_field* clone() const 
   { return new geqdsk_pressure_field(*this); }
   int dimension() const { return 1; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 

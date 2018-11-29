@@ -23,6 +23,11 @@ class m3dc1_source : public fio_source {
   int get_series(const series_type, fio_series**);
   int get_int_parameter(const parameter_type, int*) const;
   int get_real_parameter(const parameter_type, double*) const;
+
+  int sizeof_search_hint() const
+  { return sizeof(int); }
+  int allocate_search_hint(void* s);
+  int deallocate_search_hint(void* s);
 };
 
 

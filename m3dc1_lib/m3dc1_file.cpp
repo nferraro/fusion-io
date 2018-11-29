@@ -150,7 +150,9 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   else mesh = new m3dc1_mesh(nelms);
 
   // set default mesh memory depth for searching
-  mesh->set_memory_depth(3);
+  // (this is being phased out in favor of connectivity tree)
+  //  mesh->set_memory_depth(3);
+  mesh->set_memory_depth(0);    
 
   int offset;
   if(version >= 15)
@@ -190,6 +192,9 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   } else {
     mesh->period = 2.*M_PI;
   }
+
+  // Calculate connectivity tree
+  mesh->find_neighbors();
 
   H5Gclose(mesh_group);
   H5Gclose(time_group);

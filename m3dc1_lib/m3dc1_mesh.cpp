@@ -1,6 +1,7 @@
 #include "m3dc1_mesh.h"
 
 #include <iostream>
+#include <math.h>
 
 m3dc1_mesh::m3dc1_mesh(int n)
 {
@@ -42,6 +43,10 @@ m3dc1_mesh::~m3dc1_mesh()
   delete[] z;
   delete[] bound;
   delete[] region;
+  for(int i=0; i<nelms; i++)
+    delete[] neighbor[i];
+  delete[] neighbor;
+  delete[] nneighbors;
   clear_memory();
 }
 
@@ -123,6 +128,29 @@ int m3dc1_mesh::in_element(double X, double Phi, double Z,
       last_elm = guess;
       return guess;
     }
+
+    // Test neighbors
+    for(int n=0; n<nneighbors[guess]; n++) {
+      int m = neighbor[guess][n];
+      if(is_in_element(m,X,Phi,Z,xi,zi,eta)) {
+	hits++;
+	last_elm = m;
+	return m;
+      }
+    }
+
+    // Test neighbors' neighbors
+    for(int n=0; n<nneighbors[guess]; n++) {
+      int m = neighbor[guess][n];
+      for(int nn=0; nn<nneighbors[m]; nn++) {
+	int l = neighbor[guess][nn];
+	if(is_in_element(l,X,Phi,Z,xi,zi,eta)) {
+	  hits++;
+	  last_elm = l;
+	  return l;
+	}
+      }
+    }
   }
 
   if(last_elm >= 0) {
@@ -164,7 +192,98 @@ int m3dc1_mesh::in_element(double X, double Phi, double Z,
   return -1;
 }
 
+int m3dc1_mesh::shared_nodes(const int i, const int j)
+{
+  int match = 0;
+  double R[3], Z[3];
+  const double t = (a[i] + b[i] + c[i])*TOL;
 
+  R[0] = x[i];
+  R[1] = x[i] + (a[i]+b[i])*co[i];
+  R[2] = x[i] + b[i]*co[i] - c[i]*sn[i];
+  Z[0] = z[i];
+  Z[1] = z[i] + (a[i]+b[i])*sn[i];
+  Z[2] = z[i] + c[i]*co[i] + b[i]*sn[i];
+
+  for(int k=0; k<3; k++) {
+    if(fabs(R[k] - x[j]) < t) {
+      if(fabs(Z[k] - z[j]) < t) match++;
+    } else if(fabs(R[k] - (x[j] + (a[j]+b[j])*co[j])) < t) {
+      if(fabs(Z[k] - (z[j] + (a[j]+b[j])*sn[j])) < t) match++;
+    } else if(fabs(R[k] - (x[j] + b[j]*co[j] - c[j]*sn[j])) < t) {
+      if(fabs(Z[k] - (z[j] + c[j]*co[j] + b[j]*sn[j])) < t) match++;
+    }
+  }
+  
+  return match;
+}
+
+bool m3dc1_mesh::elements_are_neighbors(const int i, const int j)
+{
+  return (shared_nodes(i, j)>=2);
+}
+
+bool m3dc1_3d_mesh::elements_are_neighbors(const int i, const int j)
+{
+  return (shared_nodes(i, j)>=3);
+}
+
+int m3dc1_3d_mesh::shared_nodes(const int i, const int j)
+{
+  const int t = d[i]*TOL;
+
+  if(fabs(phi[i] - phi[j]) < t) {
+    return m3dc1_3d_mesh::shared_nodes(i,j)*2;
+
+  } else if(fabs(phi[i] + d[i] - phi[j]) < t) {
+    return m3dc1_3d_mesh::shared_nodes(i,j);
+
+  } else if(fabs(phi[i] - (phi[j] + d[j])) < t) {
+    return m3dc1_3d_mesh::shared_nodes(i,j);
+
+  } else {
+    return 0;
+  }
+}
+
+void m3dc1_mesh::find_neighbors()
+{
+  std::cerr << "Calculating M3D-C1 mesh connectivity..." << std::endl;
+  nneighbors = new int[nelms];
+  neighbor = new int*[nelms];
+
+  for(int i=0; i<nelms; i++) {
+    nneighbors[i] = 0;
+    neighbor[i] = new int[max_neighbors()];
+  }
+
+  for(int i=0; i<nelms; i++) {
+    for(int j=i+1; j<nelms; j++) {
+      if(elements_are_neighbors(i, j)) {
+	if(nneighbors[i] >= max_neighbors()) {
+	  std::cerr << "Error: element " << i << " has too many neighbors!"
+		    << std::endl;
+	} else {
+	  neighbor[i][nneighbors[i]] = j;
+	  nneighbors[i]++;
+	}
+
+	if(nneighbors[j] >= max_neighbors()) {
+	  std::cerr << "Error: element " << j << " has too many neighbors!"
+		    << std::endl;
+	} else {
+	  neighbor[j][nneighbors[j]] = i;
+	  nneighbors[j]++;
+	}
+      }
+    }
+
+    if(nneighbors[i]==0) {
+      std::cerr << "Error: Element " << i << " has 0 neighbors!" << std::endl;
+    }
+  }
+  std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
+}
 
 m3dc1_3d_mesh::m3dc1_3d_mesh(int n)
   : m3dc1_mesh(n)

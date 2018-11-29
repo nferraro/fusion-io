@@ -51,7 +51,7 @@ class m3dc1_scalar_field : public m3dc1_fio_field {
   m3dc1_scalar_field* clone() const { return new m3dc1_scalar_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }
-  int eval(const double*, double*); 
+  int eval(const double*, double*, void* =0); 
 };
 
 // ALPHA
@@ -65,7 +65,7 @@ class m3dc1_alpha_field : public m3dc1_fio_field {
   m3dc1_alpha_field* clone() const { return new m3dc1_alpha_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 // SCALAR POTENTIAL
@@ -76,7 +76,7 @@ class m3dc1_phi_field : public m3dc1_fio_field {
   m3dc1_phi_field* clone() const { return new m3dc1_phi_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 // ION_PRESSURE
@@ -89,7 +89,7 @@ class m3dc1_pi_field : public m3dc1_fio_field {
   m3dc1_pi_field* clone() const { return new m3dc1_pi_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 
@@ -104,7 +104,7 @@ class m3dc1_electric_field : public m3dc1_fio_field {
   { return new m3dc1_electric_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 // V
@@ -119,7 +119,7 @@ class m3dc1_fluid_velocity : public m3dc1_fio_field {
   { return new m3dc1_fluid_velocity(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 
@@ -134,7 +134,7 @@ class m3dc1_vector_potential : public m3dc1_fio_field {
   { return new m3dc1_vector_potential(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 
@@ -150,8 +150,8 @@ class m3dc1_magnetic_field : public m3dc1_fio_field {
   { return new m3dc1_magnetic_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
-  int eval_deriv(const double*, double*);
+  int eval(const double*, double*, void* =0);
+  int eval_deriv(const double*, double*, void* =0);
 };
 
 // J
@@ -166,7 +166,7 @@ class m3dc1_current_density : public m3dc1_fio_field {
   { return new m3dc1_current_density(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 
@@ -182,7 +182,7 @@ class m3dc1_velocity_field : public m3dc1_fio_field {
   { return new m3dc1_velocity_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 // Grad(A)
@@ -197,7 +197,7 @@ class m3dc1_grad_vector_potential : public m3dc1_fio_field {
   { return new m3dc1_grad_vector_potential(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 9; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 

@@ -6,7 +6,7 @@
 class mars_source : public fio_source {
  public:
   int nrp1, nchi;
-  double aspect, r0exp, b0exp;
+  double aspect, r0exp, b0exp, bfac, vfac;
   double* psiiso;
 
   struct mars_eqdata {
@@ -14,7 +14,7 @@ class mars_source : public fio_source {
     int nr, nc;
 
   public:
-    double* cse;
+    double* cse;     // radial coordinate s
     double* peq;
     double* t;
     double* ttp;

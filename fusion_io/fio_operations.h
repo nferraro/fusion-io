@@ -10,7 +10,7 @@ class fio_field_add : public fio_field {
   fio_field_add(const fio_field*, const double);
   fio_field_add* clone() const { return (fio_field_add*)this; }
   virtual int dimension() const;
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 class fio_field_multiply : public fio_field {
@@ -20,7 +20,7 @@ class fio_field_multiply : public fio_field {
   fio_field_multiply(const fio_field*, const double);
   fio_field_multiply* clone() const { return (fio_field_multiply*)this; }
   virtual int dimension() const;
-  virtual int eval(const double*, double*);
+  virtual int eval(const double*, double*, void* =0);
 };
 
 class fio_field_sum : public fio_field {
@@ -31,7 +31,7 @@ class fio_field_sum : public fio_field {
   fio_field_sum* clone() const { return (fio_field_sum*)this; }
   ~fio_field_sum();
   int dimension() const;
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* = 0);
 };
 
 
@@ -43,7 +43,7 @@ class fio_field_product : public fio_field {
   ~fio_field_product();
   fio_field_product* clone() const { return (fio_field_product*)this; }
   int dimension() const;
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 #endif

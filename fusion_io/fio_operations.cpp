@@ -24,7 +24,7 @@ int fio_field_sum::dimension() const
 }
 
 
-int fio_field_sum::eval(const double* d, double *v)
+int fio_field_sum::eval(const double* d, double *v, void*)
 {
   double *v1, *v2;
   int result;
@@ -67,7 +67,7 @@ int fio_field_product::dimension() const
   return 1;
 }
 
-int fio_field_product::eval(const double* d, double *v)
+int fio_field_product::eval(const double* d, double *v, void*)
 {
   double *v1, *v2;
   int result;

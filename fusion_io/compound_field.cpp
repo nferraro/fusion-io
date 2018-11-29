@@ -46,7 +46,7 @@ int fio_compound_field::add_field(fio_field* f, const int op, const double d)
   return FIO_SUCCESS;
 }
 
-int fio_compound_field::eval(const double* x, double* v)
+int fio_compound_field::eval(const double* x, double* v, void*)
 {
   double* z = new double[dimension()];
 

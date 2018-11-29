@@ -5,6 +5,7 @@
 
 #define TOL 1e-4
 
+
 class m3dc1_mesh {
  private:
   int memory_depth;
@@ -16,7 +17,12 @@ class m3dc1_mesh {
 
   void clear_memory();
 
+  int* nneighbors;
+  int** neighbor;
+
  protected:
+  virtual const int max_neighbors() const {return 3;}
+
   //  static const double tol = 1e-1;
 
   virtual bool is_in_element_local(const int i, const double xi, 
@@ -37,6 +43,8 @@ class m3dc1_mesh {
     *xi  =  (X - x[i])*co[i] + (Z - z[i])*sn[i] - b[i];
     *eta = -(X - x[i])*sn[i] + (Z - z[i])*co[i];
   }
+  virtual int shared_nodes(const int i, const int j);
+  virtual bool elements_are_neighbors(const int i, const int j);
 
  public:
   int nelms;
@@ -57,6 +65,7 @@ class m3dc1_mesh {
   virtual ~m3dc1_mesh(); 
 
   bool set_memory_depth(int d);
+  void find_neighbors();
 
   bool is_in_element(const int i, 
 		     const double X, const double Phi, const double Z,
@@ -102,6 +111,10 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
     m3dc1_mesh::global_to_local(i, X, Phi, Z, xi, zi, eta);
     *zi = Phi - phi[i];
   }
+
+  virtual int shared_nodes(const int i, const int j);
+  virtual bool elements_are_neighbors(const int i, const int j);
+  virtual const int max_neighbors() const {return 5;}
 
  public:
   double *phi;

@@ -23,10 +23,10 @@ class fio_field {
 
   virtual fio_field* clone() const = 0;
   virtual int dimension() const = 0;
-  virtual int eval(const double*, double*) = 0;
+  virtual int eval(const double*, double*, void* =0) = 0;
 
   // partial derivatives (first index = partial deriv, second index = coord)
-  virtual int eval_deriv(const double*, double*)
+  virtual int eval_deriv(const double*, double*, void* =0)
   {  return FIO_UNSUPPORTED; }
 
   virtual int get_real_parameter(const field_parameter, double*)

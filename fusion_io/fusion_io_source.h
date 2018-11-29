@@ -21,6 +21,13 @@ class fio_source {
   virtual int open(const char*) = 0;
   virtual int close() = 0;
 
+  virtual int sizeof_search_hint() const
+  { return 0; }
+  virtual int allocate_search_hint(void* s)
+  { s = 0; return FIO_UNSUPPORTED; }
+  virtual int deallocate_search_hint(void* s)
+  { return FIO_SUCCESS; };
+
   virtual int get_field_options(fio_option_list*) const = 0;
   virtual int get_field(const field_type, fio_field**, const fio_option_list*)
     = 0;
