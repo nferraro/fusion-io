@@ -18,6 +18,8 @@ class m3dc1_source : public trace_field_source {
   double psi_axis, psi_lcfs;
   double period;
 
+  int last_elm;
+
  public:
   std::string filename;
   int time;

@@ -10,6 +10,7 @@ m3dc1_source::m3dc1_source()
   factor = 1.;
   shift = 0.;
   use_g = true;
+  last_elm = -1;
 }
 
 m3dc1_source::m3dc1_source(std::string f, int t)
@@ -154,7 +155,7 @@ bool m3dc1_source::eval_psi(const double r, const double z, double* p)
 
   double phi = 0.;
 
-  if(!psi->eval(r, phi, z, psiget, val))
+  if(!psi->eval(r, phi, z, psiget, val, &last_elm))
     return false;
 
   *p = factor*val[m3dc1_field::OP_1];
@@ -184,14 +185,14 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
   // B_Z   =  (dpsi/dR)/R - (d2f/dZdphi)
   // B_Phi =  F/R
 
-  if(!psi->eval(r, phi, z, psiget, val))
+  if(!psi->eval(r, phi, z, psiget, val, &last_elm))
     return false;
 
   *b_r -= factor*val[m3dc1_field::OP_DZ]/rr;
   *b_z += factor*val[m3dc1_field::OP_DR]/rr;
 
   if(use_g) {
-    if(!g->eval(r, phi, z, gget, val))
+    if(!g->eval(r, phi, z, gget, val, &last_elm))
       return false;
     *b_phi += factor*val[m3dc1_field::OP_1]/rr;
   } else {
@@ -199,7 +200,7 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
   }
 
   if(use_f) {
-    if(!f->eval(r, phi, z, fget, val))
+    if(!f->eval(r, phi, z, fget, val, &last_elm))
       return false;
 
     *b_r -= factor*val[m3dc1_field::OP_DRP];
@@ -207,20 +208,20 @@ bool m3dc1_source::eval(const double r, const double phi0, const double z,
   }
 
   if(extsubtract==1) {
-    if(!psi_x->eval(r, phi, z, psiget, val))
+    if(!psi_x->eval(r, phi, z, psiget, val, &last_elm))
       return false;
 
     *b_r -= factor*val[m3dc1_field::OP_DZ]/rr;
     *b_z += factor*val[m3dc1_field::OP_DR]/rr;
 
     if(use_g) {
-      if(!g_x->eval(r, phi, z, gget, val))
+      if(!g_x->eval(r, phi, z, gget, val, &last_elm))
 	return false;
       *b_phi += factor*val[m3dc1_field::OP_1]/rr;
     }
 
     if(use_f) {
-      if(!f_x->eval(r, phi, z, fget, val))
+      if(!f_x->eval(r, phi, z, fget, val, &last_elm))
 	return false;
 
       *b_r -= factor*val[m3dc1_field::OP_DRP];

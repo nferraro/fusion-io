@@ -21,6 +21,8 @@ m3dc1_mesh::m3dc1_mesh(int n)
   hits = 0;
   misses = 0;
   period = 2.*M_PI;
+  neighbor = 0;
+  nneighbors = 0;
 }
 
 m3dc1_mesh::~m3dc1_mesh()
@@ -34,6 +36,7 @@ m3dc1_mesh::~m3dc1_mesh()
 	    << "hits+misses = " << evals
 	    << std::endl;
   */
+
   delete[] a;
   delete[] b;
   delete[] c;
@@ -43,10 +46,12 @@ m3dc1_mesh::~m3dc1_mesh()
   delete[] z;
   delete[] bound;
   delete[] region;
-  for(int i=0; i<nelms; i++)
-    delete[] neighbor[i];
-  delete[] neighbor;
-  delete[] nneighbors;
+  if(neighbor != 0) {
+    for(int i=0; i<nelms; i++)
+      delete[] neighbor[i];
+    delete[] neighbor;
+  }
+  if(nneighbors != 0) delete[] nneighbors;
   clear_memory();
 }
 
@@ -143,7 +148,7 @@ int m3dc1_mesh::in_element(double X, double Phi, double Z,
     for(int n=0; n<nneighbors[guess]; n++) {
       int m = neighbor[guess][n];
       for(int nn=0; nn<nneighbors[m]; nn++) {
-	int l = neighbor[guess][nn];
+	int l = neighbor[m][nn];
 	if(is_in_element(l,X,Phi,Z,xi,zi,eta)) {
 	  hits++;
 	  last_elm = l;
