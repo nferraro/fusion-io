@@ -28,7 +28,7 @@ m3dc1_mesh::m3dc1_mesh(int n)
 
 m3dc1_mesh::~m3dc1_mesh()
 {
-  /*
+
   int evals = hits+misses;
   std::cerr << "hits = " << hits
 	    << " (" << 100.*(double)hits/(double)evals << "%)\n"
@@ -36,7 +36,7 @@ m3dc1_mesh::~m3dc1_mesh()
 	    << " (" << 100.*(double)misses/(double)evals << "%)\n"
 	    << "hits+misses = " << evals
 	    << std::endl;
-  */
+
 
   delete[] a;
   delete[] b;
@@ -214,9 +214,11 @@ int m3dc1_mesh::shared_nodes(const int i, const int j)
   for(int k=0; k<3; k++) {
     if(fabs(R[k] - x[j]) < t) {
       if(fabs(Z[k] - z[j]) < t) match++;
-    } else if(fabs(R[k] - (x[j] + (a[j]+b[j])*co[j])) < t) {
+    } 
+    if(fabs(R[k] - (x[j] + (a[j]+b[j])*co[j])) < t) {
       if(fabs(Z[k] - (z[j] + (a[j]+b[j])*sn[j])) < t) match++;
-    } else if(fabs(R[k] - (x[j] + b[j]*co[j] - c[j]*sn[j])) < t) {
+    } 
+    if(fabs(R[k] - (x[j] + b[j]*co[j] - c[j]*sn[j])) < t) {
       if(fabs(Z[k] - (z[j] + c[j]*co[j] + b[j]*sn[j])) < t) match++;
     }
   }
@@ -296,8 +298,10 @@ void m3dc1_mesh::find_neighbors()
       }
     }
 
-    if(nneighbors[i]==0)
-      std::cerr << "Error: Element " << i << " has 0 neighbors!" << std::endl;
+    if(nneighbors[i]==0) {
+      std::cerr << "Error: Element " << i << " has 0 neighbors!" 
+		<< std::endl;
+    }
   }
   std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
 }
@@ -321,6 +325,10 @@ void m3dc1_3d_mesh::find_neighbors()
 
   // add the toroidally adjacent elements
   for(int i=0; i<nelms; i++) {
+    if((i < nelms/nplanes) && (phi[i] != 0.)) {
+      std::cerr << "Element " << i << " wrong plane " << phi[i] << std::endl;
+    }
+
     k = i - nelms/nplanes;
     if(k < 0) k += nelms;
     neighbor[i][nneighbors[i]++] = k;
