@@ -193,6 +193,8 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
     mesh->period = 2.*M_PI;
   }
 
+  read_parameter("nplanes", &(mesh->nplanes));
+
   // Calculate connectivity tree
   mesh->find_neighbors();
 

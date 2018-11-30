@@ -23,6 +23,7 @@ m3dc1_mesh::m3dc1_mesh(int n)
   period = 2.*M_PI;
   neighbor = 0;
   nneighbors = 0;
+  nplanes = 1;
 }
 
 m3dc1_mesh::~m3dc1_mesh()
@@ -228,6 +229,7 @@ bool m3dc1_mesh::elements_are_neighbors(const int i, const int j)
   return (shared_nodes(i, j)>=2);
 }
 
+/*
 bool m3dc1_3d_mesh::elements_are_neighbors(const int i, const int j)
 {
   return (shared_nodes(i, j)>=3);
@@ -235,21 +237,32 @@ bool m3dc1_3d_mesh::elements_are_neighbors(const int i, const int j)
 
 int m3dc1_3d_mesh::shared_nodes(const int i, const int j)
 {
-  const int t = d[i]*TOL;
+  const double t = d[i]*TOL;
 
-  if(fabs(phi[i] - phi[j]) < t) {
-    return m3dc1_3d_mesh::shared_nodes(i,j)*2;
+  if((fabs(phi[i] - phi[j]) < t) ||
+     (fabs(phi[i] - phi[j] - period) < t) ||
+     (fabs(phi[i] - phi[j] + period) < t)) {
+     if(i==105) std::cerr << "Hit! " << m3dc1_mesh::shared_nodes(i,j)
+			  << std::endl;
+    return m3dc1_mesh::shared_nodes(i,j)*2;
 
-  } else if(fabs(phi[i] + d[i] - phi[j]) < t) {
-    return m3dc1_3d_mesh::shared_nodes(i,j);
-
-  } else if(fabs(phi[i] - (phi[j] + d[j])) < t) {
-    return m3dc1_3d_mesh::shared_nodes(i,j);
-
+  } else if((fabs(phi[i] + d[i] - phi[j]) < t) ||
+	    (fabs(phi[i] + d[i] - phi[j] - period) < t) || 
+	    (fabs(phi[i] + d[i] - phi[j] + period) < t)) {
+    return m3dc1_mesh::shared_nodes(i,j);
+    
+  } else if((fabs(phi[i] - (phi[j] + d[j])) < t) || 
+	    (fabs(phi[i] - (phi[j] + d[j]) - period) < t) || 
+	    (fabs(phi[i] - (phi[j] + d[j]) + period) < t)) {
+    return m3dc1_mesh::shared_nodes(i,j);
+    
   } else {
     return 0;
   }
+
+  return m3dc1_mesh::shared_nodes(i,j);
 }
+*/
 
 void m3dc1_mesh::find_neighbors()
 {
@@ -262,8 +275,8 @@ void m3dc1_mesh::find_neighbors()
     neighbor[i] = new int[max_neighbors()];
   }
 
-  for(int i=0; i<nelms; i++) {
-    for(int j=i+1; j<nelms; j++) {
+  for(int i=0; i<nelms/nplanes; i++) {
+    for(int j=i+1; j<nelms/nplanes; j++) {
       if(elements_are_neighbors(i, j)) {
 	if(nneighbors[i] >= max_neighbors()) {
 	  std::cerr << "Error: element " << i << " has too many neighbors!"
@@ -283,12 +296,41 @@ void m3dc1_mesh::find_neighbors()
       }
     }
 
-    if(nneighbors[i]==0) {
+    if(nneighbors[i]==0)
       std::cerr << "Error: Element " << i << " has 0 neighbors!" << std::endl;
-    }
   }
   std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
 }
+
+void m3dc1_3d_mesh::find_neighbors()
+{
+  int k;
+
+  m3dc1_mesh::find_neighbors();
+  
+  // copy the neighbors found in the first plane to all the other planes
+  for(int p=1; p < nplanes; p++) {
+    for(int i=0; i<nelms/nplanes; i++) {
+      k = i + nelms*p/nplanes;
+      nneighbors[k] = nneighbors[i];
+      for(int j=0; j<nneighbors[i]; j++) {
+	neighbor[k][j] = neighbor[i][j] + nelms*p/nplanes;
+      }
+    }
+  }
+
+  // add the toroidally adjacent elements
+  for(int i=0; i<nelms; i++) {
+    k = i - nelms/nplanes;
+    if(k < 0) k += nelms;
+    neighbor[i][nneighbors[i]++] = k;
+    
+    k = i + nelms/nplanes;
+    if(k >= nelms) k -= nelms;
+    neighbor[i][nneighbors[i]++] = k;
+  }
+}
+
 
 m3dc1_3d_mesh::m3dc1_3d_mesh(int n)
   : m3dc1_mesh(n)

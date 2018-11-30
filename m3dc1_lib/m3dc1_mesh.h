@@ -17,10 +17,10 @@ class m3dc1_mesh {
 
   void clear_memory();
 
+ protected:
   int* nneighbors;
   int** neighbor;
 
- protected:
   virtual const int max_neighbors() const {return 3;}
 
   //  static const double tol = 1e-1;
@@ -43,8 +43,8 @@ class m3dc1_mesh {
     *xi  =  (X - x[i])*co[i] + (Z - z[i])*sn[i] - b[i];
     *eta = -(X - x[i])*sn[i] + (Z - z[i])*co[i];
   }
-  virtual int shared_nodes(const int i, const int j);
-  virtual bool elements_are_neighbors(const int i, const int j);
+  int shared_nodes(const int i, const int j);
+  bool elements_are_neighbors(const int i, const int j);
 
  public:
   int nelms;
@@ -59,13 +59,14 @@ class m3dc1_mesh {
   int* region;
   double period;
   bool toroidal;
+  int nplanes;
 
  public:
   m3dc1_mesh(int n);
   virtual ~m3dc1_mesh(); 
 
   bool set_memory_depth(int d);
-  void find_neighbors();
+  virtual void find_neighbors();
 
   bool is_in_element(const int i, 
 		     const double X, const double Phi, const double Z,
@@ -112,13 +113,15 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
     *zi = Phi - phi[i];
   }
 
-  virtual int shared_nodes(const int i, const int j);
-  virtual bool elements_are_neighbors(const int i, const int j);
+  int shared_nodes(const int i, const int j);
+  bool elements_are_neighbors(const int i, const int j);
   virtual const int max_neighbors() const {return 5;}
 
  public:
   double *phi;
   double *d;
+
+  virtual void find_neighbors();
 
   virtual int in_element(double X, double Phi, double Z, 
 			 double* xi=0, double* zi=0, double* eta=0, 
