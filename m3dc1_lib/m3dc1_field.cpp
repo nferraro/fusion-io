@@ -171,7 +171,9 @@ bool m3dc1_3d_field::eval(const double r, const double phi, const double z,
   double v[6];
   int e;
 
-  e = mesh->in_element(r, phi, z, &xi, &zi, &eta);
+  int guess = (element ? *element : -1);
+
+  e = mesh->in_element(r, phi, z, &xi, &zi, &eta, guess);
   
   if(element) *element = e;
 
