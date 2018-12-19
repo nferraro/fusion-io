@@ -149,7 +149,7 @@ PyObject* fio_eval_scalar_field_py(PyObject* self, PyObject *args)
     return NULL;
 
   double v;
-  int ierr = fio_eval_field(ifield, x, &v);
+  int ierr = fio_eval_field(ifield, x, &v, 0);
   if(ierr != FIO_SUCCESS)
     return NULL; 
 
@@ -183,7 +183,7 @@ PyObject* fio_eval_vector_field_py(PyObject* self, PyObject *args)
   double v[3];
   std::cerr << "ifield = " << ifield << std::endl;
   std::cerr << "x = " << x[0] << " " << x[1] << " " << x[2] << std::endl;
-  int ierr = fio_eval_field(ifield, x, v);
+  int ierr = fio_eval_field(ifield, x, v, 0);
   std::cerr << "ierr = " << ierr << std::endl;
   std::cerr << "v = " << v[0] << " " << v[1] << " " << v[2] << std::endl;
   if(ierr != FIO_SUCCESS)
