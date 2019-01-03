@@ -42,7 +42,7 @@ contains
     real, intent(in), dimension(*) :: x
     real, intent(out), dimension(*) :: v
     integer, intent(out) :: ierr
-    call fio_eval_field(ifield, x, v, 0, ierr)
+    call fio_eval_field(ifield, x, v, ierr)
   end subroutine fio_eval_field_f
 
   subroutine fio_eval_field_deriv_f(ifield, x, v, ierr)
@@ -50,7 +50,7 @@ contains
     real, intent(in), dimension(*) :: x
     real, intent(out), dimension(*) :: v
     integer, intent(out) :: ierr
-    call fio_eval_field_deriv(ifield, x, v, 0, ierr)
+    call fio_eval_field_deriv(ifield, x, v, ierr)
   end subroutine fio_eval_field_deriv_f
 
   subroutine fio_eval_series_f(iseries, x, v, ierr)

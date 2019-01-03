@@ -6,8 +6,8 @@ extern "C" {
   void fio_close_series_(const int*, int*);
   void fio_close_source_(const int*, int*);
   void fio_create_compound_field_(int*, int*);
-  void fio_eval_field_(const int*, const double*, double*, void*, int*);
-  void fio_eval_field_deriv_(const int*, const double*, double*, void*, int*);
+  void fio_eval_field_(const int*, const double*, double*, int*);
+  void fio_eval_field_deriv_(const int*, const double*, double*, int*);
   void fio_eval_series_(const int*, const double*, double*, int*);
   void fio_get_options_(const int*, int*);
   void fio_get_field_(const int*, const int*, int*, int*);
@@ -48,15 +48,15 @@ void fio_create_compound_field_(int* ifield, int* ierr)
   *ierr = fio_create_compound_field(ifield);
 }
 
-void fio_eval_field_(const int* ifield, const double* x, double* v, void* s, int* ierr)
+void fio_eval_field_(const int* ifield, const double* x, double* v, int* ierr)
 {
-  *ierr = fio_eval_field(*ifield, x, v, s);
+  *ierr = fio_eval_field(*ifield, x, v, 0);
 }
 
 void fio_eval_field_deriv_(const int* ifield, const double* x, double* v, 
-			   void* s, int* ierr)
+			   int* ierr)
 {
-  *ierr = fio_eval_field_deriv(*ifield, x, v, s);
+  *ierr = fio_eval_field_deriv(*ifield, x, v, 0);
 }
 
 void fio_eval_series_(const int* iseries, const double* x, double* v, int* ierr)
