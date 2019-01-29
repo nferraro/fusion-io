@@ -20,8 +20,8 @@ int m3dc1_fio_series::load()
 int m3dc1_fio_series::bounds(double* tmin, double* tmax) const
 {
   if(time->size() > 0) {
-    *tmin = time->at(0);
-    *tmax = time->at(time->size()-1);
+    *tmin = time->at(0) * source->t0;
+    *tmax = time->at(time->size()-1) * source->t0;
     return FIO_SUCCESS;
   } else {
     return FIO_NO_DATA;
@@ -34,7 +34,7 @@ int m3dc1_fio_series::eval(const double t, double* x)
     return FIO_NO_DATA;
   
   if(time->size()==1) {
-    *x = factor*data->at(0);
+    *x = factor * data->at(0);
     return FIO_SUCCESS;
   }
 
@@ -44,12 +44,13 @@ int m3dc1_fio_series::eval(const double t, double* x)
   // linearly interpolate data
   int i;
   for(i=0; i<time->size()-1; i++) {
-    if(time->at(i) <= t && time->at(i+1) >= t)
+    if(time->at(i) * source->t0 <= t && time->at(i+1) * source->t0 >= t)
       break;
   }
-  *x = data->at(i) + 
-    (data->at(i+1)-data->at(i))*(t-time->at(i))/(time->at(i+1)-time->at(i));
-  *x *= factor;
+  *x = factor * (
+		 data->at(i) + 
+    (data->at(i+1)-data->at(i))*
+		 (t / source->t0 - time->at(i))/(time->at(i+1)-time->at(i)));
   
   return FIO_SUCCESS;
 }
