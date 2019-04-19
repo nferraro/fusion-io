@@ -23,16 +23,16 @@ print 'Available fields:'
 for field in list:
     print ' ', fio_py.get_field_name(field)
 
-cs = fio_py.get_int_parameter(isrc, FIO_GEOMETRY)
+cs = fio_py.get_int_parameter(isrc, fio_py.FIO_GEOMETRY)
 if cs == fio_py.FIO_CYLINDRICAL:
     print 'Using CYLINDRICAL coordinate system'
 else :
     print 'Using CARTESIAN coordinate system'
 
-ntime = fio_py.get_int_parameter(isrc, FIO_NUM_TIMESLICES)
+ntime = fio_py.get_int_parameter(isrc, fio_py.FIO_NUM_TIMESLICES)
 print 'Number of time slices: ', ntime
 
-period = fio_py.get_real_parameter(isrc, FIO_PERIOD)
+period = fio_py.get_real_parameter(isrc, fio_py.FIO_PERIOD)
 print 'Toroidal period = ', period
 
 ipsi_axis = fio_py.get_series(isrc, fio_py.FIO_MAGAXIS_PSI)
@@ -46,16 +46,20 @@ print 'Psi at lcfs: ', psi_lcfs
 fio_py.close_series(ipsi_axis)
 fio_py.close_series(ipsi_lcfs)
 
-x = (10., 0., 0.)
-(ar, aphi, az) = fio_py.eval_vector_field(ia, x)
-(br, bphi, bz) = fio_py.eval_vector_field(imag, x)
-(jr, jphi, jz) = fio_py.eval_vector_field(ij, x)
-p = fio_py.eval_scalar_field(ipres, x)
-pi = fio_py.eval_scalar_field(ipi, x)
-ne = fio_py.eval_scalar_field(idens, x)
-(vr, vphi, vz) = fio_py.eval_vector_field(ivel, x)
+hint = fio_py.allocate_hint(isrc);
+
+x = (1.6, 0., 0.)
+(ar, aphi, az) = fio_py.eval_vector_field(ia, x, hint)
+(br, bphi, bz) = fio_py.eval_vector_field(imag, x, hint)
+(jr, jphi, jz) = fio_py.eval_vector_field(ij, x, hint)
+p = fio_py.eval_scalar_field(ipres, x, hint)
+pi = fio_py.eval_scalar_field(ipi, x, hint)
+ne = fio_py.eval_scalar_field(idens, x, hint)
+(vr, vphi, vz) = fio_py.eval_vector_field(ivel, x, hint)
 psi = aphi*x[0]
 psi_norm = (psi - psi_axis) / (psi_lcfs - psi_axis)
+
+fio_py.free_hint(hint)
 
 print 'At x = ', x
 print ' poloidal flux = ', psi, ' Wb'
