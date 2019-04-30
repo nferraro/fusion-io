@@ -20,7 +20,8 @@ int main() {
     fio_option_list opt;
 
 // Open an m3dc1 source
-    result = fio_open_source(&src, FIO_M3DC1_SOURCE, "C1.h5");
+//    result = fio_open_source(&src, FIO_M3DC1_SOURCE, "C1.h5");
+    result = fio_open_source(&src, FIO_M3DC1_SOURCE, "/Users/nferraro/data/Teng/it27_nl/C1.h5");
     if(result != FIO_SUCCESS) {
         std::cerr << "Error opening file" << std::endl;
         delete(src);
@@ -39,8 +40,8 @@ int main() {
         return result;
     };
   
-    size_t npts = 100000;
-    size_t nsteps = 10;
+    size_t npts = 1000;
+    size_t nsteps = 1;
     std::vector<std::array<double, 3> > x_array(npts);
     double b[3];
 
@@ -49,8 +50,8 @@ int main() {
     void* hint = calloc(npts, hint_size);
   
     std::mt19937_64 engine;
-    std::uniform_real_distribution<double> r_dist(1.0, 2.5);
-    std::uniform_real_distribution<double> z_dist(-1.0, 1.0);
+    std::uniform_real_distribution<double> r_dist(-0.1, 0.1);
+    std::uniform_real_distribution<double> z_dist(-0.1, 0.1);
     std::uniform_real_distribution<double> phi_dist(0, 2.0*M_PI);
 
     std::cout << "Starting Random" << std::endl;
@@ -66,7 +67,11 @@ int main() {
     for(int i=0; i<nsteps; i++) {
       for(int p=0; p<npts; p++) {
 	void* h = ((char*)hint) + hint_size*p;
+	int h0 = *((int*)h);
         result = magnetic_field->eval(x_array[p].data(), b, h);
+	int h1 = *((int*)h);
+	if(i > 0 && h0 != h1) 
+	  std::cerr << "Bad guess. " << h0 << " " << h1 << std::endl;
       }
     }
     const std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();

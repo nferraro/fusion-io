@@ -60,14 +60,15 @@ int m3dc1_source::open(const char* filename)
   return FIO_SUCCESS;
 }
 
-int m3dc1_source::allocate_search_hint(void* s)
+int m3dc1_source::allocate_search_hint(void** s)
 {
-  s = new int;
+  *s = new int;
+  //  std::cerr << "Allocated hint at " << *s << std::endl;
   return FIO_SUCCESS;
 }
-int m3dc1_source::deallocate_search_hint(void* s)
+int m3dc1_source::deallocate_search_hint(void** s)
 {
-  delete (int*)s;
+  delete (int*)(*s);
   return FIO_SUCCESS;
 }
 

@@ -1,6 +1,11 @@
 module fusion_io
+  use iso_c_binding
 
 #include "fusion_io_defs.h"
+
+  type fio_search_hint
+    type(c_ptr) :: ptr
+  end type fio_search_hint
 
 contains
 
@@ -12,6 +17,13 @@ contains
     integer, intent(out) :: ierr
     call fio_add_field(icfield, ifield, iop, fac, ierr)
   end subroutine fio_add_field_f
+
+  subroutine fio_allocate_search_hint_f(isrc, hint, ierr)
+    integer, intent(in) :: isrc
+    type(fio_search_hint), intent(out) :: hint
+    integer, intent(out) :: ierr
+    call fio_allocate_search_hint(isrc, hint%ptr, ierr)
+  end subroutine fio_allocate_search_hint_f
 
   subroutine fio_close_field_f(ifield, ierr)
     integer, intent(in) :: ifield
@@ -37,20 +49,37 @@ contains
     call fio_create_compound_field(ifield, ierr)
   end subroutine fio_create_compound_field_f
 
-  subroutine fio_eval_field_f(ifield, x, v, ierr)
+  subroutine fio_deallocate_search_hint_f(isrc, hint, ierr)
+    integer, intent(in) :: isrc
+    type(fio_search_hint), intent(inout) :: hint
+    integer, intent(out) :: ierr
+    call fio_deallocate_search_hint(isrc, hint%ptr, ierr)
+  end subroutine fio_deallocate_search_hint_f
+
+  subroutine fio_eval_field_f(ifield, x, v, ierr, hint)
     integer, intent(in) :: ifield
     real, intent(in), dimension(*) :: x
     real, intent(out), dimension(*) :: v
     integer, intent(out) :: ierr
-    call fio_eval_field(ifield, x, v, ierr)
+    type(fio_search_hint), intent(inout), optional :: hint
+    if(present(hint)) then
+      call fio_eval_field_hint(ifield, x, v, hint%ptr, ierr)
+    else 
+      call fio_eval_field(ifield, x, v, ierr)
+    endif
   end subroutine fio_eval_field_f
 
-  subroutine fio_eval_field_deriv_f(ifield, x, v, ierr)
+  subroutine fio_eval_field_deriv_f(ifield, x, v, ierr, hint)
     integer, intent(in) :: ifield
     real, intent(in), dimension(*) :: x
     real, intent(out), dimension(*) :: v
     integer, intent(out) :: ierr
-    call fio_eval_field_deriv(ifield, x, v, ierr)
+    type(fio_search_hint), intent(inout), optional :: hint
+    if(present(hint)) then
+      call fio_eval_field_deriv_hint(ifield, x, v, hint%ptr, ierr)
+    else 
+      call fio_eval_field_deriv(ifield, x, v, ierr)
+    endif
   end subroutine fio_eval_field_deriv_f
 
   subroutine fio_eval_series_f(iseries, x, v, ierr)

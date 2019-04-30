@@ -2,12 +2,16 @@
 
 extern "C" {
   void fio_add_field_(const int*, const int*, const int*, const double*, int*);
+  void fio_allocate_search_hint_(const int*, void**, int*);
   void fio_close_field_(const int*, int*);
   void fio_close_series_(const int*, int*);
   void fio_close_source_(const int*, int*);
   void fio_create_compound_field_(int*, int*);
+  void fio_deallocate_search_hint_(const int*, void**, int*);
   void fio_eval_field_(const int*, const double*, double*, int*);
+  void fio_eval_field_hint_(const int*, const double*, double*, void**, int*);
   void fio_eval_field_deriv_(const int*, const double*, double*, int*);
+  void fio_eval_field_deriv_hint_(const int*, const double*, double*, void**, int*);
   void fio_eval_series_(const int*, const double*, double*, int*);
   void fio_get_options_(const int*, int*);
   void fio_get_field_(const int*, const int*, int*, int*);
@@ -26,6 +30,11 @@ void fio_add_field_(const int* icfield, const int* ifield,
 		const int* op, const double* fac, int* ierr)
 {
   *ierr = fio_add_field(*icfield, *ifield, *op, *fac);
+}
+
+void fio_allocate_search_hint_(const int* isrc, void** h, int* ierr)
+{
+  *ierr = fio_allocate_search_hint(*isrc, h);
 }
 
 void fio_close_field_(const int* ifield, int* ierr)
@@ -48,15 +57,31 @@ void fio_create_compound_field_(int* ifield, int* ierr)
   *ierr = fio_create_compound_field(ifield);
 }
 
+void fio_deallocate_search_hint_(const int* isrc, void** h, int* ierr)
+{
+  *ierr = fio_deallocate_search_hint(*isrc, h);
+}
+
 void fio_eval_field_(const int* ifield, const double* x, double* v, int* ierr)
 {
   *ierr = fio_eval_field(*ifield, x, v, 0);
+}
+
+void fio_eval_field_hint_(const int* ifield, const double* x, double* v, void** h, int* ierr)
+{
+  *ierr = fio_eval_field(*ifield, x, v, *h);
 }
 
 void fio_eval_field_deriv_(const int* ifield, const double* x, double* v, 
 			   int* ierr)
 {
   *ierr = fio_eval_field_deriv(*ifield, x, v, 0);
+}
+
+void fio_eval_field_deriv_hint_(const int* ifield, const double* x, double* v, 
+				void** h, int* ierr)
+{
+  *ierr = fio_eval_field_deriv(*ifield, x, v, *h);
 }
 
 void fio_eval_series_(const int* iseries, const double* x, double* v, int* ierr)

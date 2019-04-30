@@ -26,8 +26,8 @@ class m3dc1_source : public fio_source {
 
   int sizeof_search_hint() const
   { return sizeof(int); }
-  int allocate_search_hint(void* s);
-  int deallocate_search_hint(void* s);
+  int allocate_search_hint(void** s);
+  int deallocate_search_hint(void** s);
 };
 
 

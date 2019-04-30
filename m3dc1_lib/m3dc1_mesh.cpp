@@ -28,7 +28,7 @@ m3dc1_mesh::m3dc1_mesh(int n)
 
 m3dc1_mesh::~m3dc1_mesh()
 {
-
+  /*
   int evals = hits+misses;
   std::cerr << "hits = " << hits
 	    << " (" << 100.*(double)hits/(double)evals << "%)\n"
@@ -36,7 +36,7 @@ m3dc1_mesh::~m3dc1_mesh()
 	    << " (" << 100.*(double)misses/(double)evals << "%)\n"
 	    << "hits+misses = " << evals
 	    << std::endl;
-
+  */
 
   delete[] a;
   delete[] b;
@@ -123,9 +123,55 @@ bool m3dc1_mesh::set_memory_depth(const int d)
   return true;
 }
 
-int m3dc1_mesh::in_element(double X, double Phi, double Z, 
-			   double* xi, double* zi, double* eta,
-			   int guess)
+int m3dc1_mesh::in_element_threadsafe(double X, double Phi, double Z,
+				      double* xi, double* zi, double* eta,
+				      int guess)
+{
+  // if a guess is provided, test it
+  if(guess >= 0) {
+    if(is_in_element(guess,X,Phi,Z,xi,zi,eta)) {
+      hits++;
+      return guess;
+    }
+
+    // Test neighbors
+    for(int n=0; n<nneighbors[guess]; n++) {
+      int m = neighbor[guess][n];
+      if(is_in_element(m,X,Phi,Z,xi,zi,eta)) {
+	hits++;
+	return m;
+      }
+    }
+
+    // Test neighbors' neighbors
+    for(int n=0; n<nneighbors[guess]; n++) {
+      int m = neighbor[guess][n];
+      for(int nn=0; nn<nneighbors[m]; nn++) {
+	int l = neighbor[m][nn];
+	if(is_in_element(l,X,Phi,Z,xi,zi,eta)) {
+	  hits++;
+	  return l;
+	}
+      }
+    }
+  }
+
+  misses++;
+
+  // Now, search randomly.
+  for(int e=0; e<nelms; e++) {
+    if(is_in_element(e,X,Phi,Z,xi,zi,eta))
+      return e;
+  }
+
+  // failed to find an elm containing coordinates.
+  return -1;
+
+}
+
+int m3dc1_mesh::in_element_memory(double X, double Phi, double Z,
+				  double* xi, double* zi, double* eta,
+				  int guess)
 {
   // if a guess is provided, test it
   if(guess >= 0) {
@@ -196,6 +242,18 @@ int m3dc1_mesh::in_element(double X, double Phi, double Z,
 
   // failed to find an elm containing coordinates.
   return -1;
+
+}
+
+int m3dc1_mesh::in_element(double X, double Phi, double Z, 
+			   double* xi, double* zi, double* eta,
+			   int guess)
+{
+  if(memory_depth>0) {
+    return in_element_memory(X, Phi, Z, xi, zi, eta, guess);
+  } else {
+    return in_element_threadsafe(X, Phi, Z, xi, zi, eta, guess); 
+  }
 }
 
 int m3dc1_mesh::shared_nodes(const int i, const int j)

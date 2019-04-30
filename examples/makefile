@@ -38,15 +38,15 @@ example : example.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_c : example_c.o
-	$(CC) $(LDFLAGS) $< $(LIBS) -o $@
+	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_fortran : example_fortran.o
-	$(F90) $(LDFLAGS) $< $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_push : example_push.o
 	$(F90) $(LDFLAGS) $< -lfio_push $(LIBS) -o $@
 
-korc_example : korc_example.cpp
+korc_example : main.cpp #korc_example.cpp
 	mpicxx $< -std=c++11 $(INCLUDE) $(LIBS) -o $@
 
 exmk :

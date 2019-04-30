@@ -29,71 +29,72 @@ program fio_example
   integer, parameter :: npts = 40
   real :: R0, R1, Z0, Z1, phi0, phi1, period, tmin, tmax, time
   integer :: i, j, cs, ntime, ierr
+  type(fio_search_hint) :: hint
 
   filename_m3dc1 = 'C1.h5'
 
-!!$  ! read files and fields
-!!$  print *, 'Reading ', trim(filename_m3dc1)
-!!$  call fio_open_source_f(FIO_M3DC1_SOURCE, trim(filename_m3dc1), isrc, ierr)
-!!$  if(ierr.ne.0) goto 100
-!!$
-!!$  ! Print information about coordinate system
-!!$  call fio_get_int_parameter_f(isrc, FIO_GEOMETRY, cs, ierr)
-!!$  call fio_get_real_parameter_f(isrc, FIO_PERIOD, period, ierr)
-!!$  if(cs.eq.FIO_CARTESIAN) then
-!!$     print *, 'Using CARTESIAN coordinate system'
-!!$     print *, 'Toroidal period (in m) = ', period
-!!$  else if(cs.eq.FIO_CYLINDRICAL) then
-!!$     print *, 'Using CYLINDRICAL coordinate system'
-!!$     print *, 'Toroidal period (in rad) = ', period
-!!$  else 
-!!$     print *, 'ERROR: Unrecognized coordinate system'
-!!$  end if
-!!$
-!!$  call fio_get_int_parameter_f(isrc, FIO_NUM_TIMESLICES, ntime, ierr)
-!!$  print *, 'Number of timeslices: ', ntime
-!!$
-!!$  ! Set options appropriate to this source
-!!$  call fio_get_options_f(isrc, ierr)
-!!$  call fio_set_int_option_f(FIO_TIMESLICE, timeslice, ierr)
-!!$  call fio_set_real_option_f(FIO_LINEAR_SCALE, factor, ierr)
-!!$
-!!$  ! By default, full fields (equilibrium + perturbed) will be read
-!!$  ! to read only the perturbed fields, use
-!!$  ! call fio_set_int_option_f(FIO_PART, FIO_PERTURBED_ONLY, ierr)
-!!$
-!!$  ! read fields
-!!$  ! magnetic field and total pressure are species-independent
-!!$  call fio_get_field_f(isrc, FIO_TOTAL_PRESSURE, ipres, ierr);
-!!$  call fio_get_field_f(isrc, FIO_MAGNETIC_FIELD, imag, ierr);
-!!$  call fio_get_field_f(isrc, FIO_CURRENT_DENSITY, ij, ierr);
-!!$
-!!$  ! density is species dependent; specify electrons
-!!$  call fio_set_int_option_f(FIO_SPECIES, FIO_ELECTRON, ierr)
-!!$  call fio_get_field_f(isrc, FIO_DENSITY, ine,ierr);
-!!$  
-!!$  call fio_set_int_option_f(FIO_SPECIES, FIO_MAIN_ION, ierr)
-!!$  call fio_get_field_f(isrc, FIO_DENSITY, ini,ierr);
-!!$
-!!$  ! Determine time of timeslice
-!!$  call fio_get_real_field_parameter_f(ini, FIO_TIME, time, ierr);
-!!$  print *, 'Density is being evaluated at t = ', time
-!!$
-!!$
-!!$  ! Evaluate the flux at the magnetic axis and lcfs
-!!$  call fio_get_series_f(isrc, FIO_MAGAXIS_PSI, ipsi_axis, ierr)
-!!$  call fio_get_series_f(isrc, FIO_LCFS_PSI, ipsi_lcfs, ierr)
-!!$
-!!$  call fio_eval_series_f(ipsi_axis, 0., psi_axis, ierr)
-!!$  call fio_eval_series_f(ipsi_lcfs, 0., psi_lcfs, ierr)
-!!$  print *, 'Psi at magnetic axis: ', psi_axis
-!!$  print *, 'Psi at lcfs: ', psi_lcfs
-!!$
-!!$  call fio_get_series_bounds_f(ipsi_axis, tmin, tmax, ierr)
-!!$  print *, 'Time domain bounds for magnetic axis data: ', tmin, tmax
-!!$
-!!$  call fio_close_series_f(ipsi_axis, ierr)
-!!$  call fio_close_series_f(ipsi_lcfs, ierr)
+  ! read files and fields
+  print *, 'Reading ', trim(filename_m3dc1)
+  call fio_open_source_f(FIO_M3DC1_SOURCE, trim(filename_m3dc1), isrc, ierr)
+  if(ierr.ne.0) goto 100
+
+  ! Print information about coordinate system
+  call fio_get_int_parameter_f(isrc, FIO_GEOMETRY, cs, ierr)
+  call fio_get_real_parameter_f(isrc, FIO_PERIOD, period, ierr)
+  if(cs.eq.FIO_CARTESIAN) then
+     print *, 'Using CARTESIAN coordinate system'
+     print *, 'Toroidal period (in m) = ', period
+  else if(cs.eq.FIO_CYLINDRICAL) then
+     print *, 'Using CYLINDRICAL coordinate system'
+     print *, 'Toroidal period (in rad) = ', period
+  else 
+     print *, 'ERROR: Unrecognized coordinate system'
+  end if
+
+  call fio_get_int_parameter_f(isrc, FIO_NUM_TIMESLICES, ntime, ierr)
+  print *, 'Number of timeslices: ', ntime
+
+  ! Set options appropriate to this source
+  call fio_get_options_f(isrc, ierr)
+  call fio_set_int_option_f(FIO_TIMESLICE, timeslice, ierr)
+  call fio_set_real_option_f(FIO_LINEAR_SCALE, factor, ierr)
+
+  ! By default, full fields (equilibrium + perturbed) will be read
+  ! to read only the perturbed fields, use
+  ! call fio_set_int_option_f(FIO_PART, FIO_PERTURBED_ONLY, ierr)
+
+  ! read fields
+  ! magnetic field and total pressure are species-independent
+  call fio_get_field_f(isrc, FIO_TOTAL_PRESSURE, ipres, ierr);
+  call fio_get_field_f(isrc, FIO_MAGNETIC_FIELD, imag, ierr);
+  call fio_get_field_f(isrc, FIO_CURRENT_DENSITY, ij, ierr);
+
+  ! density is species dependent; specify electrons
+  call fio_set_int_option_f(FIO_SPECIES, FIO_ELECTRON, ierr)
+  call fio_get_field_f(isrc, FIO_DENSITY, ine,ierr);
+  
+  call fio_set_int_option_f(FIO_SPECIES, FIO_MAIN_ION, ierr)
+  call fio_get_field_f(isrc, FIO_DENSITY, ini,ierr);
+
+  ! Determine time of timeslice
+  call fio_get_real_field_parameter_f(ini, FIO_TIME, time, ierr);
+  print *, 'Density is being evaluated at t = ', time
+
+
+  ! Evaluate the flux at the magnetic axis and lcfs
+  call fio_get_series_f(isrc, FIO_MAGAXIS_PSI, ipsi_axis, ierr)
+  call fio_get_series_f(isrc, FIO_LCFS_PSI, ipsi_lcfs, ierr)
+
+  call fio_eval_series_f(ipsi_axis, 0., psi_axis, ierr)
+  call fio_eval_series_f(ipsi_lcfs, 0., psi_lcfs, ierr)
+  print *, 'Psi at magnetic axis: ', psi_axis
+  print *, 'Psi at lcfs: ', psi_lcfs
+
+  call fio_get_series_bounds_f(ipsi_axis, tmin, tmax, ierr)
+  print *, 'Time domain bounds for magnetic axis data: ', tmin, tmax
+
+  call fio_close_series_f(ipsi_axis, ierr)
+  call fio_close_series_f(ipsi_lcfs, ierr)
 
   
 !  ! open efit file
@@ -115,38 +116,41 @@ program fio_example
 !!$  call fio_get_field_f(isrc_gato, FIO_MAGNETIC_FIELD, imag_gato, ierr);
 !!$  call fio_get_field_f(isrc_gato, FIO_TOTAL_PRESSURE, ipres_gato, ierr);
 
-  ! open mars file
-  filename_mars = ''
-  call fio_open_source_f(FIO_MARS_SOURCE,trim(filename_mars),isrc_mars,ierr)
-  if(ierr.ne.FIO_SUCCESS) then
-     print *, 'Error reading MARS source'
-     goto 100
-  end if
+!!$  ! open mars file
+!!$  filename_mars = ''
+!!$  call fio_open_source_f(FIO_MARS_SOURCE,trim(filename_mars),isrc_mars,ierr)
+!!$  if(ierr.ne.FIO_SUCCESS) then
+!!$     print *, 'Error reading MARS source'
+!!$     goto 100
+!!$  end if
+!!$
+!!$  call fio_get_options_f(isrc_mars, ierr)
+!!$  call fio_set_int_option_f(FIO_PART, FIO_PERTURBED_ONLY, ierr)
+!!$
+!!$  call fio_get_field_f(isrc_mars, FIO_MAGNETIC_FIELD, imag_mars, ierr);
+!!$  if(ierr.ne.FIO_SUCCESS) then
+!!$     print *, 'Error reading MARS magnetic field'
+!!$     goto 100
+!!$  end if 
 
-  call fio_get_options_f(isrc_mars, ierr)
-  call fio_set_int_option_f(FIO_PART, FIO_PERTURBED_ONLY, ierr)
+!!$  x(1) = 1.02
+!!$  x(2) = 0.
+!!$  x(3) = 0.05
+!!$  print *, 'Evaluating field'
+!!$  call fio_eval_field_f(imag_mars, x, b, ierr)
+!!$  print *, 'Done. ierr = ', ierr
 
-  call fio_get_field_f(isrc_mars, FIO_MAGNETIC_FIELD, imag_mars, ierr);
-  if(ierr.ne.FIO_SUCCESS) then
-     print *, 'Error reading MARS magnetic field'
-     goto 100
-  end if
+  ! initialize hint
+  call fio_allocate_search_hint_f(isrc, hint, ierr)
 
-  x(1) = 1.02
-  x(2) = 0.
-  x(3) = 0.05
-  print *, 'Evaluating field'
-  call fio_eval_field_f(imag_mars, x, b, ierr)
-  print *, 'Done. ierr = ', ierr
-
-  R0 = 0.9;
-  R1 = 1.1;
-  Z0 = -0.1;
-  Z1 =  0.1;
+  R0 = 0.4;
+  R1 = 2.4;
+  Z0 = -1.0;
+  Z1 =  1.0;
   phi0 = 0.;
   phi1 = 0.;
 
-  open(ifile, file='b.fio', action='write')
+!!$  open(ifile, file='b.fio', action='write')
 
   do i=1, npts
      do j=1, npts
@@ -156,30 +160,30 @@ program fio_example
 
 !        write(*, '("(",3F12.4,"):")') x
 
-        call fio_eval_field_f(imag_mars, x, b, ierr)
+!!$        call fio_eval_field_f(imag_mars, x, b, ierr)
 !        write(*, '("        efit b = ", 1p3E12.4)') b
-     
-        write(ifile, '(6e14.5)') x(1), x(3), x(2), b(1), b(3), b(2)
+!!$     
+!!$        write(ifile, '(6e14.5)') x(1), x(3), x(2), b(1), b(3), b(2)
+!!$
+     call fio_eval_field_f(ipres, x, p, ierr, hint=hint)
+     call fio_eval_field_f(ine, x, ne, ierr, hint=hint)
+     call fio_eval_field_f(ini, x, ni, ierr, hint=hint)
+     call fio_eval_field_f(imag, x, b, ierr, hint=hint)
+     call fio_eval_field_f(ij, x, curr, ierr, hint=hint)
+     call fio_eval_field_deriv_f(imag, x, db, ierr, hint=hint)
 
-!!$     call fio_eval_field_f(ipres, x, p, ierr)
-!!$     call fio_eval_field_f(ine, x, ne, ierr)
-!!$     call fio_eval_field_f(ini, x, ni, ierr)
-!!$     call fio_eval_field_f(imag, x, b, ierr)
-!!$     call fio_eval_field_f(ij, x, curr, ierr)
-!!$     call fio_eval_field_deriv_f(imag, x, db, ierr)
-!!$
-!!$     write(*, '("        pressure = ",1pE12.4)') p
-!!$     write(*, '("        electron density = ",1pE12.4)') ne
-!!$     write(*, '("        ion density = ",1pE12.4)') ni
-!!$     write(*, '("        total B = ",1p3E12.4)') b
-!!$     write(*, '("        total J = ",1p3E12.4)') curr
-!!$     write(*, '("        dB/dR = ",1p3E12.4)') &
-!!$          db(FIO_DR_R), db(FIO_DR_PHI), db(FIO_DR_Z)
-!!$     write(*, '("        dB/dPhi = ",1p3E12.4)') &
-!!$          db(FIO_DPHI_R), db(FIO_DPHI_PHI), db(FIO_DPHI_Z)
-!!$     write(*, '("        dB/dZ = ",1p3E12.4)') &
-!!$          db(FIO_DZ_R), db(FIO_DZ_PHI), db(FIO_DZ_Z)
-!!$
+     write(*, '("        pressure = ",1pE12.4)') p
+     write(*, '("        electron density = ",1pE12.4)') ne
+     write(*, '("        ion density = ",1pE12.4)') ni
+     write(*, '("        total B = ",1p3E12.4)') b
+     write(*, '("        total J = ",1p3E12.4)') curr
+     write(*, '("        dB/dR = ",1p3E12.4)') &
+          db(FIO_DR_R), db(FIO_DR_PHI), db(FIO_DR_Z)
+     write(*, '("        dB/dPhi = ",1p3E12.4)') &
+          db(FIO_DPHI_R), db(FIO_DPHI_PHI), db(FIO_DPHI_Z)
+     write(*, '("        dB/dZ = ",1p3E12.4)') &
+          db(FIO_DZ_R), db(FIO_DZ_PHI), db(FIO_DZ_Z)
+
 !     b = 0.
 !     p = 0.
 !     curr2 = 0.
@@ -196,22 +200,24 @@ program fio_example
 !!$     write(*, '("        gato b = ", 1p3E12.4)') b
      end do
 
-     write(ifile, *)
+!!$     write(ifile, *)
   end do
 
-  close(ifile)
+!!$  close(ifile)
 
 100 continue 
 
-!!$  call fio_close_field_f(ine, ierr)
-!!$  call fio_close_field_f(ini, ierr)
-!!$  call fio_close_field_f(ipres, ierr)
-!!$  call fio_close_field_f(imag, ierr)
-!!$  call fio_close_field_f(ij, ierr)
-!!$  call fio_close_source_f(isrc, ierr)
+  call fio_deallocate_search_hint_f(isrc, hint, ierr)
 
-  call fio_close_field_f(imag_mars, ierr)
-  call fio_close_source_f(isrc_mars, ierr)
+  call fio_close_field_f(ine, ierr)
+  call fio_close_field_f(ini, ierr)
+  call fio_close_field_f(ipres, ierr)
+  call fio_close_field_f(imag, ierr)
+  call fio_close_field_f(ij, ierr)
+  call fio_close_source_f(isrc, ierr)
+
+!!$  call fio_close_field_f(imag_mars, ierr)
+!!$  call fio_close_source_f(isrc_mars, ierr)
 
 
 !  call fio_close_field_f(imag_efit, ierr)

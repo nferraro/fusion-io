@@ -46,6 +46,13 @@ class m3dc1_mesh {
   int shared_nodes(const int i, const int j);
   bool elements_are_neighbors(const int i, const int j);
 
+  int in_element_threadsafe(double X, double Phi, double Z, 
+			    double* xi=0, double* zi=0, double* eta=0, 
+			    int guess=-1);
+  int in_element_memory(double X, double Phi, double Z, 
+			double* xi=0, double* zi=0, double* eta=0, 
+			int guess=-1);
+
  public:
   int nelms;
   double* a;
