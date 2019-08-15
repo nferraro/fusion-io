@@ -81,8 +81,8 @@ install :
 	mkdir -p $(FIO_INSTALL_DIR)/modules
 	-cp $(SRCDIR)/fusion-io.module $(FIO_INSTALL_DIR)/modules/fusion-io
 	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io
-#	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
-#	$(PYTHON) $(SRCDIR)/fio_setup.py install
+	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
+	$(PYTHON) $(SRCDIR)/fio_setup.py install
 
 include $(FIO_ROOT)/install/common_footer.mk
 
