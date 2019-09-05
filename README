@@ -1,4 +1,4 @@
-1. Set the following environment variables
+1. Set the environment variables FIO_ROOT, FIO_ARCH, FIO_INSTALL_DIR, and PYTHON
 
 * FIO_ROOT should be set to the directory containing this README
   file
@@ -11,6 +11,9 @@
   $FIO_INSTALL_DIR/include, $FIO_INSTALL_DIR/lib, and
   $FIO_INSTALL_DIR/bin.
 
+* PYTHON should be set to the python executable. for examplye python3 (python2 is 
+  close to getting deprecated)
+
 
 2. Create and edit the file $FIO_ROOT/install/make.inc.$FIO_ARCH
    to specify the proper compilers and library paths.  An example
@@ -18,6 +21,10 @@
    $FIO_ROOT/install/make.inc.OSX .
 
    You will need an installation of HDF5, MPI, and LAPACK
+
+   If compiling on Portal: ACML_HOME should also be changed to: /usr/pppl/acml/5.3.1
+   If compiling on eddy, the INCLUDE path might be incorrectly set (missing an -I 
+   in front of the first entry. export INCLUDE=-I$INCLUDE should fix it. 
 
 
 3. From $FIO_ROOT
@@ -32,3 +39,8 @@
    Libraries in       $FIO_INSTALL_DIR/lib/
    Headers in         $FIO_INSTALL_DIR/include/
    Fortran modules in $FIO_INSTALL_DIR/include/
+
+5. To run the code add the following paths to your bashrc:
+    PATH:             $FIO_INSTALL_DIR/bin
+    LD_LIBRARY_PATH:  $FIO_INSTALL_DIR/lib
+    PYTHONPATH:       $FIO_INSTALL_DIR/lib

@@ -72,17 +72,18 @@ python : fio_setup.py python_interface.cpp
 install :
 	mkdir -p $(FIO_INSTALL_DIR)/lib
 	-cp $(LIB) $(DLIB) $(FIO_INSTALL_DIR)/lib
+	-cp $(SRCDIR)/fpy.py $(FIO_INSTALL_DIR)/lib/
 	mkdir -p $(FIO_INSTALL_DIR)/include/
 	cp $(SRCDIR)/fusion_io_defs.h $(FIO_INSTALL_DIR)/include/
 	cp $(SRCDIR)/fusion_io_c.h $(FIO_INSTALL_DIR)/include/
 	mkdir -p $(FIO_INSTALL_DIR)/include
 	-cp *.mod $(FIO_INSTALL_DIR)/include
-	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py.so $(FIO_INSTALL_DIR)/lib
+	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py*.so $(FIO_INSTALL_DIR)/lib/fio_py.so
 	mkdir -p $(FIO_INSTALL_DIR)/modules
 	-cp $(SRCDIR)/fusion-io.module $(FIO_INSTALL_DIR)/modules/fusion-io
 	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io
-	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
-	$(PYTHON) $(SRCDIR)/fio_setup.py install
+#	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
+#	$(PYTHON) $(SRCDIR)/fio_setup.py install
 
 include $(FIO_ROOT)/install/common_footer.mk
 

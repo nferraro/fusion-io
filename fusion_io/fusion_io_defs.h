@@ -6,7 +6,11 @@
 #define INDEX_OFFSET 1
 #elif defined(PYTHON)
 #undef FIO_DEFINE_INT
+#if PY_MAJOR_VERSION >= 3
+#define FIO_DEFINE_INT(x, y) PyDict_SetItemString(PYTHON_DICT, #x, PyLong_FromLong(y));
+#else
 #define FIO_DEFINE_INT(x, y) PyDict_SetItemString(PYTHON_DICT, #x, PyInt_FromLong(y));
+#endif
 #else
 #define FIO_DEFINE_INT(x, y) const int x = y;
 #define FIO_IS_STR_OPT(x)    ((x)>FIO_STR_OPT_START && (x)<FIO_STR_OPT_END)
@@ -14,7 +18,7 @@
 #define FIO_IS_REAL_OPT(x)   ((x)>FIO_REAL_OPT_START && (x)<FIO_REAL_OPT_END)
 #define INDEX_OFFSET 0
 #endif
-#define COMMENT(x) 
+#define COMMENT(x)
 
 COMMENT(     sources     )
 FIO_DEFINE_INT(FIO_GATO_SOURCE,       1)
