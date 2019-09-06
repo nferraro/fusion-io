@@ -62,6 +62,7 @@ install: exmk
 	cp $(SRCDIR)/example_fortran.f90 $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_c.c $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_python.py $(FIO_INSTALL_DIR)/examples
+	cp $(SRCDIR)/python_fpy_example.py $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_push.f90 $(FIO_INSTALL_DIR)/examples
 	cp exmk $(FIO_INSTALL_DIR)/examples/makefile
 	rm exmk
