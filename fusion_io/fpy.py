@@ -318,13 +318,13 @@ class sim_data:
         """
         def __init__(self, sim_data, scalar):
             self.sim_data = sim_data
-            self.time      = self.sim_data._all_traces['time'].value
+            self.time      = self.sim_data._all_traces['time'][()]
             if scalar is not 'bharmonics' and scalar is not 'keharmonics':
-                self.values    = self.sim_data._all_traces[scalar].value
+                self.values    = self.sim_data._all_traces[scalar][()]
             if scalar is 'bharmonics':
-                self.values    = self.sim_data._all_attrs['bharmonics/bharmonics'].value
+                self.values    = self.sim_data._all_attrs['bharmonics/bharmonics'][()]
             if scalar is 'keharmonics':
-                self.values    = self.sim_data._all_attrs['keharmonics/keharmonics'].value
+                self.values    = self.sim_data._all_attrs['keharmonics/keharmonics'][()]
 
     class diagnostic:
         def __init__(self, sim_data, diagnostic):
@@ -361,7 +361,7 @@ class sim_data:
             # self.diagnostic is a set of arrays for different iterations
             # x_axis contains iteration number
             if diagnostic =='iterations':
-                self.diagnostic = sim_data._all_attrs['kspits/kspits'].value
+                self.diagnostic = sim_data._all_attrs['kspits/kspits'][()]
                 self.x_axis     = np.arange(np.shape(self.diagnostic[:,0])[0])+1
 
 
