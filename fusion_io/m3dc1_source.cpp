@@ -21,6 +21,7 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("version", &version);
   file.read_parameter("itor", &itor);
   file.read_parameter("ntime", &ntime);
+  file.read_parameter("ntor", &ntor);
 
   if(version < 23) 
     file.read_parameter("zeff", &z_ion);
@@ -104,6 +105,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_TEMPERATURE);
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
+  fields->push_back(FIO_ELECTRIC_FIELD);
 
   return FIO_SUCCESS;
 }
@@ -118,6 +120,10 @@ int m3dc1_source::get_int_parameter(const parameter_type t, int* p) const
 
   case FIO_GEOMETRY:
     *p = (itor==1 ? FIO_CYLINDRICAL : FIO_CARTESIAN);
+    return FIO_SUCCESS;
+
+  case FIO_TOROIDAL_MODE:
+    *p = ntor;
     return FIO_SUCCESS;
 
   default:    return FIO_UNSUPPORTED;
