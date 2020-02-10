@@ -126,7 +126,7 @@ class sim_data:
                          'alpha': ('alpha',         'scalar', None),
                          'ti': ('temperature',      'scalar', 'main ion'),
                          'te': ('temperature',      'scalar', 'electron'),
-                         'A' : ('vector potential'fpy.py, 'vector',  None ),
+                         'A' : ('vector potential', 'vector',  None ),
                          'E' : ('electric field',   'vector',  None )}
         self.available_fields = self.typedict
         self._all_attrs       = h5py.File(filename, 'r')
