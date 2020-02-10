@@ -59,6 +59,7 @@ FIO_DEFINE_INT(FIO_MAGAXIS_Z,         3004)
 COMMENT(      integer parameters         )
 FIO_DEFINE_INT(FIO_NUM_TIMESLICES,    4001)
 FIO_DEFINE_INT(FIO_GEOMETRY,          4002)
+FIO_DEFINE_INT(FIO_TOROIDAL_MODE,     4003)
 
 COMMENT(      real parameters         )
 FIO_DEFINE_INT(FIO_PERIOD,            5001)
