@@ -123,9 +123,11 @@ class sim_data:
                          'p' : ('total pressure',   'scalar',  None ),
                          'pi': ('pressure',         'scalar', 'main ion'),
                          'pe': ('pressure',         'scalar', 'electron'),
+                         'alpha': ('alpha',         'scalar', None),
                          'ti': ('temperature',      'scalar', 'main ion'),
                          'te': ('temperature',      'scalar', 'electron'),
-                         'A' : ('vector potential', 'vector',  None )}
+                         'A' : ('vector potential'fpy.py, 'vector',  None ),
+                         'E' : ('electric field',   'vector',  None )}
         self.available_fields = self.typedict
         self._all_attrs       = h5py.File(filename, 'r')
         self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
@@ -138,6 +140,11 @@ class sim_data:
         self._isrc  = fio_py.open_source(ifiletype, filename)
         self.hint   = fio_py.allocate_hint(self._isrc)
         fio_py.get_options(self._isrc)
+        #self.ntime = fio_py.get_int_parameter(self._isrc, fio_py.FIO_NUM_TIMESLICES)
+        self.ntime = self._all_attrs.attrs["ntime"]
+        if time == 'last':
+            time = self.ntime - 1
+            print('last time slice = '+str(time))
         fio_py.set_int_option(fio_py.FIO_TIMESLICE, int(time))
         self._imag = fio_py.get_field(self._isrc, fio_py.FIO_MAGNETIC_FIELD)
         self.fields.append(self._imag)
@@ -145,8 +152,12 @@ class sim_data:
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
         #available fields is a dictionary from names to assigned integers
         self._available_fields = dict(zip([fio_py.get_field_name(nr) for nr in self._iavailable_fields], self._iavailable_fields))
-        self.ntime = fio_py.get_int_parameter(self._isrc, fio_py.FIO_NUM_TIMESLICES)
+        self.ntor = fio_py.get_int_parameter(self._isrc, fio_py.FIO_TOROIDAL_MODE)
         self.period = fio_py.get_real_parameter(self._isrc, fio_py.FIO_PERIOD)
+        if time == -1:
+            self.timeslice = int(0)
+        else:
+            self.timeslice = int(time)
         self.time = fio_py.get_real_field_parameter(self._imag, fio_py.FIO_TIME)
         if verbose:
             print('Available fields:')
@@ -216,6 +227,12 @@ class sim_data:
         """
         return self.mesh(self, time)
 
+    def get_signal(self,filename,signame):
+        """
+        Return a signal object
+        """
+        return self.signal(self,filename,signame)
+
     def get_constants(self):
         return self.constants(self)
 
@@ -236,6 +253,7 @@ class sim_data:
         'ti' - ion temperature
         'te' - electron temperature
         'A'  - vector potential
+        'E'  - electric field
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
@@ -287,7 +305,7 @@ class sim_data:
         """
         def __init__(self, sim_data, time=0):
             self.sim_data = sim_data
-            fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
+            fio_py.set_int_option(fio_py.FIO_TIMESLICE, int(time))
             itype  = sim_data._available_fields['magnetic field']
             #'magnetic field' is just used as a dummy field to read time
             self.time = fio_py.get_real_field_parameter(fio_py.get_field(sim_data._isrc, itype), fio_py.FIO_TIME)
@@ -310,6 +328,17 @@ class sim_data:
             nplanes = dset.attrs["nplanes"]
 
             return mesh, version, nplanes
+
+    class signal:
+        """
+        Signal class: for diagnostic signals from magnetic probes and flux loops
+        """
+        def __init__(self, sim_data, filename, signame):
+            self.sim_data = sim_data
+            self._all_attrs       = h5py.File(filename, 'r')
+            self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
+            self.sigvalues = h5py.File(filename, 'r')[signame+'/value']
+            
 
     class time_traces:
         """
