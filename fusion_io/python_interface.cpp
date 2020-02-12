@@ -16,6 +16,7 @@ extern "C" {
   static PyObject* fio_eval_series_py(PyObject*, PyObject*);
   static PyObject* fio_eval_vector_field_py(PyObject*, PyObject*);
   static PyObject* fio_eval_vector_field_deriv_py(PyObject*, PyObject*);
+  static PyObject* fio_eval_tensor_field_py(PyObject*, PyObject*);
   static PyObject* fio_free_hint_py(PyObject*, PyObject*);
   static PyObject* fio_get_available_fields_py(PyObject*, PyObject*);
   static PyObject* fio_get_field_py(PyObject*, PyObject*);
@@ -44,6 +45,7 @@ extern "C" {
     {"eval_series", fio_eval_series_py, METH_VARARGS, ""},
     {"eval_vector_field", fio_eval_vector_field_py, METH_VARARGS, ""},
     {"eval_vector_field_deriv", fio_eval_vector_field_deriv_py, METH_VARARGS, ""},
+    {"eval_tensor_field", fio_eval_tensor_field_py, METH_VARARGS, ""},
     {"free_hint", fio_free_hint_py, METH_VARARGS, ""},
     {"get_available_fields", fio_get_available_fields_py, METH_VARARGS, ""},
     {"get_options", fio_get_options_py, METH_VARARGS, ""},
@@ -313,7 +315,30 @@ PyObject* fio_eval_vector_field_deriv_py(PyObject* self, PyObject *args)
   /* Do the evaluation!*/
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
   if(ierr != FIO_SUCCESS)
-    /* return a 3-tuple of nulls if it couldn't read*/
+    /* return a 9-tuple of nulls if it couldn't read*/
+    return Py_BuildValue("(8)", Py_None);
+
+  hint_py = PyLong_FromVoidPtr(hint);
+
+  return Py_BuildValue("(ddddddddd)", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
+}
+
+PyObject* fio_eval_tensor_field_py(PyObject* self, PyObject *args)
+{
+  int ifield;
+  double x[3];
+  PyObject* hint_py;
+
+  if(!PyArg_ParseTuple(args, "i(ddd)O", &ifield, &(x[0]), &(x[1]), &(x[2]), &hint_py))
+    return NULL;
+
+  void* hint = PyLong_AsVoidPtr(hint_py);
+
+  double v[9];
+  /* Do the evaluation!*/
+  int ierr = fio_eval_field(ifield, x, v, hint);
+  if(ierr != FIO_SUCCESS)
+    /* return a 9-tuple of nulls if it couldn't read*/
     return Py_BuildValue("(8)", Py_None);
 
   hint_py = PyLong_FromVoidPtr(hint);
