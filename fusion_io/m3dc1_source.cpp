@@ -106,6 +106,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
+  fields->push_back(FIO_GRAD_VECTOR_POTENTIAL);
 
   return FIO_SUCCESS;
 }
