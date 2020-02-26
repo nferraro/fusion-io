@@ -1,5 +1,6 @@
 #include "m3dc1_mesh.h"
 
+#include <fstream>
 #include <iostream>
 #include <math.h>
 
@@ -324,9 +325,54 @@ int m3dc1_3d_mesh::shared_nodes(const int i, const int j)
 }
 */
 
+void m3dc1_mesh::stash_neighbors()
+{
+  std::fstream stash;
+  stash.open(".stash", std::fstream::out | std::fstream::trunc);
+  stash << nelms << "\n";
+  stash << nplanes << "\n";
+  for(int i=0; i<nelms/nplanes; i++) {
+    stash << nneighbors[i] << "\n";
+    for(int j=0; j<nneighbors[i]; j++) {
+      stash << neighbor[i][j] << "\n";
+    }
+  }
+  stash.close();
+}
+
+int m3dc1_mesh::load_neighbors(std::ifstream *stash)
+{
+  std::cerr << "Loading M3D-C1 mesh connectivity..." << std::endl;
+
+  // read and verify number of elements
+  int n;
+  *stash >> n;
+  if(n != nelms) {
+    std::cerr << "failed, because number of elements does not match: nelms = " << n << std::endl;
+    return 1;
+  }
+
+  // read and verify number of planes
+  *stash >> n;
+  if(n != nplanes) {
+    std::cerr << "failed, because number of planes does not match: nplanes = " << n << std::endl;
+    return 1;
+  }
+
+  // read mesh connectivity
+  for(int i=0; i<nelms/nplanes; i++) {
+    *stash >> nneighbors[i];
+    for(int j=0; j<nneighbors[i]; j++) {
+      *stash >> neighbor[i][j];
+    }
+  }
+  stash->close();
+  std::cerr << "Done loading M3D-C1 mesh connectivity..." << std::endl;
+  return 0;
+}
+
 void m3dc1_mesh::find_neighbors()
 {
-  std::cerr << "Calculating M3D-C1 mesh connectivity..." << std::endl;
   nneighbors = new int[nelms];
   neighbor = new int*[nelms];
 
@@ -335,6 +381,13 @@ void m3dc1_mesh::find_neighbors()
     neighbor[i] = new int[max_neighbors()];
   }
 
+  // check if stash file with mesh connectivity exists
+  std::ifstream stash(".stash");
+  if (stash) {
+    if (m3dc1_mesh::load_neighbors(&stash) == 0) return;
+  }
+
+  std::cerr << "Calculating M3D-C1 mesh connectivity..." << std::endl;
   for(int i=0; i<nelms/nplanes; i++) {
     for(int j=i+1; j<nelms/nplanes; j++) {
       if(elements_are_neighbors(i, j)) {
@@ -361,6 +414,7 @@ void m3dc1_mesh::find_neighbors()
 		<< std::endl;
     }
   }
+  m3dc1_mesh::stash_neighbors();
   std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
 }
 

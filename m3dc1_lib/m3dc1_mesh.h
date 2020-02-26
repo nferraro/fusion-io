@@ -1,6 +1,7 @@
 #ifndef M3DC1_MESH_H
 #define M3DC1_MESH_H
 
+#include <fstream>
 #include <math.h>
 
 #define TOL 1e-4
@@ -73,6 +74,8 @@ class m3dc1_mesh {
   virtual ~m3dc1_mesh(); 
 
   bool set_memory_depth(int d);
+  virtual void stash_neighbors();
+  virtual int load_neighbors(std::ifstream *stash);
   virtual void find_neighbors();
 
   bool is_in_element(const int i, 
