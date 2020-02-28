@@ -325,10 +325,10 @@ int m3dc1_3d_mesh::shared_nodes(const int i, const int j)
 }
 */
 
-void m3dc1_mesh::stash_neighbors()
+void m3dc1_mesh::stash_neighbors(const char* stashname)
 {
   std::fstream stash;
-  stash.open(".stash", std::fstream::out | std::fstream::trunc);
+  stash.open(stashname, std::fstream::out | std::fstream::trunc);
   stash << nelms << "\n";
   stash << nplanes << "\n";
   for(int i=0; i<nelms/nplanes; i++) {
@@ -340,38 +340,41 @@ void m3dc1_mesh::stash_neighbors()
   stash.close();
 }
 
-int m3dc1_mesh::load_neighbors(std::ifstream *stash)
+int m3dc1_mesh::load_neighbors(const char* stashname)
 {
-  std::cerr << "Loading M3D-C1 mesh connectivity..." << std::endl;
+  // check if stash file with mesh connectivity exists
+  std::ifstream stash(stashname);
+  if (!stash) return -1;
 
+  std::cerr << "Loading M3D-C1 mesh connectivity..." << std::endl;
   // read and verify number of elements
   int n;
-  *stash >> n;
+  stash >> n;
   if(n != nelms) {
     std::cerr << "failed, because number of elements does not match: nelms = " << n << std::endl;
     return 1;
   }
 
   // read and verify number of planes
-  *stash >> n;
+  stash >> n;
   if(n != nplanes) {
     std::cerr << "failed, because number of planes does not match: nplanes = " << n << std::endl;
-    return 1;
+    return 2;
   }
 
   // read mesh connectivity
   for(int i=0; i<nelms/nplanes; i++) {
-    *stash >> nneighbors[i];
+    stash >> nneighbors[i];
     for(int j=0; j<nneighbors[i]; j++) {
-      *stash >> neighbor[i][j];
+      stash >> neighbor[i][j];
     }
   }
-  stash->close();
+  stash.close();
   std::cerr << "Done loading M3D-C1 mesh connectivity..." << std::endl;
   return 0;
 }
 
-void m3dc1_mesh::find_neighbors()
+void m3dc1_mesh::find_neighbors(const char* stashname)
 {
   nneighbors = new int[nelms];
   neighbor = new int*[nelms];
@@ -381,11 +384,8 @@ void m3dc1_mesh::find_neighbors()
     neighbor[i] = new int[max_neighbors()];
   }
 
-  // check if stash file with mesh connectivity exists
-  std::ifstream stash(".stash");
-  if (stash) {
-    if (m3dc1_mesh::load_neighbors(&stash) == 0) return;
-  }
+  // load mech connectivity stash if available
+  if (m3dc1_mesh::load_neighbors(stashname) == 0) return;
 
   std::cerr << "Calculating M3D-C1 mesh connectivity..." << std::endl;
   for(int i=0; i<nelms/nplanes; i++) {
@@ -414,15 +414,15 @@ void m3dc1_mesh::find_neighbors()
 		<< std::endl;
     }
   }
-  m3dc1_mesh::stash_neighbors();
+  m3dc1_mesh::stash_neighbors(stashname);
   std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
 }
 
-void m3dc1_3d_mesh::find_neighbors()
+void m3dc1_3d_mesh::find_neighbors(const char* stashname)
 {
   int k;
 
-  m3dc1_mesh::find_neighbors();
+  m3dc1_mesh::find_neighbors(stashname);
   
   // copy the neighbors found in the first plane to all the other planes
   for(int p=1; p < nplanes; p++) {

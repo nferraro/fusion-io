@@ -196,7 +196,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   read_parameter("nplanes", &(mesh->nplanes));
 
   // Calculate connectivity tree
-  mesh->find_neighbors();
+  mesh->find_neighbors(".stash");
 
   H5Gclose(mesh_group);
   H5Gclose(time_group);

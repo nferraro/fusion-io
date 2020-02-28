@@ -74,9 +74,9 @@ class m3dc1_mesh {
   virtual ~m3dc1_mesh(); 
 
   bool set_memory_depth(int d);
-  virtual void stash_neighbors();
-  virtual int load_neighbors(std::ifstream *stash);
-  virtual void find_neighbors();
+  virtual void stash_neighbors(const char* stashname);
+  virtual int load_neighbors(const char* stashname);
+  virtual void find_neighbors(const char* stashname);
 
   bool is_in_element(const int i, 
 		     const double X, const double Phi, const double Z,
@@ -131,7 +131,7 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
   double *phi;
   double *d;
 
-  virtual void find_neighbors();
+  virtual void find_neighbors(const char* stashname);
 
   virtual int in_element(double X, double Phi, double Z, 
 			 double* xi=0, double* zi=0, double* eta=0, 
