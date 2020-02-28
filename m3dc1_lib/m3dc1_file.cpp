@@ -1,5 +1,6 @@
 #include "m3dc1_file.h"
 #include <math.h>
+#include <libgen.h>
 
 #include <iostream>
 
@@ -16,6 +17,7 @@ m3dc1_file::~m3dc1_file()
 bool m3dc1_file::open(const char* filename)
 {
   file = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+  path = dirname(strdup(filename));
 
   if(file < 0) {
     std::cerr << "Error: couldn't open file " << filename << std::endl;
@@ -196,7 +198,8 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   read_parameter("nplanes", &(mesh->nplanes));
 
   // Calculate connectivity tree
-  mesh->find_neighbors(".stash");
+  std::string stash = path + "/.stash" + std::to_string(t);
+  mesh->find_neighbors(stash.c_str());
 
   H5Gclose(mesh_group);
   H5Gclose(time_group);

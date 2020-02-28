@@ -10,6 +10,7 @@ typedef std::vector<double> m3dc1_scalar_list;
 
 class m3dc1_file {
   hid_t file;
+  std::string path;
 
   typedef std::map<int, m3dc1_timeslice> m3dc1_timeslice_map;
   m3dc1_timeslice_map timeslice_map;
