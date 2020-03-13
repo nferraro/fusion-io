@@ -198,7 +198,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   read_parameter("nplanes", &(mesh->nplanes));
 
   // Calculate connectivity tree
-  std::string stash = path + "/.stash" + std::to_string(t);
+  std::string stash = path + "/.m3dc1." + std::to_string(t) + ".stash";
   mesh->find_neighbors(stash.c_str());
 
   H5Gclose(mesh_group);
