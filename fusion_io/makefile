@@ -40,7 +40,6 @@ OBJS = 	interpolate.o \
 	gato_field.o \
 	fusion_io.o \
 	c_interface.o \
-	fortran_interface.o \
 	fusion_io_fortran.o
 
 PUSH_LIB = libfio_push.a
