@@ -41,7 +41,7 @@ example_c : example_c.o
 	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_fortran : example_fortran.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(F90) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_push : example_push.o
 	$(F90) $(LDFLAGS) $< -lfio_push $(LIBS) -o $@
