@@ -64,6 +64,7 @@ int m3dc1_source::open(const char* filename)
 int m3dc1_source::allocate_search_hint(void** s)
 {
   *s = new int;
+  *((int*)(*s)) = -1;
   //  std::cerr << "Allocated hint at " << *s << std::endl;
   return FIO_SUCCESS;
 }
