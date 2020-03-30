@@ -1,6 +1,6 @@
 import fio_py
 
-filename = "C1.h5"
+filename = "data/m3dc1/C1.h5"
 
 isrc = fio_py.open_source(fio_py.FIO_M3DC1_SOURCE,filename)
 

@@ -14,7 +14,7 @@ int main()
   fio_option_list opt;
 
   // Open an m3dc1 source
-  result = fio_open_source(&src, FIO_M3DC1_SOURCE, "C1.h5");
+  result = fio_open_source(&src, FIO_M3DC1_SOURCE, "data/m3dc1/C1.h5");
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening file" << std::endl;
     delete(src);
