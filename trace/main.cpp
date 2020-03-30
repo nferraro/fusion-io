@@ -414,7 +414,7 @@ void gather(const double* in, double* out)
 {
   double* buf = new double[surfaces];
 
-  MPI_Gatherv(in, local_surfaces[rank], MPI_DOUBLE, 
+  MPI_Gatherv((void*)in, local_surfaces[rank], MPI_DOUBLE, 
 	      buf, local_surfaces, offset, MPI_DOUBLE, 
 	      0, MPI_COMM_WORLD); 
 
