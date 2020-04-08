@@ -659,15 +659,21 @@ int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, void* s)
     }
   }
 
-  v[FIO_DR_R    ] *= source->B0;
-  v[FIO_DR_PHI  ] *= source->B0;
-  v[FIO_DR_Z    ] *= source->B0;
-  v[FIO_DPHI_R  ] *= source->B0;
-  v[FIO_DPHI_PHI] *= source->B0;
-  v[FIO_DPHI_Z  ] *= source->B0;
-  v[FIO_DZ_R    ] *= source->B0;
-  v[FIO_DZ_PHI  ] *= source->B0;
-  v[FIO_DZ_Z    ] *= source->B0;
+  v[FIO_DR_R    ] *= source->B0 / source->L0;
+  v[FIO_DR_PHI  ] *= source->B0 / source->L0;
+  v[FIO_DR_Z    ] *= source->B0 / source->L0;
+  if(source->itor==1) {
+    v[FIO_DPHI_R  ] *= source->B0;
+    v[FIO_DPHI_PHI] *= source->B0;
+    v[FIO_DPHI_Z  ] *= source->B0;
+  } else {
+    v[FIO_DPHI_R  ] *= source->B0 / source->L0;
+    v[FIO_DPHI_PHI] *= source->B0 / source->L0;
+    v[FIO_DPHI_Z  ] *= source->B0 / source->L0;
+  }
+  v[FIO_DZ_R    ] *= source->B0 / source->L0;
+  v[FIO_DZ_PHI  ] *= source->B0 / source->L0;
+  v[FIO_DZ_Z    ] *= source->B0 / source->L0;
   
   return FIO_SUCCESS;
 }
