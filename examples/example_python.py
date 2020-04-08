@@ -5,6 +5,7 @@ filename = "data/m3dc1/C1.h5"
 isrc = fio_py.open_source(fio_py.FIO_M3DC1_SOURCE,filename)
 
 fio_py.get_options(isrc)
+fio_py.set_real_option(fio_py.FIO_LINEAR_SCALE, 5.)
 ia = fio_py.get_field(isrc, fio_py.FIO_VECTOR_POTENTIAL)
 imag = fio_py.get_field(isrc, fio_py.FIO_MAGNETIC_FIELD)
 ipres = fio_py.get_field(isrc, fio_py.FIO_TOTAL_PRESSURE)
@@ -48,7 +49,7 @@ fio_py.close_series(ipsi_lcfs)
 
 hint = fio_py.allocate_hint(isrc);
 
-x = (1.6, 0., 0.)
+x = (1.6, 0.1, 0.2)
 (ar, aphi, az) = fio_py.eval_vector_field(ia, x, hint)
 (br, bphi, bz) = fio_py.eval_vector_field(imag, x, hint)
 (jr, jphi, jz) = fio_py.eval_vector_field(ij, x, hint)
@@ -58,6 +59,7 @@ ne = fio_py.eval_scalar_field(idens, x, hint)
 (vr, vphi, vz) = fio_py.eval_vector_field(ivel, x, hint)
 psi = aphi*x[0]
 psi_norm = (psi - psi_axis) / (psi_lcfs - psi_axis)
+db = fio_py.eval_vector_field_deriv(imag, x, hint)
 
 fio_py.free_hint(hint)
 
@@ -72,6 +74,9 @@ print(' toroidal rotation = ', vphi/x[0], ' rad / s' )
 print(' pressure = ', p, ' Pa')
 print(' ion pressure = ', pi, ' Pa')
 print(' density = ', ne, ' ')
+print(' dB/dR = ', db[0:3], 'T/m')
+print(' dB/dPhi = ', db[3:6], 'T')
+print(' dB/dZ = ', db[6:10], 'T/m')
 
 fio_py.close_field(imag)
 fio_py.close_field(ipres)
