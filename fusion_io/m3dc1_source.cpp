@@ -102,6 +102,8 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_CURRENT_DENSITY);
   fields->push_back(FIO_FLUID_VELOCITY);
   fields->push_back(FIO_MAGNETIC_FIELD);
+  fields->push_back(FIO_POLOIDAL_FLUX);
+  fields->push_back(FIO_POLOIDAL_FLUX_NORM);
   fields->push_back(FIO_PRESSURE);
   fields->push_back(FIO_TEMPERATURE);
   fields->push_back(FIO_TOTAL_PRESSURE);
@@ -147,7 +149,9 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 			    const fio_option_list* opt)
 {
   *f = 0;
-  m3dc1_fio_field* mf;
+  m3dc1_fio_field* mf(0);
+  fio_series *psi0, *psi1;
+  double psi0_val, psi1_val;
   bool unneeded_species = false;
   int s, result;
 
@@ -197,6 +201,28 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 
   case(FIO_MAGNETIC_FIELD):
     mf = new m3dc1_magnetic_field(this);
+    if(s!=0) unneeded_species = true;
+    break;
+
+  case(FIO_POLOIDAL_FLUX):
+    mf = new m3dc1_scalar_field(this, "psi", 2.*M_PI*B0*L0*L0);
+    if(s!=0) unneeded_species = true;
+    break;
+
+  case(FIO_POLOIDAL_FLUX_NORM):
+    if((result = get_series(FIO_MAGAXIS_PSI, &psi0)) != FIO_SUCCESS)
+      break;
+    if((result = get_series(FIO_LCFS_PSI,    &psi1)) != FIO_SUCCESS)
+      break;
+    if((result = psi0->eval(0, &psi0_val)) != FIO_SUCCESS)
+       break;
+    if((result = psi1->eval(0, &psi1_val)) != FIO_SUCCESS)
+       break;
+    delete(psi0);
+    delete(psi1);
+    mf = new m3dc1_scalar_field(this, "psi",
+				1./(psi1_val - psi0_val), 
+				psi0_val);
     if(s!=0) unneeded_species = true;
     break;
 
