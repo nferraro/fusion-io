@@ -42,12 +42,13 @@ class m3dc1_fio_field : public fio_field {
 // Scalar (explicitly named field)
 class m3dc1_scalar_field : public m3dc1_fio_field {
   m3dc1_field *f0, *f1, *fx;
-  double factor;
+  double factor, offset;
   std::string name;
 
  public:
- m3dc1_scalar_field(m3dc1_source* s, const char* n, const double f) 
-   : m3dc1_fio_field(s) { name = n; factor = f; }
+ m3dc1_scalar_field(m3dc1_source* s, const char* n, const double f, 
+		    const double off=0.)
+   : m3dc1_fio_field(s) { name = n; factor = f; offset=off; }
   m3dc1_scalar_field* clone() const { return new m3dc1_scalar_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }

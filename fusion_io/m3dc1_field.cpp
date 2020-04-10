@@ -146,6 +146,7 @@ int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
     *v += val[m3dc1_field::OP_1];
   }
 
+  *v -= offset;
   *v *= factor;
 
   return FIO_SUCCESS;
