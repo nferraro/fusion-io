@@ -1,7 +1,7 @@
 #include "trace_integrator.h"
-#include "m3dc1_source.h"
-#include "geqdsk_source.h"
-#include "diiid_coils.h"
+
+#include <fusion_io_source.h>
+#include <m3dc1_source.h>
 
 #include <iostream>
 #include <fstream>
@@ -66,11 +66,6 @@ int main(int argc, char* argv[])
   if(tracer.sources.size() == 0) {
     std::cerr << "No sources specified.  Returning." << std::endl;
     print_help();
-    return 1;
-  }
-
-  if(!tracer.load()) {
-    std::cerr << " Error loading tracer" << std::endl;
     return 1;
   }
 
@@ -340,7 +335,7 @@ void delete_sources()
   i = tracer.sources.begin();
 
   while(i != tracer.sources.end()) {
-    delete *i;
+    i->free();
     i++;
   }
 }
@@ -437,19 +432,61 @@ void gather(const double* in, double* out)
 bool process_line(const std::string& opt, const int argc, const std::string argv[])
 {
   bool argc_err = false;
+  trace_source src;
+  fio_option_list fopt;
+  int result;
 
   if(opt=="-m3dc1") {
+    src.source = new m3dc1_source();
+    if(argc>=1) {
+      result = src.source->open(argv[0].c_str());
+    } else {
+      result = src.source->open("C1.h5");
+    }
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error opening file" << std::endl;
+      src.free();
+      return result;
+    };
+    // set options for fields obtained from this source
+    src.source->get_field_options(&fopt);
+    if(argc>=2) fopt.set_option(FIO_TIMESLICE, atoi(argv[1].c_str()));
+    if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
+    if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
+    result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error reading magnetic field" << std::endl;
+      src.free();
+      return result;
+    };
+    fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
+    result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Warning: couldn't open psi_norm field" << std::endl;
+      //      src.free();
+      //return result;
+    };
+
+    result = src.source->allocate_search_hint(&src.hint);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Warning: couldn't allocate search hint" << std::endl;
+    }
+    /*
     m3dc1_source* s = new m3dc1_source();
     if(argc>=1) s->filename = argv[0];
     if(argc>=2) s->time = atoi(argv[1].c_str());
     if(argc>=3) s->factor = atof(argv[2].c_str());
     if(argc>=4) s->shift = atof(argv[3].c_str())*M_PI/180.;
-    tracer.sources.push_back(s);
+    */
+    tracer.sources.push_back(src);
   } else if(opt=="-geqdsk") {
+    /*
     geqdsk_source* s = new geqdsk_source();
     if(argc>=1) s->filename = argv[0];
     tracer.sources.push_back(s);
+    */
   } else if(opt=="-diiid-i") {
+    /*
     coil_source* s = new coil_source();
     double current;
     int n;
@@ -459,6 +496,7 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     if(argc>=3) phase = atof(argv[2].c_str());   else phase = 0.;
     diiid_icoils(s, current, n, 0., phase);
     tracer.sources.push_back(s);
+    */
   } else if(opt=="-dR") {
     if(argc==1) dR = atof(argv[0].c_str());
     else argc_err = true;

@@ -16,15 +16,15 @@ VPATH=$(SRCDIR)
 # include platform-specific options
 include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
-LIBS := -L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
+LIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
+	-L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
 	$(HDF5_LIBS) $(LIBS) 
 
-INCLUDE := -I$(FIO_ROOT)/m3dc1_lib \
+INCLUDE :=-I$(FIO_ROOT)/fusion_io \
+	-I$(FIO_ROOT)/m3dc1_lib \
 	$(HDF5_INCLUDE) $(INCLUDE)
 
-OBJS = interpolate.o trace_source.o interpolation_source.o \
-	m3dc1_source.o geqdsk_source.o coil_source.o \
-	diiid_coils.o trace_integrator.o
+OBJS = trace_source.o trace_integrator.o
 
 all : trace plot_dr
 
