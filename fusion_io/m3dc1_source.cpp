@@ -107,7 +107,6 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
-  fields->push_back(FIO_GRAD_VECTOR_POTENTIAL);
 
   return FIO_SUCCESS;
 }
@@ -193,11 +192,6 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 
   case(FIO_FLUID_VELOCITY):
     mf = new m3dc1_fluid_velocity(this);
-    if(s!=0) unneeded_species = true;
-    break;
-
-  case(FIO_GRAD_VECTOR_POTENTIAL):
-    mf = new m3dc1_grad_vector_potential(this);
     if(s!=0) unneeded_species = true;
     break;
 

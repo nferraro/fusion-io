@@ -11,7 +11,7 @@ module fio_push
   end type field_type
 
   integer, private :: isrc
-  integer, private, dimension(2) :: iphi, ie, ia, igrada
+  integer, private, dimension(2) :: iphi, ie, ia
 
 contains
 
@@ -36,14 +36,12 @@ contains
      call fio_get_field_f(isrc, FIO_SCALAR_POTENTIAL, iphi(1), ierr);
      call fio_get_field_f(isrc, FIO_ELECTRIC_FIELD, ie(1), ierr);
      call fio_get_field_f(isrc, FIO_VECTOR_POTENTIAL, ia(1), ierr);
-     call fio_get_field_f(isrc, FIO_GRAD_VECTOR_POTENTIAL, igrada(1), ierr);
 
      ! read plasma response fields
      call fio_set_int_option_f(FIO_TIMESLICE, 1, ierr)
      call fio_get_field_f(isrc, FIO_SCALAR_POTENTIAL, iphi(2), ierr);
      call fio_get_field_f(isrc, FIO_ELECTRIC_FIELD, ie(2), ierr);
      call fio_get_field_f(isrc, FIO_VECTOR_POTENTIAL, ia(2), ierr);
-     call fio_get_field_f(isrc, FIO_GRAD_VECTOR_POTENTIAL, igrada(2), ierr);
    end subroutine fio_push_initialize
 
 
@@ -55,7 +53,6 @@ contains
         call fio_close_field_f(iphi(i), ierr)
         call fio_close_field_f(ie(i), ierr)
         call fio_close_field_f(ia(i), ierr)
-        call fio_close_field_f(igrada(i), ierr)
      end do
    end subroutine fio_push_finalize
    
@@ -81,7 +78,7 @@ contains
      call fio_eval_field_f(ie(it), q, field%gradphi, ierr)
      field%gradphi = -field%gradphi
      call fio_eval_field_f(ia(it), q, field%a, ierr)
-     call fio_eval_field_f(igrada(it), q, field%grada, ierr)
+     call fio_eval_field_deriv_f(ia(it), q, field%grada, ierr)
 
      ! Result is in (R, Phi, Z) coordinates
      ! metric tensor = diag(1, r^2, 1)

@@ -48,7 +48,7 @@ COMMENT(      species-dependent vector fields      )
 FIO_DEFINE_INT(FIO_VELOCITY,          1101)
 
 COMMENT(      tensor fields      )
-FIO_DEFINE_INT(FIO_GRAD_VECTOR_POTENTIAL, 2001)
+
 
 COMMENT(      series             )
 FIO_DEFINE_INT(FIO_MAGAXIS_PSI,       3001)
