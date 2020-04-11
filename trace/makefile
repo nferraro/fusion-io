@@ -24,7 +24,7 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 	-I$(FIO_ROOT)/m3dc1_lib \
 	$(HDF5_INCLUDE) $(INCLUDE)
 
-OBJS = trace_source.o trace_integrator.o
+OBJS = trace_integrator.o
 
 all : trace plot_dr
 
