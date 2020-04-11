@@ -187,7 +187,7 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
     return FIO_OUT_OF_BOUNDS;
 
   for(int n=0; n<6; n++)
-    si[i] = 0.;
+    si[n] = 0.;
 
   double temp;
   for(int n=0; n<4; n++) {
@@ -210,6 +210,6 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
       si[5] += temp/(dz*dz);
     }
   }
-  
+
   return FIO_SUCCESS;
 }
