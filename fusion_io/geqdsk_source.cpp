@@ -38,7 +38,7 @@ int geqdsk_source::open(const char* filename)
   }
 
   double rdim, zdim, rcentr;
-  double simag, sibry, bcentr, current;
+  double bcentr, current;
     
   for(int i=0; i<5; i++) gfile >> dum;
   gfile >> nw >> nh;
@@ -164,6 +164,34 @@ int geqdsk_source::get_field(const field_type t,fio_field** f,
   *f = mf;
   return FIO_SUCCESS;
 }
+
+int geqdsk_source::get_series(const series_type t,fio_series** s)
+{
+  switch(t) {
+  case(FIO_MAGAXIS_PSI):
+    *s = new geqdsk_series(simag);
+    break;
+
+  case(FIO_LCFS_PSI):
+    *s = new geqdsk_series(sibry);
+    break;
+
+  case(FIO_MAGAXIS_R):
+    *s = new geqdsk_series(rmaxis);
+    break;
+
+  case(FIO_MAGAXIS_Z):
+    *s = new geqdsk_series(zmaxis);
+    break;
+
+  default:
+    *s = 0;
+    return FIO_UNSUPPORTED;
+  };
+
+  return FIO_SUCCESS;
+}
+
 
 int geqdsk_source::interpolate_psi(const double r0, const double z0,
 				   double* si) const

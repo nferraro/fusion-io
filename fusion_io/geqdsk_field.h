@@ -3,6 +3,19 @@
 
 #include "geqdsk_source.h"
 
+class geqdsk_series : public fio_series {
+  double data;
+
+ public:
+  geqdsk_series(const double d) { data = d; }
+  virtual ~geqdsk_series()
+    { }
+
+  virtual int eval(const double, double*);
+  virtual int bounds(double*, double*) const;
+};
+
+
 class geqdsk_field : public fio_field {
  protected:
   geqdsk_source* source;
