@@ -450,10 +450,6 @@ bool create_source(const int type, const int argc, const std::string argv[])
     // set options for fields obtained from this source
     src.source->get_field_options(&fopt);
     fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
-    if(argc>=2) fopt.set_option(FIO_TIMESLICE, atoi(argv[1].c_str()));
-    if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
-    if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
-
     break;
 
   case(FIO_GEQDSK_SOURCE):
@@ -474,6 +470,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
   default:
     return false;
   }
+
+  if(argc>=2) fopt.set_option(FIO_TIMESLICE, atoi(argv[1].c_str()));
+  if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
+  if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
 
   // Read magnetic field
   result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
