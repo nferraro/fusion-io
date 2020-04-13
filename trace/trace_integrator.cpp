@@ -121,36 +121,6 @@ bool trace_integrator::get_surface(const double r0, const double phi0,
   //  return sources[0]->get_surface(r0, phi0, z0, ds, r, z, n);
 }
 
-bool trace_integrator::extent(double* r0, double* r1, double* z0, double* z1)
-  const
-{
-  /*
-  bool result = false;
-  trace_source_list::const_iterator i = sources.begin();
-  
-  while(i != sources.end()) {
-    double new_r0, new_r1, new_z0, new_z1;
-    bool new_result = (*i)->extent(&new_r0, &new_r1, &new_z0, &new_z1);
-    if(new_result) {
-      if(result) {
-	if(new_r0 < *r0) *r0 = new_r0;
-	if(new_r1 > *r1) *r1 = new_r1;
-	if(new_z0 < *z0) *z0 = new_z0;
-	if(new_z1 > *z1) *z1 = new_z1;
-      } else {
-	*r0 = new_r0;
-	*r1 = new_r1;
-	*z0 = new_z0;
-	*z1 = new_z1;
-	result = true;
-      }
-    }
-    i++;
-  }
-
-  return result;*/
-  return true;
-}
 
 bool trace_integrator::integrate(int transits, int steps_per_transit, 
 				 integrator_data* data)

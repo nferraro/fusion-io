@@ -56,8 +56,6 @@ class coil_source : public trace_field_source, public std::list<coil_segment> {
 	    double*, double*, double*);
   virtual bool center(double*, double*) const
   { return false;}
-  virtual bool extent(double*, double*, double*, double*) const
-  { return false;}
 };
 
 #endif

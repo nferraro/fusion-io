@@ -76,7 +76,6 @@ class trace_integrator {
   bool eval_psi(const double r, const double phi, const double z, 
 	    double* psi);
   bool center(double* r0, double* z0) const;
-  bool extent(double* r0, double* r1, double* z0, double* z1) const;
   bool get_surface(const double r0, const double phi0, const double z0,
 		   const double ds, double** r, double** z, int* n);
 
