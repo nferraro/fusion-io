@@ -14,11 +14,14 @@ struct trace_source {
   fio_source* source;
   fio_field* field;
   fio_field* psi_norm;
+  double magaxis[2];
   trace_source() {
     source = 0;
     field = 0;
     psi_norm = 0;
     hint = 0;
+    magaxis[0] = 0.;
+    magaxis[1] = 0.;
   }
   void free() {
     if(hint) {

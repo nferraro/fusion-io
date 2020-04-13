@@ -427,14 +427,15 @@ void gather(const double* in, double* out)
   delete[] buf;
 }
 
-bool process_line(const std::string& opt, const int argc, const std::string argv[])
+bool create_source(const int type, const int argc, const std::string argv[]) 
 {
-  bool argc_err = false;
   trace_source src;
   fio_option_list fopt;
+  fio_series* magaxis[2];
   int result;
 
-  if(opt=="-m3dc1") {
+  switch(type) {
+  case(FIO_M3DC1_SOURCE):
     src.source = new m3dc1_source();
     if(argc>=1) {
       result = src.source->open(argv[0].c_str());
@@ -444,7 +445,7 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     if(result != FIO_SUCCESS) {
       std::cerr << "Error opening file" << std::endl;
       src.free();
-      return result;
+      return false;
     };
     // set options for fields obtained from this source
     src.source->get_field_options(&fopt);
@@ -452,70 +453,88 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     if(argc>=2) fopt.set_option(FIO_TIMESLICE, atoi(argv[1].c_str()));
     if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
     if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
-    result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Error reading magnetic field" << std::endl;
-      src.free();
-      return result;
-    };
-    fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
-    result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Warning: couldn't open psi_norm field" << std::endl;
-      //      src.free();
-      //return result;
-    };
 
-    result = src.source->allocate_search_hint(&src.hint);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Warning: couldn't allocate search hint" << std::endl;
-    }
-    /*
-    m3dc1_source* s = new m3dc1_source();
-    if(argc>=1) s->filename = argv[0];
-    if(argc>=2) s->time = atoi(argv[1].c_str());
-    if(argc>=3) s->factor = atof(argv[2].c_str());
-    if(argc>=4) s->shift = atof(argv[3].c_str())*M_PI/180.;
-    */
-    tracer.sources.push_back(src);
-  } else if(opt=="-geqdsk") {
+    break;
+
+  case(FIO_GEQDSK_SOURCE):
     src.source = new geqdsk_source();
     if(argc>=1) {
-      result = src.source->open(argv[0].c_str());
+      if((result = src.source->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	src.free();
+	return false;
+      };
     } else {
       std::cerr << "Filename must be provided for geqdsk files." << std::endl;
       src.free();
-      return 1;
+      return false;
     }
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Error opening file" << std::endl;
-      src.free();
-      return result;
-    };
-    // set options for fields obtained from this source
-    result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Error reading magnetic field" << std::endl;
-      src.free();
-      return result;
-    };
-    result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Warning: couldn't open psi_norm field" << std::endl;
-      //      src.free();
-      //return result;
-    };
 
-    result = src.source->allocate_search_hint(&src.hint);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Warning: couldn't allocate search hint" << std::endl;
-    }    
-    /*
-    geqdsk_source* s = new geqdsk_source();
-    if(argc>=1) s->filename = argv[0];
-    */
-    tracer.sources.push_back(src);
+    break;
+  default:
+    return false;
+  }
 
+  // Read magnetic field
+  result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error reading magnetic field" << std::endl;
+    src.free();
+    return false;
+  };
+
+  // Read Psi_Norm field
+  fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
+  result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Warning: couldn't open psi_norm field" << std::endl;
+  };
+  
+  // Allocate search hint
+  result = src.source->allocate_search_hint(&src.hint);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Warning: couldn't allocate search hint" << std::endl;
+  }
+
+  // Find magnetic axis
+  if((result = src.source->get_series(FIO_MAGAXIS_R, &magaxis[0])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't load MAGAXIS_R" << std::endl;
+    src.free();
+    return false;
+  }
+  if((result = src.source->get_series(FIO_MAGAXIS_Z, &magaxis[1])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't load MAGAXIS_Z" << std::endl;
+    src.free();
+    return false;
+  }
+  if((result = magaxis[0]->eval(0, &src.magaxis[0])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
+    src.free();
+    return false;
+  }
+  if((result = magaxis[1]->eval(0, &src.magaxis[1])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
+    src.free();
+    return false;
+  }
+  delete(magaxis[0]);
+  delete(magaxis[1]);
+
+
+  // Add source to list
+  tracer.sources.push_back(src);
+    
+  return true;
+}
+
+bool process_line(const std::string& opt, const int argc, const std::string argv[])
+{
+  bool argc_err = false;
+
+  if(opt=="-m3dc1") {
+    return create_source(FIO_M3DC1_SOURCE, argc, argv);
+  } else if(opt=="-geqdsk") {
+    return create_source(FIO_GEQDSK_SOURCE, argc, argv);
   } else if(opt=="-diiid-i") {
     /*
     coil_source* s = new coil_source();

@@ -102,11 +102,10 @@ bool trace_integrator::center(double* R0, double* Z0) const
   if(sources.size()==0)
     return false;
 
-  *R0 = 1.6;
-  *Z0 = 0.;
+  *R0 = sources[0].magaxis[0];
+  *Z0 = sources[0].magaxis[1];
 
   return true;
-  //  return sources[0]->center(R0, Z0);
 }
 
 
