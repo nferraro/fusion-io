@@ -34,6 +34,9 @@ class fio_field {
 
   fio_field& operator+(const fio_field&);
   fio_field& operator*(const fio_field&);
+
+  int find_val_on_line(const double, const double*, const double*, 
+		       double*, void* =0, const double=1e-4);
 };
 
 #endif
