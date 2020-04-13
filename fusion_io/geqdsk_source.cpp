@@ -133,6 +133,8 @@ int geqdsk_source::get_available_fields(fio_field_list* fields) const
   fields->clear();
   fields->push_back(FIO_CURRENT_DENSITY);
   fields->push_back(FIO_MAGNETIC_FIELD);
+  fields->push_back(FIO_POLOIDAL_FLUX);
+  fields->push_back(FIO_POLOIDAL_FLUX_NORM);
   fields->push_back(FIO_TOTAL_PRESSURE);
 
   return FIO_SUCCESS;
@@ -141,27 +143,32 @@ int geqdsk_source::get_available_fields(fio_field_list* fields) const
 int geqdsk_source::get_field(const field_type t,fio_field** f,
 			     const fio_option_list* opt)
 {
-  *f = 0;
-  fio_field* mf;
-
   switch(t) {
   case(FIO_CURRENT_DENSITY):
-    mf = new geqdsk_current_density(this);
+    *f = new geqdsk_current_density(this);
     break;
 
   case(FIO_MAGNETIC_FIELD):
-    mf = new geqdsk_magnetic_field(this);
+    *f = new geqdsk_magnetic_field(this);
+    break;
+
+  case(FIO_POLOIDAL_FLUX):
+    *f = new geqdsk_psi_field(this, 2.*M_PI);
+    break;
+
+  case(FIO_POLOIDAL_FLUX_NORM):
+    *f = new geqdsk_psi_field(this, 1./(sibry-simag), simag);
     break;
 
   case(FIO_TOTAL_PRESSURE):
-    mf = new geqdsk_pressure_field(this);
+    *f = new geqdsk_pressure_field(this);
     break;
 
   default:
+    *f = 0;
     return FIO_UNSUPPORTED;
   };
  
-  *f = mf;
   return FIO_SUCCESS;
 }
 

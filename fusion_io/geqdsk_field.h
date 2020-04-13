@@ -60,5 +60,17 @@ class geqdsk_pressure_field : public geqdsk_field {
   int eval(const double*, double*, void* =0);
 };
 
+class geqdsk_psi_field : public geqdsk_field {
+  double factor, offset;
+  bool norm;
+ public:
+  geqdsk_psi_field(geqdsk_source* s, const double f=1., const double o=0.)
+    : geqdsk_field(s), factor(f), offset(o) { }
+  geqdsk_psi_field* clone() const 
+  { return new geqdsk_psi_field(*this); }
+  int dimension() const { return 1; }
+  int eval(const double*, double*, void* =0);
+};
+
 
 #endif
