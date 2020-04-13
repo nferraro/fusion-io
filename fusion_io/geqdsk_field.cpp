@@ -88,4 +88,19 @@ int geqdsk_psi_field::eval(const double* x, double* b, void*)
   return FIO_SUCCESS;
 }
 
+int geqdsk_psi_field::eval_deriv(const double* x, double *db, void*)
+{
+  double psi[6];
+  int ierr;
+
+  ierr = source->interpolate_psi(x[0], x[2], psi);
+  if(ierr != FIO_SUCCESS) return ierr;
+
+  db[FIO_DR  ] = psi[1]*factor;
+  db[FIO_DPHI] = 0.;
+  db[FIO_DZ  ] = psi[2]*factor;
+  
+  return FIO_SUCCESS;
+}
+
 

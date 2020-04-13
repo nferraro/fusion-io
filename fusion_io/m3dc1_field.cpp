@@ -42,7 +42,7 @@ int m3dc1_fio_series::eval(const double t, double* x)
     return FIO_OUT_OF_BOUNDS;
 
   // linearly interpolate data
-  int i;
+  m3dc1_scalar_list::size_type i;
   for(i=0; i<time->size()-1; i++) {
     if(time->at(i) * source->t0 <= t && time->at(i+1) * source->t0 >= t)
       break;
@@ -151,6 +151,37 @@ int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
 
   return FIO_SUCCESS;
 }
+
+int m3dc1_scalar_field::eval_deriv(const double* x, double* v, void* s)
+{
+  const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
+
+  double val[m3dc1_field::OP_NUM];
+
+  if(!f1->eval(x[0], x[1]-phase, x[2], get, val, (int*)s))
+    return FIO_OUT_OF_BOUNDS;
+  
+  v[FIO_DR  ] = linfac*val[m3dc1_field::OP_DR];
+  v[FIO_DPHI] = linfac*val[m3dc1_field::OP_DP];
+  v[FIO_DZ  ] = linfac*val[m3dc1_field::OP_DZ];
+
+  if(eqsub) {
+    if(!f0->eval(x[0], x[1]-phase, x[2], get, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+    
+    v[FIO_DR  ] += val[m3dc1_field::OP_DR];
+    v[FIO_DPHI] += val[m3dc1_field::OP_DP];
+    v[FIO_DZ  ] += val[m3dc1_field::OP_DZ];
+  }
+
+  v[FIO_DR  ] *= factor;
+  v[FIO_DPHI] *= factor;
+  v[FIO_DZ  ] *= factor;
+
+  return FIO_SUCCESS;
+}
+
 
 int m3dc1_pi_field::load(const fio_option_list* opt)
 {

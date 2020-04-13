@@ -70,6 +70,7 @@ class geqdsk_psi_field : public geqdsk_field {
   { return new geqdsk_psi_field(*this); }
   int dimension() const { return 1; }
   int eval(const double*, double*, void* =0);
+  int eval_deriv(const double*, double*, void* =0);
 };
 
 

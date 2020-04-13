@@ -52,7 +52,8 @@ class m3dc1_scalar_field : public m3dc1_fio_field {
   m3dc1_scalar_field* clone() const { return new m3dc1_scalar_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 1; }
-  int eval(const double*, double*, void* =0); 
+  int eval(const double*, double*, void* =0);
+  int eval_deriv(const double*, double*, void* =0);
 };
 
 // ALPHA
