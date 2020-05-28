@@ -31,6 +31,8 @@ COMMENT(      scalar fields      )
 FIO_DEFINE_INT(FIO_ALPHA,             1)
 FIO_DEFINE_INT(FIO_SCALAR_POTENTIAL,  2)
 FIO_DEFINE_INT(FIO_TOTAL_PRESSURE,    3)
+FIO_DEFINE_INT(FIO_RSTELLA,           4)
+FIO_DEFINE_INT(FIO_ZSTELLA,           5)
 
 COMMENT(      species-dependent scalar fields      )
 FIO_DEFINE_INT(FIO_PRESSURE,          101)

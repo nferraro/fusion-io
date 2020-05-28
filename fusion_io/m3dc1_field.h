@@ -127,6 +127,7 @@ class m3dc1_fluid_velocity : public m3dc1_fio_field {
 class m3dc1_vector_potential : public m3dc1_fio_field {
   m3dc1_field *psi0, *psi1, *psix;
   m3dc1_field *f0, *f1, *fx;
+  m3dc1_field *rst, *zst;
  public:
   m3dc1_vector_potential(m3dc1_source* s) 
     : m3dc1_fio_field(s) { }

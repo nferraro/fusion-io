@@ -121,14 +121,14 @@ class sim_data:
                          'v' : ('fluid velocity',   'vector',  None ),
                          'B' : ('magnetic field',   'vector',  None ),
                          'p' : ('total pressure',   'scalar',  None ),
+                         'rst': ('rst',             'scalar',  None ),
+                         'zst': ('zst',             'scalar',  None ),
                          'pi': ('pressure',         'scalar', 'main ion'),
                          'pe': ('pressure',         'scalar', 'electron'),
                          'alpha': ('alpha',         'scalar', None),
                          'ti': ('temperature',      'scalar', 'main ion'),
                          'te': ('temperature',      'scalar', 'electron'),
-                         'A' : ('vector potential', 'vector',  None ),
-                         'gradA' : ('grad vector potential', 'tensor',  None ),
-                         'E' : ('electric field',   'vector',  None )}
+                         'A' : ('vector potential', 'vector',  None )}
         self.available_fields = self.typedict
         self._all_attrs       = h5py.File(filename, 'r')
         self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
@@ -254,7 +254,6 @@ class sim_data:
         'ti' - ion temperature
         'te' - electron temperature
         'A'  - vector potential
-        'E'  - electric field
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
@@ -290,11 +289,6 @@ class sim_data:
                     return fio_py.eval_vector_field(self._ifield, x, self.sim_data.hint)
                 except:
                     return (None,None,None)
-            if self.ftype == 'tensor':
-                try:
-                    return fio_py.eval_tensor_field(self._ifield, x, self.sim_data.hint)
-                except:
-                    return (None,None,None,None,None,None,None,None,None)
             elif self.ftype == 'scalar':
                 try:
                     return (fio_py.eval_scalar_field(self._ifield, x, self.sim_data.hint),)
@@ -412,41 +406,3 @@ class sim_data:
             self.numvar    = sim_data._all_attrs.attrs['numvar']
             self.itor      = sim_data._all_attrs.attrs['itor']
             self.is3D      = sim_data._all_attrs.attrs['3d']
-
-
-class flux_coordinates:
-    """
-    Class that represents a flux surface coordinate system, e.g. PEST, Boozer or Hamada coordinates.
-    """
-    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin):
-        """
-        Initializes the flux_coordinates.
-        """
-        self.m = m
-        self.n = n
-        self.rpath = rpath
-        self.zpath = zpath
-        self.rma = axis[0]
-        self.zma = axis[1]
-        self.omega = omega
-        self.psi = psi
-        self.psi_norm = psin
-        self.flux_pol = -period*(psi-psi[0])
-        self.theta = theta
-        self.j = jac
-        self.q = q
-        self.area = area
-        self.dV_dchi = dV
-        self.fcoords = fcoords
-        #self.pest = 
-        #self.boozer = 
-        #self.hamada = 
-        self.V = V
-        self.flux_tor = phi
-        self.phi_norm = phi/phi[n-1]
-        self.rho = np.sqrt(phi/phi[n-1])
-        self.period = period
-        self.itor = itor
-        self.r0 = r0
-        self.current = current
-        self.dpsi_dchi = dpsi_dpsin

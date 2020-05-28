@@ -5,7 +5,7 @@ CFLAGS = -Wall -fPIC -O2
 F90 = mpif90
 F90FLAGS = -Wall -fdefault-real-8 -fimplicit-none -fPIC
 
-PYTHON = python
+PYTHON = python3
 
 ARCH = ar cr
 
@@ -13,9 +13,9 @@ LDD = $(CXX) -shared
 LD = $(CXX) 
 LDFLAGS = -fPIC
 
-INCLUDE = -I/opt/local/include
+INCLUDE = -I/usr/local/include
 
-LIBS = -L/opt/local/lib/gcc5 -lgfortran
+LIBS = -L/usr/lib -lgfortran
 
 HDF5_LIBS = -lhdf5 -lz
 LAPACK = -llapack

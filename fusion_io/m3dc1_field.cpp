@@ -360,6 +360,13 @@ int m3dc1_vector_potential::load(const fio_option_list* opt)
     }
   }
 
+  if(source->igeometry==1) {
+    rst = source->file.load_field("rst", time);
+    if(!rst) return 1;
+    zst = source->file.load_field("zst", time);
+    if(!zst) return 1;
+  }
+
   return FIO_SUCCESS;
 }
 
@@ -372,8 +379,20 @@ int m3dc1_vector_potential::eval(const double* x, double* v, void* s)
   const m3dc1_field::m3dc1_get_op fget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL);
 
+  const m3dc1_field::m3dc1_get_op rstget = (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_VAL);
+
+  const m3dc1_field::m3dc1_get_op zstget = (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_VAL);
+
   double val[m3dc1_field::OP_NUM];
   double r = (source->itor==1) ? x[0] : 1.;
+
+  if((source->igeometry==1)&&(source->itor==1)) {
+    if(!rst->eval(x[0], x[1]-phase, x[2], rstget, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+    r = val[m3dc1_field::OP_1];
+  }
 
   // A_R   =  R (df/dZ)
   // A_Z   = -R (df/dR) - F0 ln(R)
