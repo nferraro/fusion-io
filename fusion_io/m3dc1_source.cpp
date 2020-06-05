@@ -28,6 +28,11 @@ int m3dc1_source::open(const char* filename)
   else
     file.read_parameter("z_ion", &z_ion);
 
+  if(version >= 23)
+    file.read_parameter("kprad_z", &kprad_z);
+  else
+    kprad_z = 0;
+
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
 
@@ -170,7 +175,17 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     } else if(s==ion_species) {
       mf = new m3dc1_scalar_field(this, "den", n0);
     } else {
-      result = FIO_BAD_SPECIES;
+      if((fio_species(s).atomic_number() != kprad_z) || (kprad_z==0)) {
+	std::cerr << "Error: requesting density of species with atomic number "
+		  << fio_species(s).atomic_number()
+		  << ".  Impurity species in simulation has "
+		  << "atomic number " << kprad_z << std::endl;
+	result = FIO_BAD_SPECIES;
+      } else {
+	char name[11];
+	snprintf(name, 11, "kprad_n_%02d", fio_species(s).charge());
+	mf = new m3dc1_scalar_field(this, name, n0);
+      }
     }
     break;
 
