@@ -93,7 +93,7 @@ FIO_DEFINE_INT(FIO_REAL_OPT_END,      103)
 
 COMMENT(      field options (strings)      )
 FIO_DEFINE_INT(FIO_STR_OPT_START,     10000)
-FIO_DEFINE_INT(FIO_STR_OPT_END,       10000)
+FIO_DEFINE_INT(FIO_STR_OPT_END,       10001)
 
 COMMENT(      field operations      )
 FIO_DEFINE_INT(FIO_ADD,               1)
