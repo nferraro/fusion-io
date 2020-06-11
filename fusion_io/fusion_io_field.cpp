@@ -73,7 +73,7 @@ int fio_field::find_val_on_line(const double f0,
       return result;
     }
 
-    if(abs(fval - f0) < tol) {
+    if(fabs(fval - f0) < tol) {
       std::cerr << "Found field = " << fval << " at ( "
 		<<  x_val[0] << ", " << x_val[1] << ", " << x_val[2]
 		<< ") after " << i << " iterations." << std::endl;
