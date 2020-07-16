@@ -3,6 +3,7 @@
 #include <fusion_io_source.h>
 #include <m3dc1_source.h>
 #include <geqdsk_source.h>
+#include <gpec_source.h>
 
 #include <iostream>
 #include <fstream>
@@ -341,9 +342,9 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 18;
+  const int num_opts = 19;
   std::string arg_list[num_opts] = 
-    { "-geqdsk", "-m3dc1", "-diiid-i",
+    { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0", 
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
@@ -465,8 +466,25 @@ bool create_source(const int type, const int argc, const std::string argv[])
       src.free();
       return false;
     }
-
+    src.source->get_field_options(&fopt);
     break;
+
+  case(FIO_GPEC_SOURCE):
+    src.source = new gpec_source();
+    if(argc>=1) {
+      if((result = src.source->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	src.free();
+	return false;
+      };
+    } else {
+      std::cerr << "Directory must be provided for gpec files." << std::endl;
+      src.free();
+      return false;
+    }
+    src.source->get_field_options(&fopt);
+    break;
+
   default:
     return false;
   }
@@ -535,6 +553,8 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-geqdsk") {
     return create_source(FIO_GEQDSK_SOURCE, argc, argv);
+  } else if(opt=="-gpec") {
+    return create_source(FIO_GPEC_SOURCE, argc, argv);
   } else if(opt=="-diiid-i") {
     /*
     coil_source* s = new coil_source();
