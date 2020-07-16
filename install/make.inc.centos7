@@ -1,0 +1,31 @@
+# ====================================================================
+# Required modules:
+# -----------------
+# intel/2019.u3
+# openmpi/4.0.3
+# hdf5-parallel/1.10.5
+# lapack/3.9.0 (for lapack routines)
+# python/3.8.2
+# ====================================================================
+
+CC = mpicc
+CXX = mpicxx
+CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC
+
+F90 = mpif90
+F90FLAGS = -O3 -r8 -qopt-report=0 -qopt-report-phase=vec -fPIC
+
+LD = $(CXX)
+LDFLAGS =
+
+ARCH = ar cr
+LDD = $(CXX) --shared
+
+PYTHON = python3
+
+LAPACK = -llapack
+
+HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
+HDF5_INCLUDE = -I$(HDF5_HOME)/include
+
+LIBS = -lstdc++ -lifcore
