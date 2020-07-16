@@ -196,7 +196,7 @@ int gpec_source::get_series(const series_type t,fio_series** s)
 {
   switch(t) {
   case(FIO_MAGAXIS_R):
-    *s = new fio_scalar_series(1.7);
+    *s = new fio_scalar_series(1.875);
     break;
 
   case(FIO_MAGAXIS_Z):
@@ -228,19 +228,19 @@ int gpec_source::gpec_field_data::interpolate(const double r0, const double z0,
   if(i < 1 || i > nr) return FIO_OUT_OF_BOUNDS;
   if(j < 1 || j > nz) return FIO_OUT_OF_BOUNDS;
 
-
+  /*
   for(int k=0; k<n_comp; k++) {
     vr[k] = v_real[k][i][j];
     if(is_complex) vi[k] = v_imag[k][i][j];
   }
+  */
 
-  /*
   bool result;
   double si[6];
   bool imag = false;
   int loops = is_complex ? 1 : 0;
 
-  for(int l=0; l<loops; l++) {
+  for(int l=0; l<=loops; l++) {
     for(int k=0; k<n_comp; k++) {
       if(l==0) {
 	result = 
@@ -255,11 +255,11 @@ int gpec_source::gpec_field_data::interpolate(const double r0, const double z0,
       for(int n=0; n<6; n++)
 	si[n] = 0.;
       
-      double temp;
+      //double temp;
       for(int n=0; n<4; n++) {
 	for(int m=0; m<4; m++) {
 	  si[0] += a[m][n]      *pow(p-i,n  )*pow(q-j,m  );
-	  
+	  /*	  
 	  temp = a[m][n]      *n*pow(p-i,n-1)*pow(q-j,m  );
 	  si[1] += temp/dx;
 	  
@@ -274,6 +274,7 @@ int gpec_source::gpec_field_data::interpolate(const double r0, const double z0,
 	  
 	  temp = a[m][n]*m*(m-1)*pow(p-i,n  )*pow(q-j,m-2);
 	  si[5] += temp/(dz*dz);
+	  */
 	}
       }
       if(l==0) {
@@ -283,6 +284,6 @@ int gpec_source::gpec_field_data::interpolate(const double r0, const double z0,
       }    
     }
   }
-  */
+
   return FIO_SUCCESS;
 }
