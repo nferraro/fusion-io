@@ -35,7 +35,7 @@ examples : example example_c example_fortran example_push
 push : $(EXAMPLE_PUSH_BIN)
 
 example : example.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_c : example_c.o
 	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
