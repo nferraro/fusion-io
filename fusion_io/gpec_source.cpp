@@ -84,13 +84,13 @@ int gpec_source::read_field_data(const char* filename, gpec_field_data* d)
     return FIO_FILE_ERROR;
   }
 
-  int nr, nz, ntor;
+  int nr, nz;
 
   std::getline(file, dum);  std::cerr << dum << std::endl;
   std::getline(file, dum);  std::cerr << dum << std::endl;
   std::getline(file, dum);  std::cerr << dum << std::endl;
-  file >> dum >> dum >> ntor;
-  std::cerr << "Toroidal Mode Number = " << ntor << std::endl;
+  file >> dum >> dum >> d->ntor;
+  std::cerr << "Toroidal Mode Number = " << d->ntor << std::endl;
   file >> dum >> dum >> nr >> dum >> dum >> nz;
   std::cerr << "Dimensions: " << nr << " x " << nz << std::endl;
 
@@ -150,6 +150,9 @@ int gpec_source::extent(double* r0, double* r1, double* z0, double* z1)
 int gpec_source::get_field_options(fio_option_list* opt) const
 {
   opt->clear();
+  opt->add_option(FIO_LINEAR_SCALE, 1.);
+  opt->add_option(FIO_PHASE, 0.);
+  opt->add_option(FIO_PART, FIO_TOTAL);
 
   return FIO_SUCCESS;
 }
@@ -192,6 +195,13 @@ int gpec_source::get_field(const field_type t,fio_field** f,
 int gpec_source::get_series(const series_type t,fio_series** s)
 {
   switch(t) {
+  case(FIO_MAGAXIS_R):
+    *s = new fio_scalar_series(1.7);
+    break;
+
+  case(FIO_MAGAXIS_Z):
+    *s = new fio_scalar_series(0.0);
+    break;
 
   default:
     *s = 0;

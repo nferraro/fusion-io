@@ -3,23 +3,12 @@
 
 #include "gpec_source.h"
 
-class gpec_series : public fio_series {
-  double data;
-
- public:
-  gpec_series(const double d) { data = d; }
-  virtual ~gpec_series()
-    { }
-
-  virtual int eval(const double, double*);
-  virtual int bounds(double*, double*) const;
-};
-
 
 class gpec_field : public fio_field {
  protected:
   gpec_source* source;
   double linfac;
+  double phase;
   int ilin;
 
  public:

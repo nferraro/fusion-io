@@ -2,20 +2,6 @@
 #include "interpolate.h"
 
 
-int geqdsk_series::bounds(double* tmin, double* tmax) const 
-{
-  *tmin = 0.;
-  *tmax = 0.;
-
-  return FIO_SUCCESS;
-}
-
-int geqdsk_series::eval(const double t, double* x)
-{
-  *x = data;
-  return FIO_SUCCESS;
-}
-
 int geqdsk_current_density::eval(const double* x, double* j, void*)
 {
   double psi[6];

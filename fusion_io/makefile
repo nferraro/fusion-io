@@ -27,6 +27,7 @@ DLIB = libfusionio.so
 OBJS = 	interpolate.o \
 	options.o \
 	fusion_io_species.o \
+	fusion_io_series.o \
 	fusion_io_field.o \
 	fio_operations.o \
 	compound_field.o \

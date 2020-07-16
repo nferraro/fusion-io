@@ -3,6 +3,7 @@
 
 #include "fusion_io_defs.h"
 #include "fusion_io_species.h"
+#include "fusion_io_series.h"
 #include "fusion_io_source.h"
 #include "fusion_io_field.h"
 #include "fio_operations.h"

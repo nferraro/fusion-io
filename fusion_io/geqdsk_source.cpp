@@ -176,19 +176,19 @@ int geqdsk_source::get_series(const series_type t,fio_series** s)
 {
   switch(t) {
   case(FIO_MAGAXIS_PSI):
-    *s = new geqdsk_series(simag);
+    *s = new fio_scalar_series(simag);
     break;
 
   case(FIO_LCFS_PSI):
-    *s = new geqdsk_series(sibry);
+    *s = new fio_scalar_series(sibry);
     break;
 
   case(FIO_MAGAXIS_R):
-    *s = new geqdsk_series(rmaxis);
+    *s = new fio_scalar_series(rmaxis);
     break;
 
   case(FIO_MAGAXIS_Z):
-    *s = new geqdsk_series(zmaxis);
+    *s = new fio_scalar_series(zmaxis);
     break;
 
   default:

@@ -1,20 +1,7 @@
 #include "fusion_io.h"
 #include "interpolate.h"
 
-
-int gpec_series::bounds(double* tmin, double* tmax) const 
-{
-  *tmin = 0.;
-  *tmax = 0.;
-
-  return FIO_SUCCESS;
-}
-
-int gpec_series::eval(const double t, double* x)
-{
-  *x = data;
-  return FIO_SUCCESS;
-}
+#include <iostream>
 
 int gpec_magnetic_field::load(const fio_option_list* opt)
 {
@@ -22,6 +9,7 @@ int gpec_magnetic_field::load(const fio_option_list* opt)
 
   opt->get_option(FIO_LINEAR_SCALE, &linfac);
   opt->get_option(FIO_PART, &ilin);
+  opt->get_option(FIO_PHASE, &phase);
 
   if(ilin != FIO_PERTURBED_ONLY) {
     result = source->read_field_data("gpec_eqbrzphi_n1.out", &source->b0);
@@ -31,6 +19,11 @@ int gpec_magnetic_field::load(const fio_option_list* opt)
     result = source->read_field_data("gpec_brzphi_n1.out", &source->b1);
     if(result != FIO_SUCCESS) return result;
   }
+
+  std::cerr << "linfac = " << linfac << std::endl;
+  std::cerr << "phase = " << phase << std::endl;
+
+  return FIO_SUCCESS;
 }
 
 int gpec_magnetic_field::eval(const double* x, double* b, void*)
@@ -61,12 +54,12 @@ int gpec_magnetic_field::eval(const double* x, double* b, void*)
     ierr = source->b1.interpolate(x[0], x[2], vr, vi);
     if(ierr != FIO_SUCCESS) return ierr;
 
-    double phase = source->b1.ntor*x[1]*M_PI/180.;
+    double p = source->b1.ntor*(x[1] - phase)*M_PI/180.;
 
     // GPEC data is stored in (BR, BZ, BPhi) order, so we re-order it here
-    b[0] += linfac*(vr[0]*cos(phase) - vi[0]*sin(phase));
-    b[1] += linfac*(vr[2]*cos(phase) - vi[2]*sin(phase));
-    b[2] += linfac*(vr[1]*cos(phase) - vi[1]*sin(phase));
+    b[0] += linfac*(vr[0]*cos(p) + vi[0]*sin(p));
+    b[1] += linfac*(vr[2]*cos(p) + vi[2]*sin(p));
+    b[2] += linfac*(vr[1]*cos(p) + vi[1]*sin(p));
   }
 
   return FIO_SUCCESS;
