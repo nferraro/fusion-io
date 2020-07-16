@@ -33,8 +33,9 @@ class gpec_source : public fio_source {
 
   };
 
-  gpec_field_data b0;
-  gpec_field_data b1;
+  gpec_field_data b0;  // axisymmetric field
+  gpec_field_data b1;  // total perturbed field
+  gpec_field_data bx;  // vacuum perturbed field
 
   int read_field_data(const char* filename, gpec_field_data* d);
 

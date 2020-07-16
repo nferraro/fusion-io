@@ -5,7 +5,7 @@ if [[ "$1" == "m3dc1" ]]; then
 elif [[ "$1" == "geqdsk" ]]; then
     FILE="-geqdsk data/geqdsk/g158115.04701"
 elif [[ "$1" == "gpec" ]]; then
-    FILE="-gpec data/gpec 0 1"
+    FILE="-gpec data/gpec 1 1"
 fi
 
 if [ -z "$FILE" ]; then

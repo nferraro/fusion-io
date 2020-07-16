@@ -15,7 +15,7 @@ static double pow(double x, int p)
 
 
 gpec_source::gpec_source()
-  : b0(false, 3), b1(true, 3)
+  : b0(false, 3), b1(true, 3), bx(true, 3)
 {
 }
 
@@ -153,6 +153,7 @@ int gpec_source::get_field_options(fio_option_list* opt) const
   opt->add_option(FIO_LINEAR_SCALE, 1.);
   opt->add_option(FIO_PHASE, 0.);
   opt->add_option(FIO_PART, FIO_TOTAL);
+  opt->add_option(FIO_TIMESLICE, 1);
 
   return FIO_SUCCESS;
 }

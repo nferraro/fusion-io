@@ -10,6 +10,7 @@ class gpec_field : public fio_field {
   double linfac;
   double phase;
   int ilin;
+  int time;
 
  public:
   gpec_field(gpec_source* s) 
@@ -23,6 +24,8 @@ class gpec_field : public fio_field {
 };
 
 class gpec_magnetic_field : public gpec_field {
+  gpec_source::gpec_field_data *b0, *b1;
+
  public:
   gpec_magnetic_field(gpec_source* s)
     : gpec_field(s) { }
