@@ -17,6 +17,11 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
     ierr = (*src)->open(filename);
     break;
 
+  case(FIO_GPEC_SOURCE):
+    *src = new gpec_source();
+    ierr = (*src)->open(filename);
+    break;
+
   case(FIO_M3DC1_SOURCE):
     *src = new m3dc1_source();
     ierr = (*src)->open(filename);

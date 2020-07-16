@@ -38,6 +38,8 @@ OBJS = 	interpolate.o \
 	geqdsk_field.o \
 	gato_source.o \
 	gato_field.o \
+	gpec_source.o \
+	gpec_field.o \
 	fusion_io.o \
 	c_interface.o \
 	fusion_io_fortran.o

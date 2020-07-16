@@ -15,6 +15,8 @@
 #include "m3dc1_field.h"
 #include "mars_source.h"
 #include "mars_field.h"
+#include "gpec_source.h"
+#include "gpec_field.h"
 #include "fusion_io_c.h"
 
 #include <string>
