@@ -57,7 +57,8 @@ int main(int argc, char* argv[])
   src->get_field_options(&opt);
   opt.set_option(FIO_TIMESLICE, 1);
   opt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
-  opt.set_option(FIO_LINEAR_SCALE, 10.);
+  opt.set_option(FIO_LINEAR_SCALE, 100.);
+  opt.set_option(FIO_PHASE, 180.);
 
   // open fields
   result = src->get_field(FIO_MAGNETIC_FIELD, &magnetic_field, &opt);
