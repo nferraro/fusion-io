@@ -1,19 +1,31 @@
+# ====================================================================
+# Required modules:
+# -----------------
+# intel/2015.u1
+# openmpi/1.10.3
+# hdf5-parallel/1.10.0p1 (parallel installation does not have shared libraries)
+# acml/5.3.1/ifort64 (for lapack routines)
+# python
+# ====================================================================
+
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -vec_report0 -fPIC
+CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC
 
 F90 = mpif90
-F90FLAGS = -O3 -r8 -vec_report0 -fPIC
+F90FLAGS = -O3 -r8 -qopt-report=0 -qopt-report-phase=vec -fPIC
 
-LD = $(CC)
+LD = $(CXX)
 LDFLAGS =
 
 ARCH = ar cr
-LDD = $(CC) --shared
+LDD = $(CXX) --shared
 
-LAPACK = -L$(ACML_HOME)/ifort64/lib -lacml
+PYTHON = python
 
-HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -lz
+LAPACK = -L$(ACML_HOME)/lib -lacml
+
+HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
 HDF5_INCLUDE = -I$(HDF5_HOME)/include
 
-LIBS = -lstdc++ -lifcore -Wl,-rpath,$(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)
+LIBS = -lstdc++ -lifcore

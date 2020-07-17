@@ -7,15 +7,6 @@
 typedef int field_attribute;
 typedef int field_parameter;
 
-class fio_series {
- public:
-  virtual ~fio_series()
-    { }
-
-  virtual int eval(const double, double*) = 0;
-  virtual int bounds(double*, double*) const = 0;
-};
-
 class fio_field {
  public:
   virtual ~fio_field()
@@ -34,6 +25,9 @@ class fio_field {
 
   fio_field& operator+(const fio_field&);
   fio_field& operator*(const fio_field&);
+
+  int find_val_on_line(const double, const double*, const double*, 
+		       double*, void* =0, const double=1e-4);
 };
 
 #endif

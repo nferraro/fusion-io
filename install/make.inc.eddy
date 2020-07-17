@@ -16,4 +16,6 @@ LAPACK = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -
 HDF5_LIBS = -L$(HDF5DIR)/lib64 -lhdf5 -lz -Wl,-rpath,$(HDF5DIR)/lib64
 HDF5_INCLUDE = -I$(HDF5DIR)/include
 
+PYTHON = python
+
 LIBS = -lstdc++ -lifcore -Wl,-rpath,$(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)

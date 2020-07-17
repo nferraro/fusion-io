@@ -6,7 +6,11 @@
 #define INDEX_OFFSET 1
 #elif defined(PYTHON)
 #undef FIO_DEFINE_INT
+#if PY_MAJOR_VERSION >= 3
+#define FIO_DEFINE_INT(x, y) PyDict_SetItemString(PYTHON_DICT, #x, PyLong_FromLong(y));
+#else
 #define FIO_DEFINE_INT(x, y) PyDict_SetItemString(PYTHON_DICT, #x, PyInt_FromLong(y));
+#endif
 #else
 #define FIO_DEFINE_INT(x, y) const int x = y;
 #define FIO_IS_STR_OPT(x)    ((x)>FIO_STR_OPT_START && (x)<FIO_STR_OPT_END)
@@ -14,7 +18,7 @@
 #define FIO_IS_REAL_OPT(x)   ((x)>FIO_REAL_OPT_START && (x)<FIO_REAL_OPT_END)
 #define INDEX_OFFSET 0
 #endif
-#define COMMENT(x) 
+#define COMMENT(x)
 
 COMMENT(     sources     )
 FIO_DEFINE_INT(FIO_GATO_SOURCE,       1)
@@ -22,11 +26,14 @@ FIO_DEFINE_INT(FIO_GEQDSK_SOURCE,     2)
 FIO_DEFINE_INT(FIO_M3DC1_SOURCE,      3)
 FIO_DEFINE_INT(FIO_MARS_SOURCE,       4)
 FIO_DEFINE_INT(FIO_NIMROD_SOURCE,     5)
+FIO_DEFINE_INT(FIO_GPEC_SOURCE,       6)
 
 COMMENT(      scalar fields      )
 FIO_DEFINE_INT(FIO_ALPHA,             1)
 FIO_DEFINE_INT(FIO_SCALAR_POTENTIAL,  2)
 FIO_DEFINE_INT(FIO_TOTAL_PRESSURE,    3)
+FIO_DEFINE_INT(FIO_POLOIDAL_FLUX,     4)
+FIO_DEFINE_INT(FIO_POLOIDAL_FLUX_NORM,5)
 
 COMMENT(      species-dependent scalar fields      )
 FIO_DEFINE_INT(FIO_PRESSURE,          101)
@@ -44,7 +51,7 @@ COMMENT(      species-dependent vector fields      )
 FIO_DEFINE_INT(FIO_VELOCITY,          1101)
 
 COMMENT(      tensor fields      )
-FIO_DEFINE_INT(FIO_GRAD_VECTOR_POTENTIAL, 2001)
+
 
 COMMENT(      series             )
 FIO_DEFINE_INT(FIO_MAGAXIS_PSI,       3001)
@@ -55,6 +62,7 @@ FIO_DEFINE_INT(FIO_MAGAXIS_Z,         3004)
 COMMENT(      integer parameters         )
 FIO_DEFINE_INT(FIO_NUM_TIMESLICES,    4001)
 FIO_DEFINE_INT(FIO_GEOMETRY,          4002)
+FIO_DEFINE_INT(FIO_TOROIDAL_MODE,     4003)
 
 COMMENT(      real parameters         )
 FIO_DEFINE_INT(FIO_PERIOD,            5001)
@@ -86,7 +94,7 @@ FIO_DEFINE_INT(FIO_REAL_OPT_END,      103)
 
 COMMENT(      field options (strings)      )
 FIO_DEFINE_INT(FIO_STR_OPT_START,     10000)
-FIO_DEFINE_INT(FIO_STR_OPT_END,       10000)
+FIO_DEFINE_INT(FIO_STR_OPT_END,       10001)
 
 COMMENT(      field operations      )
 FIO_DEFINE_INT(FIO_ADD,               1)
@@ -102,6 +110,7 @@ FIO_DEFINE_INT(FIO_FILE_ERROR,        10003)
 FIO_DEFINE_INT(FIO_BAD_DIMENSIONS,    10004)
 FIO_DEFINE_INT(FIO_BAD_SPECIES,       10005)
 FIO_DEFINE_INT(FIO_NO_DATA,           10006)
+FIO_DEFINE_INT(FIO_DIVERGED,          10007)
 
 COMMENT(      vector components      )
 FIO_DEFINE_INT(FIO_R, 0+INDEX_OFFSET)
