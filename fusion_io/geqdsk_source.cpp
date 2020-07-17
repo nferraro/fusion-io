@@ -213,8 +213,6 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
   if(i < 1 || i > nw) return FIO_OUT_OF_BOUNDS;
   if(j < 1 || j > nh) return FIO_OUT_OF_BOUNDS;
 
-  // convert i, j to fortran indices
-  i++; j++; p++; q++;
   bool result = 
     bicubic_interpolation_coeffs((const double**)psirz,nh,nw,q,p,a);
 
