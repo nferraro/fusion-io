@@ -41,17 +41,19 @@ int geqdsk_source::open(const char* filename)
   double bcentr, current;
     
   for(int i=0; i<5; i++) gfile >> dum;
-  gfile >> nw >> nh;
-  gfile >> rdim >> zdim >> rcentr >> rleft >> zmid;
-  gfile >> rmaxis >> zmaxis >> simag >> sibry >> bcentr;
-  gfile >> current >> simag >> dum >> rmaxis >> dum;
-  gfile >> zmaxis >> dum >> sibry >> dum >> dum;
+  gfile >> std::setw(16) >> nw >> nh;
+  gfile >> std::setw(16) >> rdim >> zdim >> rcentr >> rleft >> zmid;
+  gfile >> std::setw(16) >> rmaxis >> zmaxis >> simag >> sibry >> bcentr;
+  gfile >> std::setw(16) >> current >> simag >> dum >> rmaxis >> dum;
+  gfile >> std::setw(16) >> zmaxis >> dum >> sibry >> dum >> dum;
+  zbottom = zmid - zdim/2.;
 
   std::cout << "nw = " << nw << ", nh = " << nh << std::endl;
   std::cout << "rmaxis = " << rmaxis << ", zmaxis = " << zmaxis << std::endl;
   std::cout << "rleft = " << rleft << ", zmid = " << zmid << std::endl;
   std::cout << "rdim = " << rdim << ", zdim = " << zdim << std::endl;
   std::cout << "simag = " << simag << std::endl;
+  std::cout << "dum = " << dum << std::endl;
 
   psirz = new double*[nh];
   for(int i=0; i<nh; i++)
@@ -64,7 +66,7 @@ int geqdsk_source::open(const char* filename)
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> press[i];
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> ffprime[i];
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> dum;      // pprime
-  for(int i=0; i<nh; i++) 
+  for(int i=0; i<nh; i++)
     for(int j=0; j<nw; j++)
       gfile >> std::setw(16) >> psirz[i][j];
 
@@ -115,8 +117,8 @@ int geqdsk_source::extent(double* r0, double* r1, double* z0, double* z1)
 {
   *r0 = rleft;
   *r1 = rleft + dx*(double)(nw-1);
-  *z0 = zmid - dz*(double)((nh-1)/2);
-  *z1 = zmid + dz*(double)((nh-1)/2);
+  *z0 = zbottom;
+  *z1 = zbottom + dz*(double)(nh-1);
 
   return FIO_SUCCESS;
 }
@@ -206,12 +208,9 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
   double a[4][4];
 
   double p = (r0-rleft)/dx;
-  double q = (z0-zmid)/dz + (double)nh/2.;
+  double q = (z0-zbottom)/dz;
   int i = (int)p;
   int j = (int)q;
-
-  if(i < 1 || i > nw) return FIO_OUT_OF_BOUNDS;
-  if(j < 1 || j > nh) return FIO_OUT_OF_BOUNDS;
 
   bool result = 
     bicubic_interpolation_coeffs((const double**)psirz,nh,nw,q,p,a);
