@@ -21,7 +21,7 @@ class m3dc1_mesh {
   int* nneighbors;
   int** neighbor;
 
-  virtual const int max_neighbors() const {return 3;}
+  virtual int max_neighbors() const {return 3;}
 
   //  static const double tol = 1e-1;
 
@@ -122,7 +122,7 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
 
   int shared_nodes(const int i, const int j);
   bool elements_are_neighbors(const int i, const int j);
-  virtual const int max_neighbors() const {return 5;}
+  virtual int max_neighbors() const {return 5;}
 
  public:
   double *phi;
