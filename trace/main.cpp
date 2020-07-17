@@ -451,6 +451,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
     // set options for fields obtained from this source
     src.source->get_field_options(&fopt);
     fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
+    if(argc<2) fopt.set_option(FIO_TIMESLICE,-1);  // default to timeslice=-1
     break;
 
   case(FIO_GEQDSK_SOURCE):
