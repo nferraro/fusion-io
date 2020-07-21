@@ -108,6 +108,8 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
   fields->push_back(FIO_GRAD_VECTOR_POTENTIAL);
+  fields->push_back(FIO_WALL_DIST);
+  fields->push_back(FIO_JPHI);
   if (igeometry==1) {
     fields->push_back(FIO_RSTELLA);
     fields->push_back(FIO_ZSTELLA);
@@ -226,6 +228,16 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 
   case(FIO_TOTAL_PRESSURE):
     mf = new m3dc1_scalar_field(this, "P", p0);
+    if(s!=0) unneeded_species = true;
+    break;
+
+  case(FIO_WALL_DIST):
+    mf = new m3dc1_scalar_field(this, "wall_dist", L0);
+    if(s!=0) unneeded_species = true;
+    break;
+
+  case(FIO_JPHI):
+    mf = new m3dc1_scalar_field(this, "jphi", L0);
     if(s!=0) unneeded_species = true;
     break;
 
