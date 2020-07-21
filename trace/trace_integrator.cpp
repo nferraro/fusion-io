@@ -19,108 +19,49 @@ trace_integrator::~trace_integrator()
   close_file();
 }
 
-bool trace_integrator::load()
+
+bool trace_integrator::eval(const double r, const double phi, const double z, 
+			    double* br, double* bphi, double* bz)
 {
+  double m[3], x[3];
+
+  x[0] = r;
+  x[1] = phi;
+  x[2] = z;
+
+  *br = 0.;
+  *bphi = 0.;
+  *bz = 0.;
+      
   trace_source_list::iterator i = sources.begin();
 
-  interpolate = false;
-  interp_source.sources.erase(interp_source.sources.begin(), 
-			      interp_source.sources.end());
-
-  // load each source
   while(i != sources.end()) {
-    if(!((*i)->load()))
+    int result = i->field->eval(x, m, i->hint);
+    if(result != FIO_SUCCESS)
       return false;
-
-    // if this source wants to be interpolated,
-    // add it to the interpolation source
-    if((*i)->interpolate) {
-      interpolate = true;
-      interp_source.sources.push_back(*i);
-    }
+    *br   += m[0];
+    *bphi += m[1];
+    *bz   += m[2];
     i++;
-  } 
-
-  // if any fields want to be interpolated,
-  // load the interpolation grid
-  if(interpolate) {
-    std::cerr<< "Loading interpolating source" << std::endl;
-
-    // determine the size of the grid
-    double r0, r1, z0, z1;
-    if(!extent(&r0, &r1, &z0, &z1)) {
-      std::cerr << "Error: cannot set extent for interpolation grid" 
-		<< std::endl;
-      return false;
-    }
-    int n[3];
-    n[0] = 64;
-    n[1] = 64;
-    n[2] = 64;
-    interp_source.set_extent(r0, r1, z0, z1, n[0], n[1], n[2]);
-    
-    // load the interpolation source
-    if(!interp_source.load())
-      return false;
   }
-
-  if(sources.size() == 0) return false;
-
-  toroidal = sources[0]->toroidal;
-  period = sources[0]->get_period();
-  std::cout << "Toroidal " << toroidal << std::endl;
-  std::cout << "Period " << period << std::endl;
 
   return true;
 }
 
-bool trace_integrator::eval(const double r, const double phi, const double z, 
-			    double *b_r, double *b_phi, double *b_z)
+bool trace_integrator::eval_psi(const double r, const double phi, const double z, 
+			    double* psi)
 {
-  *b_r = 0.;
-  *b_phi = 0.;
-  *b_z = 0.;
+  if(!sources[0].psi_norm)
+    return false;
+  
+  double x[3];
+  x[0] = r;
+  x[1] = phi;
+  x[2] = z;
 
-  if(tpts <= 1) {
-    trace_source_list::iterator i = sources.begin();
-
-    while(i != sources.end()) {
-      if(!(*i)->interpolate)
-	if(!((*i)->eval(r, phi, z, b_r, b_phi, b_z)))
-	  return false;
-      i++;
-    }
-    
-    if(interpolate) {
-      if(!interp_source.eval(r, phi, z, b_r, b_phi, b_z))
-	return false;
-    }
-
-  } else {
-    double dphi = period/(double)tpts;
-
-    for(int t=0; t<tpts; t++) {
-      double y = dphi*(double)t;
-      if(y >= period) y -= period;
-      
-      trace_source_list::iterator i = sources.begin();
-      
-      while(i != sources.end()) {
-	if(!(*i)->interpolate)
-	  if(!((*i)->eval(r, y, z, b_r, b_phi, b_z)))
-	    return false;
-	i++;
-      }
-      
-      if(interpolate) {
-	if(!interp_source.eval(r, y, z, b_r, b_phi, b_z))
-	  return false;
-      }
-    }
-    *b_r   /= (double)tpts;
-    *b_phi /= (double)tpts;
-    *b_z   /= (double)tpts;
-  }
+  int result = sources[0].psi_norm->eval(x, psi, sources[0].hint);
+  if(result != FIO_SUCCESS)
+    return false;
 
   return true;
 }
@@ -161,16 +102,12 @@ bool trace_integrator::center(double* R0, double* Z0) const
   if(sources.size()==0)
     return false;
 
-  return sources[0]->center(R0, Z0);
+  *R0 = sources[0].magaxis[0];
+  *Z0 = sources[0].magaxis[1];
+
+  return true;
 }
 
-bool trace_integrator::psibound(double* psi0, double* psi1) const
-{
-  if(sources.size()==0)
-    return false;
-
-  return sources[0]->psibound(psi0, psi1);
-}
 
 bool trace_integrator::get_surface(const double r0, const double phi0, 
 				   const double z0, const double ds, 
@@ -179,37 +116,10 @@ bool trace_integrator::get_surface(const double r0, const double phi0,
   if(sources.size()==0)
     return false;
 
-  return sources[0]->get_surface(r0, phi0, z0, ds, r, z, n);
+  return true;
+  //  return sources[0]->get_surface(r0, phi0, z0, ds, r, z, n);
 }
 
-bool trace_integrator::extent(double* r0, double* r1, double* z0, double* z1)
-  const
-{
-  bool result = false;
-  trace_source_list::const_iterator i = sources.begin();
-  
-  while(i != sources.end()) {
-    double new_r0, new_r1, new_z0, new_z1;
-    bool new_result = (*i)->extent(&new_r0, &new_r1, &new_z0, &new_z1);
-    if(new_result) {
-      if(result) {
-	if(new_r0 < *r0) *r0 = new_r0;
-	if(new_r1 > *r1) *r1 = new_r1;
-	if(new_z0 < *z0) *z0 = new_z0;
-	if(new_z1 > *z1) *z1 = new_z1;
-      } else {
-	*r0 = new_r0;
-	*r1 = new_r1;
-	*z0 = new_z0;
-	*z1 = new_z1;
-	result = true;
-      }
-    }
-    i++;
-  }
-
-  return result;
-}
 
 bool trace_integrator::integrate(int transits, int steps_per_transit, 
 				 integrator_data* data)
@@ -234,9 +144,6 @@ bool trace_integrator::integrate(int transits, int steps_per_transit,
 
   double R0, Z0;
   center(&R0,&Z0);
-
-  double psi_axis, psi_lcfs;
-  bool use_psinorm = psibound(&psi_axis, &psi_lcfs);
 
   dphi = pd/(double)steps_per_transit;
 
@@ -339,12 +246,8 @@ bool trace_integrator::integrate(int transits, int steps_per_transit,
       double Z_plot = Z*f + last_Z*(1.-f);
       double theta_plot = atan2(Z_plot - Z0, R_plot - R0)*180./M_PI;
       double psi_plot;
-      if(!sources[0]->eval_psi(R_plot, Z_plot, &psi_plot))
+      if(!eval_psi(R_plot, plane, Z_plot, &psi_plot))
 	psi_plot = 0;
-      else {
-	if(use_psinorm)
-	  psi_plot = (psi_plot - psi_axis) / (psi_lcfs - psi_axis);
-      }
 
       file << std::setiosflags(std::ios::scientific)
 	   << std::setw(20) << std::setprecision(12) 

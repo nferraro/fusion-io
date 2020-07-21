@@ -31,7 +31,7 @@ program fio_example
   integer :: i, j, cs, ntime, ierr
   type(fio_search_hint) :: hint
 
-  filename_m3dc1 = 'C1.h5'
+  filename_m3dc1 = 'data/m3dc1/C1.h5'
 
   ! read files and fields
   print *, 'Reading ', trim(filename_m3dc1)

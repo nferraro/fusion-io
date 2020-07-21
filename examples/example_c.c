@@ -42,7 +42,7 @@ int main()
 
   int isz;
 
-  strcpy(filename, "C1.h5");
+  strcpy(filename, "data/m3dc1/C1.h5");
 
   // read files and fields
   printf("Reading %s\n", filename);

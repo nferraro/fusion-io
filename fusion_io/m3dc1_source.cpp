@@ -29,6 +29,11 @@ int m3dc1_source::open(const char* filename)
   else
     file.read_parameter("z_ion", &z_ion);
 
+  if(version >= 23)
+    file.read_parameter("kprad_z", &kprad_z);
+  else
+    kprad_z = 0;
+
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
 
@@ -65,6 +70,7 @@ int m3dc1_source::open(const char* filename)
 int m3dc1_source::allocate_search_hint(void** s)
 {
   *s = new int;
+  *((int*)(*s)) = -1;
   //  std::cerr << "Allocated hint at " << *s << std::endl;
   return FIO_SUCCESS;
 }
@@ -102,12 +108,13 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_CURRENT_DENSITY);
   fields->push_back(FIO_FLUID_VELOCITY);
   fields->push_back(FIO_MAGNETIC_FIELD);
+  fields->push_back(FIO_POLOIDAL_FLUX);
+  fields->push_back(FIO_POLOIDAL_FLUX_NORM);
   fields->push_back(FIO_PRESSURE);
   fields->push_back(FIO_TEMPERATURE);
   fields->push_back(FIO_TOTAL_PRESSURE);
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
-  fields->push_back(FIO_GRAD_VECTOR_POTENTIAL);
   fields->push_back(FIO_WALL_DIST);
   fields->push_back(FIO_JPHI);
   if (igeometry==1) {
@@ -153,7 +160,9 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
 			    const fio_option_list* opt)
 {
   *f = 0;
-  m3dc1_fio_field* mf;
+  m3dc1_fio_field* mf(0);
+  fio_series *psi0, *psi1;
+  double psi0_val, psi1_val;
   bool unneeded_species = false;
   int s, result;
 
@@ -172,7 +181,17 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     } else if(s==ion_species) {
       mf = new m3dc1_scalar_field(this, "den", n0);
     } else {
-      result = FIO_BAD_SPECIES;
+      if((fio_species(s).atomic_number() != kprad_z) || (kprad_z==0)) {
+	std::cerr << "Error: requesting density of species with atomic number "
+		  << fio_species(s).atomic_number()
+		  << ".  Impurity species in simulation has "
+		  << "atomic number " << kprad_z << std::endl;
+	result = FIO_BAD_SPECIES;
+      } else {
+	char name[11];
+	snprintf(name, 11, "kprad_n_%02d", fio_species(s).charge());
+	mf = new m3dc1_scalar_field(this, name, n0);
+      }
     }
     break;
 
@@ -201,13 +220,30 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     if(s!=0) unneeded_species = true;
     break;
 
-  case(FIO_GRAD_VECTOR_POTENTIAL):
-    mf = new m3dc1_grad_vector_potential(this);
+  case(FIO_MAGNETIC_FIELD):
+    mf = new m3dc1_magnetic_field(this);
     if(s!=0) unneeded_species = true;
     break;
 
-  case(FIO_MAGNETIC_FIELD):
-    mf = new m3dc1_magnetic_field(this);
+  case(FIO_POLOIDAL_FLUX):
+    mf = new m3dc1_scalar_field(this, "psi", 2.*M_PI*B0*L0*L0);
+    if(s!=0) unneeded_species = true;
+    break;
+
+  case(FIO_POLOIDAL_FLUX_NORM):
+    if((result = get_series(FIO_MAGAXIS_PSI, &psi0)) != FIO_SUCCESS)
+      break;
+    if((result = get_series(FIO_LCFS_PSI,    &psi1)) != FIO_SUCCESS)
+      break;
+    if((result = psi0->eval(0, &psi0_val)) != FIO_SUCCESS)
+       break;
+    if((result = psi1->eval(0, &psi1_val)) != FIO_SUCCESS)
+       break;
+    delete(psi0);
+    delete(psi1);
+    mf = new m3dc1_scalar_field(this, "psi",
+				1./(psi1_val - psi0_val), 
+				psi0_val);
     if(s!=0) unneeded_species = true;
     break;
 

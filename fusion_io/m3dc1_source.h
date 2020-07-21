@@ -11,6 +11,7 @@ class m3dc1_source : public fio_source {
   double bzero, rzero, z_ion, ion_mass, period;
   double n0, L0, B0, p0, t0, v0, J0, Phi0, temp0;
   int linear, eqsubtract, extsubtract, icomplex, i3d, version, itor, ntor, ntime, igeometry;
+  int kprad_z;
   fio_species ion_species;
 
  public:

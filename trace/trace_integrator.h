@@ -1,12 +1,51 @@
 #ifndef TRACE_INTEGRATOR_H
 #define TRACE_INTEGRATOR_H
 
+#include <fusion_io_source.h>
+
 #include <fstream>
+#include <deque>
 
-#include "trace_source.h"
-#include "interpolation_source.h"
+//#include "trace_source.h"
+//#include "interpolation_source.h"
 
-class trace_integrator : private trace_field_source {
+struct trace_source {
+  void* hint;
+  fio_source* source;
+  fio_field* field;
+  fio_field* psi_norm;
+  double magaxis[2];
+  trace_source() {
+    source = 0;
+    field = 0;
+    psi_norm = 0;
+    hint = 0;
+    magaxis[0] = 0.;
+    magaxis[1] = 0.;
+  }
+  void free() {
+    if(hint) {
+      if(source) source->deallocate_search_hint(&hint);
+      hint = 0;
+    }
+    if(psi_norm) {
+      delete(psi_norm);
+      psi_norm = 0;
+    }
+    if(field) {
+      delete(field);
+      field = 0;
+    }
+    if(source) {
+      delete(source);
+      source = 0;
+    }
+  }
+};
+
+typedef std::deque<trace_source> trace_source_list;
+
+class trace_integrator {
   double R, Phi, Z;
 
   double dr[4], dz[4];
@@ -30,20 +69,18 @@ class trace_integrator : private trace_field_source {
 
   double plane;
   trace_source_list sources;
-  interpolation_source interp_source;
 
   trace_integrator();
   virtual ~trace_integrator();
 
-  virtual bool load();
-  virtual bool eval(const double r, const double phi, const double z,
-		    double* b_r, double* b_phi, double* b_z);
-  virtual bool center(double* r0, double* z0) const;
-  virtual bool psibound(double* psi0, double* psi1) const;
-  virtual bool extent(double* r0, double* r1, double* z0, double* z1) const;
-  virtual bool get_surface(const double r0, const double phi0, const double z0,
-			   const double ds, double** r, double** z, int* n);
-
+  bool load();
+  bool eval(const double r, const double phi, const double z, 
+	    double* br, double* bphi, double* bz);
+  bool eval_psi(const double r, const double phi, const double z, 
+	    double* psi);
+  bool center(double* r0, double* z0) const;
+  bool get_surface(const double r0, const double phi0, const double z0,
+		   const double ds, double** r, double** z, int* n);
 
   void set_reverse(const bool r);
 

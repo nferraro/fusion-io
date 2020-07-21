@@ -12,6 +12,7 @@ class fio_species {
   fio_species(const fio_species&);
   fio_species(const int);
   fio_species(const int, const int, const int);
+  int atomic_number() const;
   int charge() const;
   int mass() const;
   std::string name() const;

@@ -2,6 +2,7 @@
 #define FUSION_IO_SOURCE_H
 
 #include "fusion_io_species.h"
+#include "fusion_io_series.h"
 #include "fusion_io_field.h"
 #include "options.h"
 

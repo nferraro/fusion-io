@@ -42,7 +42,7 @@ int m3dc1_fio_series::eval(const double t, double* x)
     return FIO_OUT_OF_BOUNDS;
 
   // linearly interpolate data
-  int i;
+  m3dc1_scalar_list::size_type i;
   for(i=0; i<time->size()-1; i++) {
     if(time->at(i) * source->t0 <= t && time->at(i+1) * source->t0 >= t)
       break;
@@ -146,10 +146,42 @@ int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
     *v += val[m3dc1_field::OP_1];
   }
 
+  *v -= offset;
   *v *= factor;
 
   return FIO_SUCCESS;
 }
+
+int m3dc1_scalar_field::eval_deriv(const double* x, double* v, void* s)
+{
+  const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
+
+  double val[m3dc1_field::OP_NUM];
+
+  if(!f1->eval(x[0], x[1]-phase, x[2], get, val, (int*)s))
+    return FIO_OUT_OF_BOUNDS;
+  
+  v[FIO_DR  ] = linfac*val[m3dc1_field::OP_DR];
+  v[FIO_DPHI] = linfac*val[m3dc1_field::OP_DP];
+  v[FIO_DZ  ] = linfac*val[m3dc1_field::OP_DZ];
+
+  if(eqsub) {
+    if(!f0->eval(x[0], x[1]-phase, x[2], get, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+    
+    v[FIO_DR  ] += val[m3dc1_field::OP_DR];
+    v[FIO_DPHI] += val[m3dc1_field::OP_DP];
+    v[FIO_DZ  ] += val[m3dc1_field::OP_DZ];
+  }
+
+  v[FIO_DR  ] *= factor;
+  v[FIO_DPHI] *= factor;
+  v[FIO_DZ  ] *= factor;
+
+  return FIO_SUCCESS;
+}
+
 
 int m3dc1_pi_field::load(const fio_option_list* opt)
 {
@@ -169,16 +201,13 @@ int m3dc1_pi_field::load(const fio_option_list* opt)
 
 int m3dc1_pi_field::eval(const double* x, double* v, void* s)
 {
-  const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_VAL);
-
   double val;
   int result;
 
   result = p->eval(x, v, s);
   if(result != FIO_SUCCESS) return result;
 
-  result = pe->eval(x, &val, (int*)s);
+  result = pe->eval(x, &val, s);
   if(result != FIO_SUCCESS) return result;
   
   *v = *v - val;
@@ -446,6 +475,86 @@ int m3dc1_vector_potential::eval(const double* x, double* v, void* s)
   return FIO_SUCCESS;
 }
 
+int m3dc1_vector_potential::eval_deriv(const double* x, double* v, void* s)
+{
+  const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
+
+  const m3dc1_field::m3dc1_get_op fget =
+    (m3dc1_field::m3dc1_get_op)
+    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL);
+
+  double val[m3dc1_field::OP_NUM];
+
+  if(!psi1->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
+    return FIO_OUT_OF_BOUNDS;
+
+  v[1] = linfac*(val[m3dc1_field::OP_DR] - val[m3dc1_field::OP_1]/x[0])/x[0];
+  v[4] = linfac*val[m3dc1_field::OP_DP]/x[0];
+  v[7] = linfac*val[m3dc1_field::OP_DZ]/x[0];
+
+  if(use_f) {
+    if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+
+    v[0] =  linfac*(x[0]*val[m3dc1_field::OP_DRZ] + val[m3dc1_field::OP_DZ]);
+    v[2] = -linfac*(x[0]*val[m3dc1_field::OP_DRR] + val[m3dc1_field::OP_DR]);
+    v[3] =  linfac*(x[0]*val[m3dc1_field::OP_DZP]);
+    v[5] = -linfac*(x[0]*val[m3dc1_field::OP_DRP]);
+    v[6] =  linfac*(x[0]*val[m3dc1_field::OP_DZZ]);
+    v[8] = -linfac*(x[0]*val[m3dc1_field::OP_DRZ]);
+  } else {
+    v[0] = v[2] = v[3] = v[5] = v[6] = v[8] = 0.;
+  }
+
+  if(eqsub) {
+    if(!psi0->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+
+    v[1] += (val[m3dc1_field::OP_DR]-val[m3dc1_field::OP_1]/x[0])/x[0];
+    v[4] += val[m3dc1_field::OP_DP]/x[0];
+    v[7] += val[m3dc1_field::OP_DZ]/x[0];
+
+    v[2] -= source->bzero*source->rzero/x[0];
+  }
+
+  if(extsub) {
+    if(!psix->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
+      return FIO_OUT_OF_BOUNDS;
+
+    v[1] += linfac*(val[m3dc1_field::OP_DR]-val[m3dc1_field::OP_1]/x[0])/x[0];
+    v[4] += linfac*val[m3dc1_field::OP_DP]/x[0];
+    v[7] += linfac*val[m3dc1_field::OP_DZ]/x[0];
+
+    if(use_f) {
+      if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
+        return FIO_OUT_OF_BOUNDS;
+
+      v[0] += linfac*(x[0]*val[m3dc1_field::OP_DRZ] + val[m3dc1_field::OP_DZ]);
+      v[2] -= linfac*(x[0]*val[m3dc1_field::OP_DRR] + val[m3dc1_field::OP_DR]);
+      v[3] += linfac*(x[0]*val[m3dc1_field::OP_DZP]);
+      v[5] -= linfac*(x[0]*val[m3dc1_field::OP_DRP]);
+      v[6] += linfac*(x[0]*val[m3dc1_field::OP_DZZ]);
+      v[8] -= linfac*(x[0]*val[m3dc1_field::OP_DRZ]);
+    }
+  }
+
+  // convert to mks
+  v[0] *= source->B0;
+  v[1] *= source->B0;
+  v[2] *= source->B0;
+  v[3] *= source->B0*source->L0;
+  v[4] *= source->B0*source->L0;
+  v[5] *= source->B0*source->L0;
+  v[6] *= source->B0;
+  v[7] *= source->B0;
+  v[8] *= source->B0;
+  
+  return FIO_SUCCESS;
+}
+
+
+
 int m3dc1_magnetic_field::load(const fio_option_list* opt)
 {
   m3dc1_fio_field::load(opt);
@@ -678,15 +787,21 @@ int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, void* s)
     }
   }
 
-  v[FIO_DR_R    ] *= source->B0;
-  v[FIO_DR_PHI  ] *= source->B0;
-  v[FIO_DR_Z    ] *= source->B0;
-  v[FIO_DPHI_R  ] *= source->B0;
-  v[FIO_DPHI_PHI] *= source->B0;
-  v[FIO_DPHI_Z  ] *= source->B0;
-  v[FIO_DZ_R    ] *= source->B0;
-  v[FIO_DZ_PHI  ] *= source->B0;
-  v[FIO_DZ_Z    ] *= source->B0;
+  v[FIO_DR_R    ] *= source->B0 / source->L0;
+  v[FIO_DR_PHI  ] *= source->B0 / source->L0;
+  v[FIO_DR_Z    ] *= source->B0 / source->L0;
+  if(source->itor==1) {
+    v[FIO_DPHI_R  ] *= source->B0;
+    v[FIO_DPHI_PHI] *= source->B0;
+    v[FIO_DPHI_Z  ] *= source->B0;
+  } else {
+    v[FIO_DPHI_R  ] *= source->B0 / source->L0;
+    v[FIO_DPHI_PHI] *= source->B0 / source->L0;
+    v[FIO_DPHI_Z  ] *= source->B0 / source->L0;
+  }
+  v[FIO_DZ_R    ] *= source->B0 / source->L0;
+  v[FIO_DZ_PHI  ] *= source->B0 / source->L0;
+  v[FIO_DZ_Z    ] *= source->B0 / source->L0;
   
   return FIO_SUCCESS;
 }
@@ -809,121 +924,6 @@ int m3dc1_current_density::eval(const double* x, double* v, void* s)
   v[0] *= source->J0;
   v[1] *= source->J0;
   v[2] *= source->J0;
-  
-  return FIO_SUCCESS;
-}
-
-
-
-int m3dc1_grad_vector_potential::load(const fio_option_list* opt)
-{
-  m3dc1_fio_field::load(opt);
-
-  psi1 = source->file.load_field("psi", time);
-  if(!psi1) return 1;
-  i1 = source->file.load_field("I", time);
-  if(!i1) return 1;
-  if(use_f) {
-    f1 = source->file.load_field("f", time);
-    if(!f1) return 1;
-  }
-
-  if(eqsub) {
-    psi0 = source->file.load_field("psi", -1);
-    if(!psi0) return 1;
-    i0 = source->file.load_field("I", -1);
-    if(!i0) return 1;
-  }
-
-  if(extsub) {
-    psix = source->file.load_field("psi_ext", time);
-    if(!psix) return 1;
-    ix = source->file.load_field("I_ext", time);
-    if(!ix) return 1;
-    if(use_f) {
-      fx = source->file.load_field("f_ext", time);
-      if(!fx) return 1;
-    }
-  }
-
-  return FIO_SUCCESS;
-}
-
-
-int m3dc1_grad_vector_potential::eval(const double* x, double* v, void* s)
-{
-  const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
-
-  const m3dc1_field::m3dc1_get_op fget =
-    (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL);
-
-  double val[m3dc1_field::OP_NUM];
-
-  if(!psi1->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
-    return FIO_OUT_OF_BOUNDS;
-
-  v[1] = linfac*(val[m3dc1_field::OP_DR] - val[m3dc1_field::OP_1]/x[0])/x[0];
-  v[4] = linfac*val[m3dc1_field::OP_DP]/x[0];
-  v[7] = linfac*val[m3dc1_field::OP_DZ]/x[0];
-
-  if(use_f) {
-    if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
-      return FIO_OUT_OF_BOUNDS;
-
-    v[0] =  linfac*(x[0]*val[m3dc1_field::OP_DRZ] + val[m3dc1_field::OP_DZ]);
-    v[2] = -linfac*(x[0]*val[m3dc1_field::OP_DRR] + val[m3dc1_field::OP_DR]);
-    v[3] =  linfac*(x[0]*val[m3dc1_field::OP_DZP]);
-    v[5] = -linfac*(x[0]*val[m3dc1_field::OP_DRP]);
-    v[6] =  linfac*(x[0]*val[m3dc1_field::OP_DZZ]);
-    v[8] = -linfac*(x[0]*val[m3dc1_field::OP_DRZ]);
-  } else {
-    v[0] = v[2] = v[3] = v[5] = v[6] = v[8] = 0.;
-  }
-
-  if(eqsub) {
-    if(!psi0->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
-      return FIO_OUT_OF_BOUNDS;
-
-    v[1] += (val[m3dc1_field::OP_DR]-val[m3dc1_field::OP_1]/x[0])/x[0];
-    v[4] += val[m3dc1_field::OP_DP]/x[0];
-    v[7] += val[m3dc1_field::OP_DZ]/x[0];
-
-    v[2] -= source->bzero*source->rzero/x[0];
-  }
-
-  if(extsub) {
-    if(!psix->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
-      return FIO_OUT_OF_BOUNDS;
-
-    v[1] += linfac*(val[m3dc1_field::OP_DR]-val[m3dc1_field::OP_1]/x[0])/x[0];
-    v[4] += linfac*val[m3dc1_field::OP_DP]/x[0];
-    v[7] += linfac*val[m3dc1_field::OP_DZ]/x[0];
-
-    if(use_f) {
-      if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
-        return FIO_OUT_OF_BOUNDS;
-
-      v[0] += linfac*(x[0]*val[m3dc1_field::OP_DRZ] + val[m3dc1_field::OP_DZ]);
-      v[2] -= linfac*(x[0]*val[m3dc1_field::OP_DRR] + val[m3dc1_field::OP_DR]);
-      v[3] += linfac*(x[0]*val[m3dc1_field::OP_DZP]);
-      v[5] -= linfac*(x[0]*val[m3dc1_field::OP_DRP]);
-      v[6] += linfac*(x[0]*val[m3dc1_field::OP_DZZ]);
-      v[8] -= linfac*(x[0]*val[m3dc1_field::OP_DRZ]);
-    }
-  }
-
-  // convert to mks
-  v[0] *= source->B0;
-  v[1] *= source->B0;
-  v[2] *= source->B0;
-  v[3] *= source->B0*source->L0;
-  v[4] *= source->B0*source->L0;
-  v[5] *= source->B0*source->L0;
-  v[6] *= source->B0;
-  v[7] *= source->B0;
-  v[8] *= source->B0;
   
   return FIO_SUCCESS;
 }

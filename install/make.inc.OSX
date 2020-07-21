@@ -11,11 +11,11 @@ ARCH = ar cr
 
 LDD = $(CXX) -shared
 LD = $(CXX) 
-LDFLAGS = -fPIC
+LDFLAGS = -fPIC -Wl,-rpath,/opt/local/lib
 
 INCLUDE = -I/usr/local/include
 
-LIBS = -L/usr/lib -lgfortran
+LIBS = -L/opt/local/lib/gcc9 -lgfortran -lstdc++
 
-HDF5_LIBS = -lhdf5 -lz
+HDF5_LIBS = /opt/local/lib/libhdf5.a -lz
 LAPACK = -llapack

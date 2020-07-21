@@ -157,10 +157,11 @@ class sim_data:
         self._available_fields = dict(zip([fio_py.get_field_name(nr) for nr in self._iavailable_fields], self._iavailable_fields))
         self.ntor = fio_py.get_int_parameter(self._isrc, fio_py.FIO_TOROIDAL_MODE)
         self.period = fio_py.get_real_parameter(self._isrc, fio_py.FIO_PERIOD)
-        if time == -1:
-            self.timeslice = int(0)
-        else:
-            self.timeslice = int(time)
+        self.fc = None #used to store flux coodinate object upon calculation of flux coordinates (see class definition below and flux_coordinates.py)
+        #if time == -1:
+        #    self.timeslice = int(0)
+        #else:
+        self.timeslice = int(time)
         self.time = fio_py.get_real_field_parameter(self._imag, fio_py.FIO_TIME)
         if verbose:
             print('Available fields:')
@@ -316,8 +317,11 @@ class sim_data:
         def read_mesh(self, sim_data, time):
             self.sim_data = sim_data
             timestr = str(time)
-            fname = "time_"+timestr.zfill(3)
-            f     = sim_data._all_attrs[fname]
+            if timestr == '-1':
+                fname = 'equilibrium.h5'
+            else:
+                fname = "time_"+timestr.zfill(3)+'.h5'
+            f     = h5py.File(fname, 'r')
             mesh  = np.asarray(f['mesh/elements'])
 
             version = f.attrs["version"]

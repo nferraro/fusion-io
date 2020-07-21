@@ -27,6 +27,7 @@ DLIB = libfusionio.so
 OBJS = 	interpolate.o \
 	options.o \
 	fusion_io_species.o \
+	fusion_io_series.o \
 	fusion_io_field.o \
 	fio_operations.o \
 	compound_field.o \
@@ -38,9 +39,10 @@ OBJS = 	interpolate.o \
 	geqdsk_field.o \
 	gato_source.o \
 	gato_field.o \
+	gpec_source.o \
+	gpec_field.o \
 	fusion_io.o \
 	c_interface.o \
-	fortran_interface.o \
 	fusion_io_fortran.o
 
 PUSH_LIB = libfio_push.a

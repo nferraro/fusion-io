@@ -200,9 +200,18 @@ int mars_source::open(const char* )
 
 int mars_source::close()
 {
-  if(psiiso) delete(psiiso);    psiiso = 0;
-  if(eqdata) delete(eqdata);    eqdata = 0;
-  if(eqdatam) delete(eqdatam);  eqdatam = 0;
+  if(psiiso) { 
+    delete(psiiso);    
+    psiiso = 0;
+  }
+  if(eqdata) {
+    delete(eqdata);    
+    eqdata = 0;
+  }
+  if(eqdatam) {
+    delete(eqdatam);  
+    eqdatam = 0;
+  }
 
   return FIO_SUCCESS;
 }

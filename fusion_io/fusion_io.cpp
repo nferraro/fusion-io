@@ -17,6 +17,11 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
     ierr = (*src)->open(filename);
     break;
 
+  case(FIO_GPEC_SOURCE):
+    *src = new gpec_source();
+    ierr = (*src)->open(filename);
+    break;
+
   case(FIO_M3DC1_SOURCE):
     *src = new m3dc1_source();
     ierr = (*src)->open(filename);
@@ -83,12 +88,13 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_ELECTRIC_FIELD):    *s = "electric field";   break;
   case(FIO_FLUID_VELOCITY):    *s = "fluid velocity";   break; 
   case(FIO_MAGNETIC_FIELD):    *s = "magnetic field";   break;
+  case(FIO_POLOIDAL_FLUX):     *s = "poloidal flux";    break;
+  case(FIO_POLOIDAL_FLUX_NORM):*s = "normalized poloidal flux"; break;
   case(FIO_PRESSURE):          *s = "pressure";         break;
   case(FIO_SCALAR_POTENTIAL):  *s = "scalar potential"; break;
   case(FIO_TEMPERATURE):       *s = "temperature";      break;
   case(FIO_TOTAL_PRESSURE):    *s = "total pressure";   break;
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
-  case(FIO_GRAD_VECTOR_POTENTIAL):  *s = "grad vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
   case(FIO_RSTELLA):           *s = "rst";              break;
   case(FIO_ZSTELLA):           *s = "zst";              break;
