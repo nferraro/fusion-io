@@ -1,13 +1,3 @@
-# ====================================================================
-# Required modules:
-# -----------------
-# intel/2019.u3
-# openmpi/4.0.3
-# hdf5-parallel/1.10.5
-# lapack/3.9.0 (for lapack routines)
-# python/3.8.2
-# ====================================================================
-
 CC = mpicc
 CXX = mpicxx
 CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC
@@ -21,7 +11,7 @@ LDFLAGS =
 ARCH = ar cr
 LDD = $(CXX) --shared
 
-PYTHON = python3
+PYTHON = python
 
 LAPACK = -llapack
 
