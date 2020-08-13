@@ -434,6 +434,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
   fio_option_list fopt;
   fio_series* magaxis[2];
   int result;
+  double slice_time = 0.;
 
   switch(type) {
   case(FIO_M3DC1_SOURCE):
@@ -490,7 +491,14 @@ bool create_source(const int type, const int argc, const std::string argv[])
     return false;
   }
 
-  if(argc>=2) fopt.set_option(FIO_TIMESLICE, atoi(argv[1].c_str()));
+  if(argc>=2) {
+    int timeslice = atoi(argv[1].c_str());
+    std::cerr << "Time slice " << timeslice << std::endl;
+    fopt.set_option(FIO_TIMESLICE, timeslice);
+    if(src.source->get_slice_time(timeslice, &slice_time)==FIO_SUCCESS) {
+      std::cerr << "Slice time = " << slice_time << std::endl;
+    }
+  }
   if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
   if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
 
@@ -526,16 +534,18 @@ bool create_source(const int type, const int argc, const std::string argv[])
     src.free();
     return false;
   }
-  if((result = magaxis[0]->eval(0, &src.magaxis[0])) != FIO_SUCCESS) {
-    std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
-    src.free();
-    return false;
-  }
-  if((result = magaxis[1]->eval(0, &src.magaxis[1])) != FIO_SUCCESS) {
-    std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
-    src.free();
-    return false;
-  }
+  if((result = magaxis[0]->eval(slice_time, &src.magaxis[0])) != FIO_SUCCESS)
+    {
+      std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
+      src.free();
+      return false;
+    }
+  if((result = magaxis[1]->eval(slice_time, &src.magaxis[1])) != FIO_SUCCESS)
+    {
+      std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
+      src.free();
+      return false;
+    }
   delete(magaxis[0]);
   delete(magaxis[1]);
 

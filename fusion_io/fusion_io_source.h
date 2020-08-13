@@ -49,6 +49,11 @@ class fio_source {
     default:                                 return FIO_UNSUPPORTED; 
     }
   }
+  virtual int get_slice_time(const int slice, double* t)
+  {
+    *t = 0.;
+    return FIO_UNSUPPORTED;
+  }
 };
 
 #endif 

@@ -324,3 +324,12 @@ int m3dc1_source::get_series(const series_type t,fio_series** s)
   return result;
 }
 
+int m3dc1_source::get_slice_time(const int slice, double* time)
+{
+  if(!file.get_slice_time(slice, time)) {
+    return FIO_OUT_OF_BOUNDS;
+  }
+  *time *= t0;
+  return FIO_SUCCESS;
+}
+

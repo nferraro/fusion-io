@@ -24,6 +24,7 @@ class m3dc1_source : public fio_source {
   int get_series(const series_type, fio_series**);
   int get_int_parameter(const parameter_type, int*) const;
   int get_real_parameter(const parameter_type, double*) const;
+  int get_slice_time(const int, double*);
 
   int sizeof_search_hint() const
   { return sizeof(int); }
