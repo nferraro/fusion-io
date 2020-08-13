@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
   if(!R0_set) R0 = R_axis;
   if(!Z0_set) Z0 = Z_axis;
 
-  if(dR0<=0.) dR0 = dR;
+  if(dR0==0.) dR0 = dR;
 
   print_parameters();
 
