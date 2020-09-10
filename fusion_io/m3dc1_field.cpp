@@ -127,7 +127,7 @@ int m3dc1_scalar_field::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
+int m3dc1_scalar_field::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_VAL);
@@ -152,7 +152,7 @@ int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
   return FIO_SUCCESS;
 }
 
-int m3dc1_scalar_field::eval_deriv(const double* x, double* v, void* s)
+int m3dc1_scalar_field::eval_deriv(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
@@ -199,7 +199,7 @@ int m3dc1_pi_field::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_pi_field::eval(const double* x, double* v, void* s)
+int m3dc1_pi_field::eval(const double* x, double* v, fio_hint s)
 {
   double val;
   int result;
@@ -229,7 +229,7 @@ int m3dc1_phi_field::load(const fio_option_list* opt)
   return FIO_SUCCESS;
 }
 
-int m3dc1_phi_field::eval(const double* x, double* v, void* s)
+int m3dc1_phi_field::eval(const double* x, double* v, fio_hint s)
 {
   *v = 0.;
 
@@ -259,7 +259,7 @@ int m3dc1_electric_field::load(const fio_option_list* opt)
   return FIO_SUCCESS;
 }
 
-int m3dc1_electric_field::eval(const double* x, double* v, void* s)
+int m3dc1_electric_field::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op get = 
     (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_VAL);
@@ -307,7 +307,7 @@ int m3dc1_fluid_velocity::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_fluid_velocity::eval(const double* x, double* v, void* s)
+int m3dc1_fluid_velocity::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op phiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL);
@@ -393,7 +393,7 @@ int m3dc1_vector_potential::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_vector_potential::eval(const double* x, double* v, void* s)
+int m3dc1_vector_potential::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_VAL);
@@ -456,7 +456,7 @@ int m3dc1_vector_potential::eval(const double* x, double* v, void* s)
   return FIO_SUCCESS;
 }
 
-int m3dc1_vector_potential::eval_deriv(const double* x, double* v, void* s)
+int m3dc1_vector_potential::eval_deriv(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
@@ -571,7 +571,7 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_magnetic_field::eval(const double* x, double* v, void* s)
+int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL);
@@ -648,7 +648,7 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, void* s)
   return FIO_SUCCESS;
 }
 
-int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, void* s)
+int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL);
@@ -823,7 +823,7 @@ int m3dc1_current_density::load(const fio_option_list* opt)
 }
 
 
-int m3dc1_current_density::eval(const double* x, double* v, void* s)
+int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
 {
   const m3dc1_field::m3dc1_get_op psiget = (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL);

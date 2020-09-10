@@ -1,3 +1,5 @@
+#include <string.h>
+
 //=====================================================
 // bicubic_interpolation_coeffs
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -210,5 +212,42 @@ bool cubic_interpolation(const int m, const double* p, const double p0,
     dp = (p0-p[i])/(p[i+1]-p[i]);
     *f0 = a[0] + (a[1] + (a[2] + a[3]*dp)*dp)*dp;
   }
+  return true;
+}
+
+
+// shift array so that index s becomes index 0
+bool shift_array(const int m, double* x, const int s)
+{
+  if(s >= m || s < 0) return false;
+
+  double* tmp = new double[m];
+
+  for(int i=0; i<m-s; i++)
+      tmp[i] = x[i+s];
+
+  for(int i=m-s; i<m; i++)
+      tmp[i] = x[i+s-m];
+
+  memcpy(x, tmp, m*sizeof(double));
+
+  delete[] tmp;
+
+  return true;
+}
+
+
+// reverse elements of array
+bool reverse_array(const int m, double* x)
+{
+  double* tmp = new double[m];
+
+  for(int i=0; i<m; i++)
+      tmp[i] = x[m-i-1];
+
+  memcpy(x, tmp, m*sizeof(double));
+
+  delete[] tmp;
+
   return true;
 }

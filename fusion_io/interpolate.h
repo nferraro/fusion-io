@@ -7,5 +7,8 @@ bool cubic_interpolation_coeffs(const double* x, const int m, const int i,
 				double* a);
 bool cubic_interpolation(const int m, const double* p, const double p0, 
 			const double* f, double* f0);
+bool shift_array(const int m, double* x, const int s);
+bool reverse_array(const int m, double* x);
+
 
 #endif

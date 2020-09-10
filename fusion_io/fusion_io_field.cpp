@@ -15,7 +15,7 @@ fio_field& fio_field::operator*(const fio_field& f)
 
 int fio_field::find_val_on_line(const double f0,
 			 const double* x0_in, const double *x1,
-			 double* x_val, void* hint, const double tol)
+			 double* x_val, fio_hint hint, const double tol)
 {
   const int maxits = 100;
   bool checklen;
