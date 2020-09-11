@@ -129,36 +129,63 @@ int main(int argc, char* argv[])
   enclose[2] = 0.;
   double** path0;
   int m0;
-  result = fio_isosurface_2d(electron_temperature, 3900., x,
-			     enclose, 1e-2, 1e-2,
-			     0.1, &m0, &path0);
+  const int nphi = 16;
+  result = fio_isosurface(electron_temperature, 3900., x,
+			  enclose, 1e-2, 1e-2,
+			  0.1, 2.*M_PI/nphi, &m0, &path0);
 
-  std::cerr << "Found path with " << m0 << " points." << std::endl;
+  if(result == FIO_SUCCESS) {
+    std::cerr << "Found path with " << m0 << " points." << std::endl;
 
 
-  const int ntheta = 100;
-  double* theta = new double[ntheta];
-  double** path = new double*[3];
-  path[0] = new double[ntheta];
-  path[1] = new double[ntheta];
-  path[2] = new double[ntheta];
-  fio_gridify_surface_2d(m0, path0, enclose, ntheta, path, theta);
+    std::ofstream file;
 
-  for(int i=0; i<ntheta; i++) {
-    std::cout << path[0][i] << ", " << path[2][i] << ", " 
-	      << theta[i] << std::endl;
+    file.open("surface_raw.dat", std::ofstream::out | std::ofstream::trunc);
+    for(int i=0; i<m0; i++) {
+      if(i > 0) {
+	if(path0[1][i] != path0[1][i-1])
+	  file << '\n';
+      }
+      file << path0[1][i] << ", " << path0[0][i] << ", " << path0[2][i] 
+	   << '\n';;
+    }
+    file.close();
+    
+    
+    const int ntheta = 100;
+    double* theta = new double[ntheta];
+    double* phi = new double[nphi];
+    double** path = new double*[3];
+    path[0] = new double[ntheta*nphi];
+    path[1] = new double[ntheta*nphi];
+    path[2] = new double[ntheta*nphi];
+    result = 
+      fio_gridify_surface(m0, path0, enclose, nphi, ntheta, path, phi, theta);
+
+    file.open("surface_gridded.dat", std::ofstream::out|std::ofstream::trunc);
+    int k=0;
+    for(int j=0; j<nphi; j++) {
+      if(j > 0) file << '\n';
+      for(int i=0; i<ntheta; i++) {
+	file << path[1][k] << ", " << path[0][k] << ", " << path[2][k] 
+	     << '\n';;
+	k++;
+      }
+    }
+    file.close();
+    
+    std::cerr << "Deallocating.." << std::endl;
+    delete[] path0[0];
+    delete[] path0[1];
+    delete[] path0[2];
+    delete[] path0;
+
+    delete[] theta;
+    delete[] path[0];
+    delete[] path[1];
+    delete[] path[2];
+    delete[] path;
   }
-
-  delete[] path0[0];
-  delete[] path0[1];
-  delete[] path0[2];
-  delete[] path0;
-
-  delete[] theta;
-  delete[] path[0];
-  delete[] path[1];
-  delete[] path[2];
-  delete[] path;
 
   fio_close_field(&pressure);
   fio_close_field(&density);
