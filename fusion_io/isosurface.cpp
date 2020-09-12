@@ -7,7 +7,8 @@
 #include "interpolate.h"
 
 int fio_find_val_2d(fio_field* f, const double val, double* x,
-		    const double tol, const double max_step, fio_hint h=0)
+		    const double tol, const double max_step, 
+		    const double* axis, fio_hint h=0)
 {
   if(f->dimension() != 1) {
     std::cerr << "Error in fio_find_val_2d: field is not a scalar field"
@@ -17,16 +18,29 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
 
   const int max_its = 50;
   int result;
-  double last_x[3], dx[3], dv[3], v, dl, mod_dv;
+  double last_x[3], dx[3], dv[3], v, dl, mod_dv, co, sn;
+
+  if(axis) {
+    double d0 = x[0] - axis[0];
+    double d2 = x[2] - axis[2];
+    double d = sqrt(d0*d0 + d2*d2);
+    co = d0/d;
+    sn = d2/d;
+  }
   
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
     result = f->eval(x, &v, h);
-    /*    
+    /*       
     std::cerr << "f(" << x[0] << ", " << x[1] << ", " << x[2] << ") = "
 	      << v << std::endl;
     std::cerr << val - v << std::endl;
+    if(axis) {
+      std::cerr << "angle = " << atan2(x[2] - axis[2], x[0] - axis[0]) 
+		<< std::endl;
+    }
     */
+
     if(result == FIO_OUT_OF_BOUNDS) {
       if(i==0) { 
 	std::cerr << "Error in fio_find_val_2d: initial guess is out of bounds"
@@ -53,8 +67,14 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     result = f->eval_deriv(x, dv, h);
     if(result != FIO_SUCCESS) return result;
 
-    mod_dv = sqrt(dv[0]*dv[0] + dv[2]*dv[2]);
-    dl = (val - v) / mod_dv;
+    if(axis) {
+      // if angle is provided, then maintain angle
+      dl = (val - v) / (dv[0]*co + dv[2]*sn);
+    } else {
+      // if no angle is provided, then follow path of fastest descent
+      mod_dv = sqrt(dv[0]*dv[0] + dv[2]*dv[2]);
+      dl = (val - v) / mod_dv;
+    }
 
     if(dl==0.) {
       std::cerr << "Error in fio_find_val_2d: zero gradient" << std::endl;
@@ -65,8 +85,13 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     } else if(dl < -max_step) {
       dl = -max_step;
     }
-    dx[0] = dl*dv[0]/mod_dv;
-    dx[2] = dl*dv[2]/mod_dv;
+    if(axis) {
+      dx[0] = dl*co;
+      dx[2] = dl*sn;
+    } else {
+      dx[0] = dl*dv[0]/mod_dv;
+      dx[2] = dl*dv[2]/mod_dv;
+    }
 
     last_x[0] = x[0];
     last_x[2] = x[2];
@@ -74,8 +99,8 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     x[2] += dx[2];
   }
 
-  std::cerr << "Error in fio_find_val_2d: did not converge"
-	    << std::endl;
+  std::cerr << "Error in fio_find_val_2d: did not converge after " << max_its
+	    << " iterations" << std::endl;
   return FIO_DIVERGED;
 }
 
@@ -127,7 +152,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
     double t[3], e[3], dv[3];
     double dt, de2;
 
-    result = fio_find_val_2d(f, val, x, tol, max_step, h);
+    result = fio_find_val_2d(f, val, x, tol, max_step, 0, h);
     if(result != FIO_SUCCESS) return result;
     
     p[0].push_back(x[0]);
@@ -200,6 +225,74 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
 	    << std::endl;
 
   return FIO_DIVERGED;
+}
+
+// fio_gridded_isosurface
+// ~~~~~~~~~~~~~~~~~~~~~~
+// finds an isosurface in field f and returns path on uniform theta, phi grid
+// where theta and phi are the geometric poloidal and toroidal angles.
+//
+// inputs: 
+//    val: value of isosurface (i.e. find surface where f = val)
+//    guess: initial guess for first point on isosurface
+//    axis[3]:  R, phi, Z coordinates of poloidal axis
+//    tol: max acceptable different between f and val on isosurface
+//    nphi: number of toroidal points
+//    ntheta: number ot poloidal points
+//
+// outputs:
+//    path[3][ntheta*nphi]: R, phi, Z coordinates of points on path
+//    h: hint for last point on path
+//
+int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
+			   const double* axis, const double tol,
+			   const double nphi, const double ntheta, 
+			   double*** path, fio_hint h=0)
+{
+  const double toroidal_period = 2.*M_PI; // TODO: generalize this
+
+  double x[3];
+  double dx = guess[0] - axis[0];
+  double dz = guess[2] - axis[2];
+  double l = sqrt(dx*dx + dz*dz);
+  double phi, theta;
+  int result, k;
+
+  for(int i=0; i<nphi; i++) {
+    phi = toroidal_period*i/nphi;
+    for(int j=0; j<ntheta; j++) {
+      k = i*ntheta + j;
+      theta = 2.*M_PI*j/ntheta;
+      
+      x[0] = l*cos(theta) + axis[0];
+      x[1] = phi;
+      x[2] = l*sin(theta) + axis[2];
+
+      /*
+      std::cerr << "theta, l = " << theta << ", " << l << std::endl;
+      std::cerr << "Guess: (" << x[0] << ", " << x[1] << ", " << x[2] << ")"
+		<< std::endl;
+      */
+      result = fio_find_val_2d(f, val, x, tol, l/4., axis, h);
+
+      if(result != FIO_SUCCESS)
+	return result;
+      /*
+      std::cerr << "Found: (" << x[0] << ", " << x[1] << ", " << x[2] << ")"
+		<< std::endl;
+      */
+      (*path)[0][k] = x[0];
+      (*path)[1][k] = x[1];
+      (*path)[2][k] = x[2];
+
+      // update guess for distance from axis
+      dx = x[0] - axis[0];
+      dz = x[2] - axis[2];
+      l = sqrt(dx*dx + dz*dz);
+    }
+  }
+
+  return FIO_SUCCESS;
 }
 
 

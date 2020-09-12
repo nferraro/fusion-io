@@ -76,6 +76,9 @@ int main(int argc, char* argv[])
     density = 0;
   };
 
+  void* h;
+  src->allocate_search_hint(&h);
+
   double x[3];
 
   /*
@@ -113,21 +116,56 @@ int main(int argc, char* argv[])
   }
   */
 
-  x[0] = 1.8;
-  x[1] = 0.;
-  x[2] = 0.;
+  double axis[3];
+  axis[0] = 1.7;
+  axis[1] = 0.;
+  axis[2] = 0.;
   /*
-  result = fio_find_val_2d(electron_temperature, 3900., x, 1e-2, 0.1);
+  x[0] = 1.64952;
+  x[1] = 4.31969;
+  x[2] = 0.0298542;
+  result = fio_find_val_2d(electron_temperature, 3900., x, 0.1, 0.1, axis);
   if(result==FIO_SUCCESS) {
     std::cerr << "Found at " << x[0] << ", " << x[1] << ", " << x[2] 
 	      << std::endl;
-	      }
+  }
   */
-  double enclose[3];
-  enclose[0] = 1.7;
-  enclose[1] = 0.;
-  enclose[2] = 0.;
-  double** path0;
+  x[0] = 1.8;
+  x[1] = 0.;
+  x[2] = 0.;
+
+  const int nphi = 16;
+  const int ntheta = 200;
+  double** path;
+  path = new double*[3];
+  path[0] = new double[nphi*ntheta];
+  path[1] = new double[nphi*ntheta];
+  path[2] = new double[nphi*ntheta];
+
+  result = fio_gridded_isosurface(electron_temperature, 2900., x,
+				  axis, 0.1, nphi, ntheta, &path, h);
+
+  if(result==FIO_SUCCESS) {
+    std::ofstream file;
+    file.open("surface_gridded.dat", std::ofstream::out|std::ofstream::trunc);
+    int k=0;
+    for(int j=0; j<nphi; j++) {
+      if(j > 0) file << '\n';
+      for(int i=0; i<ntheta; i++) {
+	file << path[1][k] << ", " << path[0][k] << ", " << path[2][k] 
+	     << '\n';;
+	k++;
+      }
+    }
+    file.close();
+  }
+
+  delete[] path[0];
+  delete[] path[1];
+  delete[] path[2];
+  delete[] path;
+
+  /*
   int m0;
   const int nphi = 16;
   result = fio_isosurface(electron_temperature, 3900., x,
@@ -186,6 +224,9 @@ int main(int argc, char* argv[])
     delete[] path[2];
     delete[] path;
   }
+  */
+
+  src->deallocate_search_hint(&h);
 
   fio_close_field(&pressure);
   fio_close_field(&density);
