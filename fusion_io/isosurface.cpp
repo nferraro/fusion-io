@@ -6,6 +6,67 @@
 #include "fusion_io_field.h"
 #include "interpolate.h"
 
+int fio_find_val_1d_brute(fio_field* f, const double val, double* x,
+		    const double tol, const double max_step, 
+		    const double* axis, fio_hint h=0)
+{
+  const int max_its = 100;
+  double d0 = x[0] - axis[0];
+  double d2 = x[2] - axis[2];
+  double d = sqrt(d0*d0 + d2*d2);
+  double co = d0/d;
+  double sn = d2/d;
+  double v;
+  double error, last_error;
+  double last_d;
+  double step = max_step;
+
+  double x0[3];
+  x0[0] = x[0];
+  x0[1] = x[1];
+  x0[2] = x[2];
+  
+  d = step;
+
+  for(int i=0; i<max_its; i++) {
+    x[0] = d*co + axis[0];
+    x[2] = d*sn + axis[2];
+    
+    int result = f->eval(x, &v, h);
+
+    if(result == FIO_OUT_OF_BOUNDS) {
+      std::cerr << "No sign flip found." << std::endl;
+    } 
+
+    if(result != FIO_SUCCESS)
+      break;
+
+    error = v - val;
+    if(fabs(error) < tol)
+      return FIO_SUCCESS;
+
+    if(i > 0) {
+      if(error*last_error < 0) {
+	d = last_d;
+	error = last_error;
+	step /= 2;
+	continue;
+      }
+    }
+
+    last_d = d;
+    last_error = error;
+    d += step;
+  }
+
+  x[0] = x0[0];
+  x[1] = x0[1];
+  x[2] = x0[2];
+
+  std::cerr << "Brute force failed" << std::endl;
+  return FIO_DIVERGED;
+}
+
 int fio_find_val_2d(fio_field* f, const double val, double* x,
 		    const double tol, const double max_step, 
 		    const double* axis, fio_hint h=0)
@@ -19,6 +80,10 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
   const int max_its = 50;
   int result;
   double last_x[3], dx[3], dv[3], v, dl, mod_dv, co, sn;
+  double x0[3];
+  x0[0] = x[0];
+  x0[1] = x[1];
+  x0[2] = x[2];
 
   if(axis) {
     double d0 = x[0] - axis[0];
@@ -27,19 +92,21 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     co = d0/d;
     sn = d2/d;
   }
+
+  double x2[3], v2;
+  const double del = 1e-5;
+  double error, last_error;
   
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
     result = f->eval(x, &v, h);
-    /*       
+
+    /*
     std::cerr << "f(" << x[0] << ", " << x[1] << ", " << x[2] << ") = "
 	      << v << std::endl;
-    std::cerr << val - v << std::endl;
-    if(axis) {
-      std::cerr << "angle = " << atan2(x[2] - axis[2], x[0] - axis[0]) 
-		<< std::endl;
-    }
     */
+
+    error = v - val;
 
     if(result == FIO_OUT_OF_BOUNDS) {
       if(i==0) { 
@@ -48,8 +115,11 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
 	return FIO_OUT_OF_BOUNDS;
       } else {
 	// If we've moved out of bounds, cut step size in half and try again
-	dx[0] /= 2;
-	dx[2] /= 2;
+	std::cerr << "Out of bounds.  re-stepping." << std::endl;
+	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
+	std::cerr << x[0] << ", " << x[2] << std::endl;
+	dx[0] /= 2.;
+	dx[2] /= 2.;
 	x[0] = last_x[0] + dx[0];
 	x[2] = last_x[2] + dx[2];
 	continue;
@@ -59,21 +129,44 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     }
 
     // Check if we are within tolerance
-    if(fabs(v - val) < tol) {
+    if(fabs(error) < tol) {
       return FIO_SUCCESS;
     }
+    /*
+    if(i > 0) {
+      // if things are getting worse, then back up
+      if((fabs(error) > fabs(last_error)) && (error*last_error > 0.)) {
+	dx[0] = dx[0]/2.;
+	dx[2] = dx[2]/2.;
+	x[0] = last_x[0] + dx[0];
+	x[2] = last_x[2] + dx[2];
+	last_error = error;
+	continue;
+      }
+    }
+    */
 
     // Evaluate the derivative of the field and take a step
-    result = f->eval_deriv(x, dv, h);
+
+    if(axis) {
+      x2[0] = x[0] + del*co;
+      x2[1] = x[1];
+      x2[2] = x[2] + del*sn;
+      result = f->eval(x2, &v2, h);
+    } else {
+      result = f->eval_deriv(x, dv, h);
+    }
+
     if(result != FIO_SUCCESS) return result;
 
     if(axis) {
       // if angle is provided, then maintain angle
-      dl = (val - v) / (dv[0]*co + dv[2]*sn);
+      //      dl = -error / (dv[0]*co + dv[2]*sn);
+      dl = -error / (v2 - v) * del;
     } else {
       // if no angle is provided, then follow path of fastest descent
       mod_dv = sqrt(dv[0]*dv[0] + dv[2]*dv[2]);
-      dl = (val - v) / mod_dv;
+      dl = -error / mod_dv;
     }
 
     if(dl==0.) {
@@ -85,6 +178,19 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     } else if(dl < -max_step) {
       dl = -max_step;
     }
+
+    /*
+    std::cerr << error << std::endl;
+    std::cerr << "dv: " << dv[0] << ", " << dv[2] << std::endl;
+    std::cerr << "dv / dl: " << co*dv[0] + sn*dv[2] << std::endl;
+    std::cerr << "dv / dl test = " << (v2-v)/del << std::endl;
+    std::cerr << "dl = " << dl << std::endl;
+    if(axis) {
+      std::cerr << "angle = " << atan2(x[2] - axis[2], x[0] - axis[0]) 
+		<< std::endl;
+    }
+    */
+
     if(axis) {
       dx[0] = dl*co;
       dx[2] = dl*sn;
@@ -97,10 +203,26 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     last_x[2] = x[2];
     x[0] += dx[0];
     x[2] += dx[2];
+
+    last_error = error;
   }
 
-  std::cerr << "Error in fio_find_val_2d: did not converge after " << max_its
-	    << " iterations" << std::endl;
+
+  x[0] = x0[0];
+  x[1] = x0[1];
+  x[2] = x0[2];
+
+  if(axis) {
+    result = fio_find_val_1d_brute(f, val, x, tol, max_step, axis, h);
+  } 
+
+  if(!axis || result != FIO_SUCCESS) {
+    std::cerr << "Error: fio_find_val_2d did not converge after " << max_its
+	      << " iterations" << std::endl;
+
+  }
+  //  std::cerr << val << ", " <<  x0[0] << ", " << x0[2] << std::endl;
+
   return FIO_DIVERGED;
 }
 
@@ -246,6 +368,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
 //
 int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   const double* axis, const double tol,
+			   const double max_step,
 			   const double nphi, const double ntheta, 
 			   double*** path, fio_hint h=0)
 {
@@ -273,14 +396,12 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
       std::cerr << "Guess: (" << x[0] << ", " << x[1] << ", " << x[2] << ")"
 		<< std::endl;
       */
-      result = fio_find_val_2d(f, val, x, tol, l/4., axis, h);
-
+      result = fio_find_val_2d(f, val, x, tol, max_step, axis, h);
+      /*
       if(result != FIO_SUCCESS)
 	return result;
-      /*
-      std::cerr << "Found: (" << x[0] << ", " << x[1] << ", " << x[2] << ")"
-		<< std::endl;
       */
+
       (*path)[0][k] = x[0];
       (*path)[1][k] = x[1];
       (*path)[2][k] = x[2];
@@ -448,6 +569,104 @@ int fio_gridify_surface(const int m0, double** path0, const double* axis,
       << "Error in fio_gridify_surface: wrong number of toroidal points" 
       << std::endl;
   }
+
+  return FIO_SUCCESS;
+}
+
+
+int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
+		     double* bpol, fio_hint h=0)
+{
+  int result;
+
+  *q = 0.;
+
+  if(f->dimension() != 3) {
+    std::cerr << "Error in fio_q_at_surface: field is not a vector field"
+	      << std::endl;
+    return FIO_UNSUPPORTED;
+  }
+
+  for(int i=0; i<n; i++) {
+    double b[3], p[3];
+  
+    p[0] = x[0][i];
+    p[1] = x[1][i];
+    p[2] = x[2][i];
+    result = f->eval(p, b, h);
+    if(result !=FIO_SUCCESS) 
+      return result;
+    
+    int im, ip;
+    if(i==0  ) im = n-1; else im = i-1;
+    if(i==n-1) ip = 0;   else ip = i+1;
+
+    double dx[3];
+    dx[0] = (x[0][ip] - x[0][im]) / 2.;
+    dx[1] = (x[1][ip] - x[1][im]) / 2.;
+    dx[2] = (x[2][ip] - x[2][im]) / 2.;
+
+    double dl, bp;
+    dl = sqrt(dx[0]*dx[0] + 0.*dx[1]*dx[1] + dx[2]*dx[2]);
+    if(dl==0.) continue;
+    bp = (b[0]*dx[0] + 0.*b[1]*dx[1] + b[2]*dx[2]) / dl;
+
+    //    std::cerr << p[0] << ", " << bp << ", " << b[1] << ", " << dl << std::endl;
+
+    *q += b[1]/(p[0]*bp) * dl;
+
+    if(bpol)
+      bpol[i] = bp;
+  }
+
+  *q /= (2.*M_PI);
+
+  return FIO_SUCCESS;
+}
+
+
+
+int fio_surface_average(fio_field* f, const int n, double** x, double* a,
+			double* bpol, fio_hint h=0)
+{
+  int result;
+
+  if(f->dimension() != 1) {
+    std::cerr << "Error in fio_q_at_surface: field is not a vector field"
+	      << std::endl;
+    return FIO_UNSUPPORTED;
+  }
+
+  *a = 0.;
+  double denom = 0.;
+
+  for(int i=0; i<n; i++) {
+    double v, p[3];
+  
+    p[0] = x[0][i];
+    p[1] = x[1][i];
+    p[2] = x[2][i];
+    result = f->eval(p, &v, h);
+    if(result !=FIO_SUCCESS) 
+      return result;
+
+    int im, ip;
+    if(i==0  ) im = n-1; else im = i-1;
+    if(i==n-1) ip = 0;   else ip = i+1;
+
+    double dx[3];
+    dx[0] = (x[0][ip] - x[0][im]) / 2.;
+    dx[1] = (x[1][ip] - x[1][im]) / 2.;
+    dx[2] = (x[2][ip] - x[2][im]) / 2.;
+
+    double dl;
+    dl = sqrt(dx[0]*dx[0] + 0.*dx[1]*dx[1] + dx[2]*dx[2]);
+    if(dl==0.) continue;
+
+    *a += v/bpol[i] * dl;
+    denom += 1./bpol[i] * dl;
+  }
+  *a /= denom;
 
   return FIO_SUCCESS;
 }
