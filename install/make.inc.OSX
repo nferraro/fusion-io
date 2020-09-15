@@ -18,4 +18,6 @@ INCLUDE = -I/opt/local/include
 LIBS = -L/opt/local/lib/gcc9 -lgfortran -lstdc++
 
 HDF5_LIBS = /opt/local/lib/libhdf5.a -lz
+NETCDF_LIBS = -lnetcdf
+
 LAPACK = -llapack

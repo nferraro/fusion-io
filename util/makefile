@@ -18,7 +18,7 @@ include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
 LIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
 	-L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
-	$(HDF5_LIBS) $(LIBS) 
+	$(HDF5_LIBS) $(NETCDF_LIBS) $(LIBS) 
 
 INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 	-I$(FIO_ROOT)/m3dc1_lib \

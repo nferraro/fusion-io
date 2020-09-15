@@ -34,9 +34,8 @@ int fio_find_val_1d_brute(fio_field* f, const double val, double* x,
     
     int result = f->eval(x, &v, h);
 
-    if(result == FIO_OUT_OF_BOUNDS) {
+    if(result == FIO_OUT_OF_BOUNDS)
       std::cerr << "No sign flip found." << std::endl;
-    } 
 
     if(result != FIO_SUCCESS)
       break;
@@ -95,18 +94,11 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
 
   double x2[3], v2;
   const double del = 1e-5;
-  double error, last_error;
+  double error;
   
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
     result = f->eval(x, &v, h);
-
-    /*
-    std::cerr << "f(" << x[0] << ", " << x[1] << ", " << x[2] << ") = "
-	      << v << std::endl;
-    */
-
-    error = v - val;
 
     if(result == FIO_OUT_OF_BOUNDS) {
       if(i==0) { 
@@ -115,9 +107,11 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
 	return FIO_OUT_OF_BOUNDS;
       } else {
 	// If we've moved out of bounds, cut step size in half and try again
+	/*
 	std::cerr << "Out of bounds.  re-stepping." << std::endl;
 	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
 	std::cerr << x[0] << ", " << x[2] << std::endl;
+	*/
 	dx[0] /= 2.;
 	dx[2] /= 2.;
 	x[0] = last_x[0] + dx[0];
@@ -129,25 +123,12 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     }
 
     // Check if we are within tolerance
+    error = v - val;
     if(fabs(error) < tol) {
       return FIO_SUCCESS;
     }
-    /*
-    if(i > 0) {
-      // if things are getting worse, then back up
-      if((fabs(error) > fabs(last_error)) && (error*last_error > 0.)) {
-	dx[0] = dx[0]/2.;
-	dx[2] = dx[2]/2.;
-	x[0] = last_x[0] + dx[0];
-	x[2] = last_x[2] + dx[2];
-	last_error = error;
-	continue;
-      }
-    }
-    */
 
     // Evaluate the derivative of the field and take a step
-
     if(axis) {
       x2[0] = x[0] + del*co;
       x2[1] = x[1];
@@ -179,18 +160,6 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
       dl = -max_step;
     }
 
-    /*
-    std::cerr << error << std::endl;
-    std::cerr << "dv: " << dv[0] << ", " << dv[2] << std::endl;
-    std::cerr << "dv / dl: " << co*dv[0] + sn*dv[2] << std::endl;
-    std::cerr << "dv / dl test = " << (v2-v)/del << std::endl;
-    std::cerr << "dl = " << dl << std::endl;
-    if(axis) {
-      std::cerr << "angle = " << atan2(x[2] - axis[2], x[0] - axis[0]) 
-		<< std::endl;
-    }
-    */
-
     if(axis) {
       dx[0] = dl*co;
       dx[2] = dl*sn;
@@ -203,25 +172,21 @@ int fio_find_val_2d(fio_field* f, const double val, double* x,
     last_x[2] = x[2];
     x[0] += dx[0];
     x[2] += dx[2];
-
-    last_error = error;
   }
-
 
   x[0] = x0[0];
   x[1] = x0[1];
   x[2] = x0[2];
 
   if(axis) {
+    // If Newton iterations don't converge, try brute force search
     result = fio_find_val_1d_brute(f, val, x, tol, max_step, axis, h);
-  } 
-
-  if(!axis || result != FIO_SUCCESS) {
-    std::cerr << "Error: fio_find_val_2d did not converge after " << max_its
-	      << " iterations" << std::endl;
-
+    if(result==FIO_SUCCESS)
+      return FIO_SUCCESS;
   }
-  //  std::cerr << val << ", " <<  x0[0] << ", " << x0[2] << std::endl;
+
+  std::cerr << "Error: fio_find_val_2d did not converge after " << max_its
+	    << " iterations" << std::endl;
 
   return FIO_DIVERGED;
 }
@@ -415,7 +380,6 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 
   return FIO_SUCCESS;
 }
-
 
 // fio_gridify_surface
 // ~~~~~~~~~~~~~~~~~~~
