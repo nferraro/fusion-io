@@ -22,7 +22,9 @@ LIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
 
 INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 	-I$(FIO_ROOT)/m3dc1_lib \
-	$(HDF5_INCLUDE) $(INCLUDE)
+	$(HDF5_INCLUDE) \
+	$(NETCDF_C_INCLUDE) \
+	$(INCLUDE)
 
 all : write_neo_input
 
