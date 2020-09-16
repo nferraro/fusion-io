@@ -243,12 +243,12 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
   int i_start = 0;
   int iphi = 0;
 
-  for(int i=0; i<max_pts; i++) {
+  while(*n < max_pts) {
     int result;
     double t[3], e[3], dv[3];
     double dt, de2;
 
-    if(i==i_start) {
+    if(*n==i_start) {
       // For first point, keep angle fixed
       result = fio_find_val_2d(f, val, x, tol, max_step, enclose, h);
     } else {
@@ -287,15 +287,43 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
     
     if(fabs(dtheta) > 2.*M_PI) {
       /*
-      e[0] = p[0][i]-p[0][i_start];
-      e[2] = p[0][i]-p[0][i_start];
+      e[0] = x[0]-p[0][i_start];
+      e[2] = x[2]-p[2][i_start];
       de2 = e[0]*e[0] + e[2]*e[2];
       if(de2 > dl*dl) {
 	std::cerr << "Warning: path does not close" << std::endl;
 	std::cerr << p[0][i_start] << ", " << p[2][i_start] << std::endl;
-	std::cerr << p[0][i] << ", " << p[2][i] << std::endl;
+	std::cerr << p[0][*n] << ", " << p[2][*n] << std::endl;
+	std::cerr << x[0] << ", " << x[2] << std::endl;
+	std::cerr << dtheta / (2.*M_PI) << std::endl;
       }
       */
+
+      // close path
+      /*
+      x[0] = p[0][i_start];
+      x[1] = p[1][i_start];
+      x[2] = p[2][i_start];
+      p[0].push_back(x[0]);
+      p[1].push_back(x[1]);
+      p[2].push_back(x[2]);
+      (*n)++;
+      */
+
+      // if we've gone around toroidally, convert data to arrays and exit
+      if(iphi==nphi-1) {      
+	(*path) = new double*[3];
+	(*path)[0] = new double[*n];
+	(*path)[1] = new double[*n];
+	(*path)[2] = new double[*n];
+	for(int j=0; j<*n; j++) {
+	  (*path)[0][j] = p[0][j];
+	  (*path)[1][j] = p[1][j];
+	  (*path)[2][j] = p[2][j];
+	}
+	
+	return FIO_SUCCESS;
+      }
 
       // if we've gone around once poloidally, take a step toroidally
       // new guess should maintain poloidal angle but change distance to 
@@ -307,7 +335,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
       double dphi = toroidal_extent/nphi;
       double dl = -dv[1]*dphi / (dv[0]*co + dv[2]*sn);
       x[0] = enclose[0] + (d + dl)*co;
-      x[1] = guess[1] + toroidal_extent * (iphi+1) / nphi;
+      x[1] = guess[1] + toroidal_extent * (double)(iphi+1) / (double)nphi;
       x[2] = enclose[2] + (d + dl)*sn;
       if(x[1] >= toroidal_extent) {
 	x[1] -= toroidal_extent;
@@ -318,23 +346,9 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
 	offset -= toroidal_extent;
       }
       dtheta = 0.;
-      i_start = i+1;
+      i_start = *n+1;
       iphi++;
 
-      // if we've gone around toroidally, convert data to arrays and exit
-      if(iphi==nphi) {
-      
-	(*path) = new double*[3];
-	(*path)[0] = new double[*n];
-	(*path)[1] = new double[*n];
-	(*path)[2] = new double[*n];
-	for(int j=0; j<*n; j++) {
-	  (*path)[0][j] = p[0][j];
-	  (*path)[1][j] = p[1][j];
-	  (*path)[2][j] = p[2][j];
-	}
-	return FIO_SUCCESS;
-      }
     }
 
     // take a step
@@ -451,14 +465,24 @@ int fio_gridify_surface_2d(const int m0, double** path0, const double* axis,
   path[0][0] = path0[0][0];
   path[1][0] = path0[1][0];
   path[2][0] = path0[2][0];
+  theta[0] = 0.;
   for(int i=1; i<m; i++) {
     theta[i] = (double)i/(double)(m-1);
     double l = theta[i]*l0[m0-1];
-    cubic_interpolation(m0, l0, l, path0[0], &(path[0][i]));
-    cubic_interpolation(m0, l0, l, path0[1], &(path[1][i]));
-    cubic_interpolation(m0, l0, l, path0[2], &(path[2][i]));
-  }
+    bool r = true;
+    r = cubic_interpolation(m0, l0, l, path0[0], &(path[0][i])) && r;
+    r = cubic_interpolation(m0, l0, l, path0[1], &(path[1][i])) && r;
+    r = cubic_interpolation(m0, l0, l, path0[2], &(path[2][i])) && r;
 
+    if(!r)
+      std::cerr << "Error interpolating " << i << std::endl;
+  }
+  /*
+  std::cerr << path0[0][0] << ", " << path0[0][m0-1] << ", "
+	    << path0[1][0] << ", " << path0[1][m0-1] << ", "
+	    << path0[2][0] << ", " << path0[2][m0-1] << ", "
+	    << theta[m-1] << std::endl;
+  */
   delete[] l0;
 
   return FIO_SUCCESS;
@@ -500,7 +524,6 @@ int fio_gridify_surface(const int m0, double** path0, const double* axis,
       tmp_path[1] = &(path[1][ntheta*iphi]);
       tmp_path[2] = &(path[2][ntheta*iphi]);
       
-
       result = fio_gridify_surface_2d(m, tmp_path0, axis, 
 				      ntheta, tmp_path, theta);
       if(result != FIO_SUCCESS)
@@ -553,50 +576,6 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   double** temp_path;
   const double toroidal_extent = 2.*M_PI;
 
-
-  // 2D method
-  /*
-  double** path_plane;
-  path_plane = new double*[3];
-
-  for(int i=0; i<nphi; i++) {
-
-    double x[3];
-    
-    x[0] = guess[0];
-    x[1] = toroidal_extent*i/nphi;
-    x[2] = guess[2];
-    result = fio_isosurface(f, val, x, axis, dl, tol, max_step, 
-			    toroidal_extent, &n, &temp_path, h);
-
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Error finding surface" << std::endl;
-      return result;
-    }
-    //    std::cerr << "points = " << n << std::endl;
-    
-    path_plane[0] = &(path[0][i*ntheta]);
-    path_plane[1] = &(path[1][i*ntheta]);
-    path_plane[2] = &(path[2][i*ntheta]);
-
-    result = fio_gridify_surface_2d(n, temp_path, axis, 
-				    ntheta, path_plane, theta);
-    if(result != FIO_SUCCESS) {
-      std::cerr << "Error gridifying surface" << std::endl;
-      return result;
-    }
-
-    delete[] temp_path[0];
-    delete[] temp_path[1];
-    delete[] temp_path[2];
-    delete[] temp_path;
-  }
-
-  delete[] path_plane;
-  */
-
-  // Full surface method
-
   result = fio_isosurface(f, val, guess, axis, dl, tol, max_step, 
 			  nphi, &n, &temp_path, h);
 
@@ -604,6 +583,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     std::cerr << "Error finding surface" << std::endl;
     return result;
   }
+
   result = fio_gridify_surface(n, temp_path, axis, 
 			       nphi, ntheta, 
 			       path, phi, theta);

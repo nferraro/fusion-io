@@ -222,12 +222,12 @@ int main(int argc, char* argv[])
   double* te = new double[npsi];
   double* ni = new double[npsi];
   double* ti = new double[npsi];
-
+  /*
   for(int i=0; i<ntheta; i++) 
     theta[i] = 2.*M_PI*i/ntheta;
   for(int i=0; i<nphi; i++)
     phi[i] = 360.*i/nphi;
-
+  */
 
   // Surfaces
   std::ofstream gplot;
@@ -408,6 +408,11 @@ int main(int argc, char* argv[])
 
   double ion_mass = 2.;  // TODO: generalize this
   int version = 2;
+
+  // convert phi to degrees
+  for(int i=0; i<nphi; i++)
+    phi[i] = 180.*phi[i]/M_PI;
+
 
   nc_put_att_int(ncid, NC_GLOBAL, "version", NC_SHORT, 1, &version);
   nc_put_att_double(ncid, NC_GLOBAL, "ion_mass", NC_FLOAT, 1, &ion_mass);
