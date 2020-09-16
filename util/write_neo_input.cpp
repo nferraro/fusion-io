@@ -11,7 +11,7 @@
 int npsi = 50;   // number of psi points for profiles
 int nr = 20;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
-int nphi = 16;    // number of toroidal points
+int nphi = 64;    // number of toroidal points
 
 double scalefac = 1.;
 
@@ -281,15 +281,53 @@ int main(int argc, char* argv[])
       path_surf[0] = &(path[0][ind]);
       path_surf[1] = &(path[1][ind]);
       path_surf[2] = &(path[2][ind]);
+
+      result = fio_gridded_isosurface(electron_temperature, temp, x,
+				      axis, 0.01, 1., 0.01,
+				      nphi, ntheta, phi, theta,
+				      path_surf, h);
+      if(result != FIO_SUCCESS) {
+	std::cerr << "Error constructing surface at psi_norm = "
+		  << psi_norm << std::endl;
+      }
+
+      /*
       result = fio_gridded_isosurface(electron_temperature, temp, x,
 				      axis, 1., 0.1,
 				      nphi, ntheta, &path_surf, h);
-      
+      */
+	/*
+      double** temp_path;
+      int temp_n;
+      //      std::cerr << "finding isosurface..." << std::endl;
+      result = fio_isosurface(electron_temperature, temp, x,
+			      axis, 0.01, 1., 0.1, 
+			      2.*M_PI/nphi, &temp_n, &temp_path, h);
+
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding surface" << std::endl;
 	std::cerr << " psi_norm = " << psi_norm << std::endl;
 	break;
       }
+      //      std::cerr << "Found isosurface with " << temp_n  << " points" << std::endl;
+
+      //      std::cerr << "Gridifying isosurface..." << std::endl;
+      result = fio_gridify_surface(temp_n, temp_path, axis, 
+				   nphi, ntheta, 
+				   path_surf, phi, theta);
+            
+      if(result != FIO_SUCCESS) {
+	std::cerr << "Error gridifying surface" << std::endl;
+	std::cerr << " psi_norm = " << psi_norm << std::endl;
+	break;
+      }
+      //      std::cerr << "Successfully gridified surface" << std::endl;
+
+      delete[] temp_path[0];
+      delete[] temp_path[1];
+      delete[] temp_path[2];
+      delete[] temp_path;
+	*/
 
       // Estimate q by averaging q over each toroidal plane
       double q_plane;
@@ -341,8 +379,9 @@ int main(int argc, char* argv[])
 	  for(int j=0; j<nphi; j++) {
 	    if(j > 0) file << '\n';
 	    for(int i=0; i<ntheta; i++) {
-	      file << path[1][k] << ", " << path[0][k] << ", " << path[2][k] 
-		   << '\n';;
+	      file << path_surf[1][k] << ", " 
+		   << path_surf[0][k] << ", " 
+		   << path_surf[2][k] << '\n';;
 	      k++;
 	    }
 	  }
