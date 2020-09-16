@@ -29,6 +29,10 @@ all : write_neo_input
 write_neo_input : write_neo_input.o
 	$(CXX) -o $@ $< $(LIBS)
 
+install : write_neo_input
+	mkdir -p $(FIO_INSTALL_DIR)/bin
+	cp write_neo_input $(FIO_INSTALL_DIR)/bin/
+
 include $(FIO_ROOT)/install/common_footer.mk
 
 endif
