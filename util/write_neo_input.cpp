@@ -12,6 +12,8 @@ int npsi = 50;   // number of psi points for profiles
 int nr = 20;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 64;    // number of toroidal points
+double psi_start = -1;
+double psi_end = -1;
 
 double scalefac = 1.;
 
@@ -74,12 +76,21 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  if(psi_start <= 0. || psi_start > 1.) psi_start = 0.;
+  if(psi_end <= 0. || psi_end > 1.) psi_end = 1.;
+  if(psi_start <= 0.) psi_start = (psi_end-psi_start)/nphi;
+  if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nphi;
+
   std::cerr << "Input parameters\n=======================\n";
   std::cerr << "Scale factor (scale) = " << scalefac << '\n';
   std::cerr << "Radial grid points (nr) = " << nr << '\n';
   std::cerr << "Toroidal grid points (nphi) = " << nphi << '\n';
   std::cerr << "Poloidal grid points (ntheta) = " << ntheta << '\n';
   std::cerr << "Radial profile points (npsi) = " << npsi << '\n';
+  std::cerr << "First value of psi_norm (psi_start) = "
+	    << psi_start << '\n';
+  std::cerr << "Last value of psi_norm (psi_end) = "
+	    << psi_end << '\n';
   std::cerr << "=======================" << std::endl;
 
   double slice_time = 0;
@@ -230,9 +241,12 @@ int main(int argc, char* argv[])
   */
 
   // Surfaces
-  std::ofstream gplot;
+  std::ofstream gplot, splot;
   gplot.open("plot_surfaces", std::ofstream::out|std::ofstream::trunc);
+  splot.open("splot_surfaces", std::ofstream::out|std::ofstream::trunc);
+  
   gplot << "plot ";
+  splot << "set hidden3d\nsplot ";
 
   for(int surfaces=0; surfaces<2; surfaces++) {
     int s_max;
@@ -250,7 +264,11 @@ int main(int argc, char* argv[])
 
     for(int s=0; s<s_max; s++) {
       
-      psi_norm = (s+1.)/(s_max+1.);
+      if(s_max==1) {
+	psi_norm = psi_start;
+      } else {
+	psi_norm = (psi_end-psi_start)*s/(s_max-1.) + psi_start;
+      }
       
       x[1] = axis[1];
       x[2] = axis[2];
@@ -388,13 +406,18 @@ int main(int argc, char* argv[])
 	  file.close();
 	  
 	  gplot << " '" << surface_filename << "' u 2:3 w l";
-	  if(s<nr-1) gplot << ", \\\n";
+	  splot << " '" << surface_filename << "' w l";
+	  if(s<nr-1) {
+	    gplot << ", \\\n";
+	    splot << ", \\\n";
+	  }
 	}
       }
     }
   }
 
   gplot.close();
+  splot.close();
 
   // Create netcdf file
   std::cerr << "Writing netcdf file" << std::endl;
@@ -499,6 +522,20 @@ int main(int argc, char* argv[])
 bool parse_args(int argc, char* argv[])
 {
   for(int i=1; i<argc; i++) {
+    if(strcmp(argv[i],"-psi_start")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -psi_start requires an argument" << std::endl;
+	return false;
+      }
+      psi_start = atof(argv[i+1]);
+    }
+    if(strcmp(argv[i],"-psi_end")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -psi_end requires an argument" << std::endl;
+	return false;
+      }
+      psi_end = atof(argv[i+1]);
+    }
     if(strcmp(argv[i],"-scale")==0) {
       if(i+1 >= argc) {
 	std::cerr << "Error: -scale requires an argument" << std::endl;
