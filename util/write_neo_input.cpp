@@ -15,7 +15,7 @@ int nphi = 32;    // number of toroidal points
 double psi_start = -1;
 double psi_end = -1;
 double scalefac = 1.;
-fio_source* src;
+fio_source* src = 0;
 
 bool parse_args(int argc, char* argv[]);
 
@@ -64,6 +64,11 @@ int main(int argc, char* argv[])
   
   if(!parse_args(argc, argv))
     return 1;
+
+  if(!src) {
+    std::cerr << "Error, no source is loaded" << std::endl;
+    return 1;
+  }
 
   if(psi_start <= 0. || psi_start > 1.) psi_start = 0.;
   if(psi_end <= 0. || psi_end > 1.) psi_end = 1.;
