@@ -9,13 +9,13 @@
 #include <netcdf.h>
 
 int npsi = 50;   // number of psi points for profiles
-int nr = 20;      // number of radial points for surfaces
+int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
-int nphi = 64;    // number of toroidal points
+int nphi = 32;    // number of toroidal points
 double psi_start = -1;
 double psi_end = -1;
-
 double scalefac = 1.;
+fio_source* src;
 
 bool parse_args(int argc, char* argv[]);
 
@@ -23,7 +23,6 @@ int main(int argc, char* argv[])
 {
   int result;
   const int timeslice = 1;
-  fio_source* src;
   fio_field *electron_density, *electron_temperature;
   fio_field *ion_density, *ion_temperature;
   fio_field *psin0, *mag0;
@@ -49,7 +48,6 @@ int main(int argc, char* argv[])
   if(source_type == "m3dc1") {
     // Open an m3dc1 source
     */
-  result = fio_open_source(&src, FIO_M3DC1_SOURCE, "../examples/data/m3dc1/C1.h5");
     /*
   } else if(source_type == "geqdsk") {
     result = fio_open_source(&src, FIO_GEQDSK_SOURCE, "../examples/data/geqdsk/g158115.04701");
@@ -63,18 +61,9 @@ int main(int argc, char* argv[])
     return 1;
   };
     */
-
-    
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening file" << std::endl;
-    delete(src);
-    return result;
-  }
-
   
-  if(!parse_args(argc, argv)) {
+  if(!parse_args(argc, argv))
     return 1;
-  }
 
   if(psi_start <= 0. || psi_start > 1.) psi_start = 0.;
   if(psi_end <= 0. || psi_end > 1.) psi_end = 1.;
@@ -571,7 +560,17 @@ bool parse_args(int argc, char* argv[])
       }
       nphi = atoi(argv[i+1]);
     }
-
+    if(strcmp(argv[i],"-m3dc1")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -m3dc1 requires an argument" << std::endl;
+	return false;
+      }
+      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[i+1]);
+      if(result != FIO_SUCCESS) {
+	std::cerr << "Error opening m3dc1 file " << argv[1];
+	return false;
+      }
+    }
   }
 
   return true;
