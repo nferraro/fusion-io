@@ -72,8 +72,8 @@ int main(int argc, char* argv[])
 
   if(psi_start <= 0. || psi_start > 1.) psi_start = 0.;
   if(psi_end <= 0. || psi_end > 1.) psi_end = 1.;
-  if(psi_start <= 0.) psi_start = (psi_end-psi_start)/nphi;
-  if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nphi;
+  if(psi_start <= 0.) psi_start = (psi_end-psi_start)/nr;
+  if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nr;
 
   std::cerr << "Input parameters\n=======================\n";
   std::cerr << "Scale factor (scale) = " << scalefac << '\n';
@@ -282,6 +282,10 @@ int main(int argc, char* argv[])
 	std::cerr << "Error evaluating electron temperature" << std::endl;
 	break;
       }
+
+      std::cerr << "Found psi_norm = " << psi_norm << " at ("
+		<< x[0] << ", " << x[1] << ", " << x[2] 
+		<< ") with Te = " << temp << std::endl;
       
       // Calculate 3D surface
       int ind;
