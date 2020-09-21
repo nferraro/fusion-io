@@ -283,9 +283,11 @@ int main(int argc, char* argv[])
 	break;
       }
 
-      std::cerr << "Found psi_norm = " << psi_norm << " at ("
-		<< x[0] << ", " << x[1] << ", " << x[2] 
-		<< ") with Te = " << temp << std::endl;
+      if(surfaces==1) {
+	std::cerr << s << ": Found psi_norm = " << psi_norm << " at ("
+		  << x[0] << ", " << x[1] << ", " << x[2] 
+		  << ") with Te = " << temp << std::endl;
+      }
       
       // Calculate 3D surface
       int ind;
@@ -299,7 +301,7 @@ int main(int argc, char* argv[])
       path_surf[2] = &(path[2][ind]);
 
       result = fio_gridded_isosurface(electron_temperature, temp, x,
-				      axis, 0.01, 1., 0.01,
+				      axis, 0.001, 1., 0.01,
 				      nphi, ntheta, phi, theta,
 				      path_surf, h);
       if(result != FIO_SUCCESS) {
