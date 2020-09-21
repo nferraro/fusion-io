@@ -230,6 +230,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
   double d = sqrt(dx*dx+dz*dz);
   double co = dx/d;
   double sn = dz/d;
+
   
   std::deque<double> p[3];
   p[0].clear();
@@ -255,6 +256,17 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
       result = fio_find_val_2d(f, val, x, tol, max_step, 0, h);
     }
     if(result != FIO_SUCCESS) return result;
+    /*    
+    if(*n >= 1) {
+      dx = x[0] - p[0][*n-1];
+      dz = x[2] - p[2][*n-1];
+      if(dx*dx + dz*dz > 16.*dl*dl) {
+	std::cerr << "Warning: big jump in position ("
+		  << p[0][*n-1] << ", " << p[2][*n-1] << ") -> ("
+		  << x[0] << ", " << x[2] << std::endl;
+      }
+    }
+    */
     
     p[0].push_back(x[0]);
     p[1].push_back(x[1]);
@@ -266,6 +278,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
     result = f->eval_deriv(x, dv, h);
     if(result != FIO_SUCCESS) return result;
     
+    // t = \hat{phi} x grad(f)
     t[0] = dv[2];
     t[2] = -dv[0];
     dt = sqrt(t[0]*t[0] + t[2]*t[2]);
@@ -284,8 +297,19 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
     de2 = e[0]*e[0] + e[2]*e[2];
     dtheta += (t[2]*e[0] - t[0]*e[2]) / de2;
     //    std::cerr << "dtheta = " << dtheta << std::endl;
+
+    dx = x[0] - p[0][i_start];
+    dz = x[2] - p[2][i_start];
+    de2 = dx*dx + dz*dz;
     
-    if(fabs(dtheta) > 2.*M_PI) {
+    bool looped;
+    /*
+    looped = (fabs(dtheta) >= 2.*M_PI)
+      || ((de2 < dl*dl) && (*n - i_start) > 3);
+    */
+    looped =  ((de2 < dl*dl) && (*n - i_start) > 3);
+
+    if(looped) {
       /*
       e[0] = x[0]-p[0][i_start];
       e[2] = x[2]-p[2][i_start];
@@ -456,19 +480,45 @@ int fio_gridify_surface_2d(const int m0, double** path0, const double* axis,
     dx[0] = path0[0][i]-path0[0][i-1];
     dx[1] = (path0[1][i]-path0[1][i-1])*(path0[0][i]+path0[0][i-1])/2.;
     dx[2] = path0[2][i]-path0[2][i-1];
-				       
+
+    if(dx[1] != 0) 
+      std::cerr << "ERROR: dx[1] != 0" << std::endl;
+
     double dl = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
     l0[i] = l0[i-1] + dl;
   }
-  
+
+  //  std::cerr << "l0[m0-1] = " << l0[m0-1] << std::endl;
+
   // interpolate path onto regular arc length grid with m points
   path[0][0] = path0[0][0];
   path[1][0] = path0[1][0];
   path[2][0] = path0[2][0];
   theta[0] = 0.;
+  //  int j=0;
   for(int i=1; i<m; i++) {
     theta[i] = (double)i/(double)(m-1);
     double l = theta[i]*l0[m0-1];
+    /*
+    path[0][i] = path0[0][i];
+    path[1][i] = path0[1][i];
+    path[2][i] = path0[2][i];
+    */
+    /*
+    while(l0[j+1] < l) {
+      j++;
+      if(j==m0) {
+	std::cerr << " j not found! " << std::endl;
+	j = m0-1;
+	break;
+      } 
+    }
+    double delta_l = l0[j+1] - l0[j];
+    double dl = l - l0[j];
+    path[0][i] = path0[0][j]*(1.-dl/delta_l) + path0[0][j+1]*(dl/delta_l);
+    path[2][i] = path0[2][j]*(1.-dl/delta_l) + path0[2][j+1]*(dl/delta_l);
+    */
+
     bool r = true;
     r = cubic_interpolation(m0, l0, l, path0[0], &(path[0][i])) && r;
     r = cubic_interpolation(m0, l0, l, path0[1], &(path[1][i])) && r;
@@ -574,7 +624,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   int n;
   int result;
   double** temp_path;
-  const double toroidal_extent = 2.*M_PI;
+  //  const double toroidal_extent = 2.*M_PI;
 
   result = fio_isosurface(f, val, guess, axis, dl, tol, max_step, 
 			  nphi, &n, &temp_path, h);
@@ -583,6 +633,8 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     std::cerr << "Error finding surface" << std::endl;
     return result;
   }
+
+  //  std::cerr << "Isosurface has " << n << " points." << std::endl;
 
   result = fio_gridify_surface(n, temp_path, axis, 
 			       nphi, ntheta, 
