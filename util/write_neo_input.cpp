@@ -16,6 +16,7 @@ double psi_start = -1;
 double psi_end = -1;
 double scalefac = 1.;
 fio_source* src = 0;
+bool pert_prof = false; // Use perturbed surfaces for calculating profiles
 
 bool parse_args(int argc, char* argv[]);
 
@@ -25,7 +26,7 @@ int main(int argc, char* argv[])
   const int timeslice = 1;
   fio_field *electron_density, *electron_temperature;
   fio_field *ion_density, *ion_temperature;
-  fio_field *psin0, *mag0;
+  fio_field *psin, *mag, *psin0, *te0;
   fio_option_list opt;
 
   /*
@@ -85,6 +86,8 @@ int main(int argc, char* argv[])
 	    << psi_start << '\n';
   std::cerr << "Last value of psi_norm (psi_end) = "
 	    << psi_end << '\n';
+  std::cerr << "Use perturbed surfaces for profiles (pert_prof)? "
+	    << pert_prof << '\n';
   std::cerr << "=======================" << std::endl;
 
   double slice_time = 0;
@@ -168,46 +171,61 @@ int main(int argc, char* argv[])
   opt.set_option(FIO_LINEAR_SCALE, scalefac);
 
   // open fields
-  result = src->get_field(FIO_MAGNETIC_FIELD, &mag0, &opt);
+  result = src->get_field(FIO_MAGNETIC_FIELD, &mag, &opt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening magnetic field field" << std::endl;
-    mag0 = 0;
-  };
-  result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin0, &opt);
+    mag = 0;
+  }
+  result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin, &opt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening psi norm field" << std::endl;
-    psin0 = 0;
-  };
-
+    psin = 0;
+  }
 
   opt.set_option(FIO_SPECIES, FIO_ELECTRON);
-  result = src->get_field(FIO_DENSITY, &electron_density, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening density field" << std::endl;
-    electron_density = 0;
-  };
   result = src->get_field(FIO_TEMPERATURE, &electron_temperature, &opt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening electron temperature field" << std::endl;
     electron_temperature = 0;
-  };
+  }
+
+
+  if(!pert_prof) {
+    opt.set_option(FIO_PART, FIO_EQUILIBRIUM_ONLY);
+    result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin0, &opt);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error opening equilirbium psi norm field" << std::endl;
+      psin0 = 0;
+    }
+    result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &te0, &opt);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error opening equilibrium Te field" << std::endl;
+      te0 = 0;
+    }
+  }
+  result = src->get_field(FIO_DENSITY, &electron_density, &opt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening density field" << std::endl;
+    electron_density = 0;
+  }
   opt.set_option(FIO_SPECIES, FIO_MAIN_ION);
   result = src->get_field(FIO_DENSITY, &ion_density, &opt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening density field" << std::endl;
     ion_density = 0;
-  };
+  }
   result = src->get_field(FIO_TEMPERATURE, &ion_temperature, &opt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error opening electron temperature field" << std::endl;
     ion_temperature = 0;
-  };
-  
+  }
+
 
   void* h;
   src->allocate_search_hint(&h);
 
   double x[3];
+
 
   // Calculate 3D surfaces
   double** path = new double*[3];
@@ -227,12 +245,6 @@ int main(int argc, char* argv[])
   double* te = new double[npsi];
   double* ni = new double[npsi];
   double* ti = new double[npsi];
-  /*
-  for(int i=0; i<ntheta; i++) 
-    theta[i] = 2.*M_PI*i/ntheta;
-  for(int i=0; i<nphi; i++)
-    phi[i] = 360.*i/nphi;
-  */
 
   // Surfaces
   std::ofstream gplot, splot;
@@ -242,7 +254,11 @@ int main(int argc, char* argv[])
   gplot << "plot ";
   splot << "set hidden3d\nsplot ";
 
+  int surfaces = 1;
+  /*
   for(int surfaces=0; surfaces<2; surfaces++) {
+  */
+  
     int s_max;
     double psi_norm;
     
@@ -253,8 +269,8 @@ int main(int argc, char* argv[])
       std::cerr << "Calculating profiles..." << std::endl; 
       s_max = npsi;
     }
-  
-    x[0] = axis[0] + 0.01;
+
+    x[0] = axis[0] - 0.01;
 
     for(int s=0; s<s_max; s++) {
       
@@ -267,17 +283,25 @@ int main(int argc, char* argv[])
       x[1] = axis[1];
       x[2] = axis[2];
 
-      result = fio_find_val_2d(psin0, psi_norm, x, 1e-4, 0.1, axis, h);
+      if(surfaces==0 && !pert_prof) {
+	result = fio_find_val(psin0, psi_norm, x, 1e-4, 0.1, 1, axis, h);
+      } else {
+	result = fio_find_val(psin, psi_norm, x, 1e-4, 0.1, 1, axis, h);
+      }
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding psi_norm = " << psi_norm
 		  << std::endl;
 	std::cerr << " psi_norm = " << psi_norm << std::endl;
 	break;
       }
-      
+
       // Find electron temperature on surface
       double temp;
-      result = electron_temperature->eval(x, &temp, h);
+      if(surfaces==0 && !pert_prof) {
+	result = te0->eval(x, &temp, h);
+      } else {
+	result = electron_temperature->eval(x, &temp, h);
+      }
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error evaluating electron temperature" << std::endl;
 	break;
@@ -288,6 +312,43 @@ int main(int argc, char* argv[])
 		  << x[0] << ", " << x[1] << ", " << x[2] 
 		  << ") with Te = " << temp << std::endl;
       }
+
+      int n;
+      double norm[3];
+      norm[0] = 0.;
+      norm[1] = 0.;
+      norm[2] = 1.;
+      double** path_tor0;
+      result = fio_isosurface_2d(electron_temperature, temp, x,
+				 axis, norm, 
+				 0.01, 1., 0.01,
+				 &n, &path_tor0, h);
+
+      if(result!=FIO_SUCCESS) {
+	std::cerr << "Error finding toroidal loop." << std::endl;
+	continue;
+      }
+      std::cerr << "Found toroidal loop with " << n << " points." << std::endl;
+
+
+      double** path_tor = new double*[3];
+      path_tor[0] = new double[nphi];
+      path_tor[1] = new double[nphi];
+      path_tor[2] = new double[nphi];
+      result = fio_gridify_loop(n, path_tor0, 0, nphi, path_tor, phi, 2);
+      if(result!=FIO_SUCCESS) {
+	std::cerr << "Error gridifying toroidal loop" << std::endl;
+	/*
+	delete[] path_tor[0];
+	delete[] path_tor[1];
+	delete[] path_tor[2];
+	delete[] path_tor;
+	continue;
+	*/
+      }
+	  
+
+      /*
       
       // Calculate 3D surface
       int ind;
@@ -300,52 +361,22 @@ int main(int argc, char* argv[])
       path_surf[1] = &(path[1][ind]);
       path_surf[2] = &(path[2][ind]);
 
-      result = fio_gridded_isosurface(electron_temperature, temp, x,
-				      axis, 0.001, 1., 0.01,
-				      nphi, ntheta, phi, theta,
-				      path_surf, h);
+      if(surfaces==0 && !pert_prof) {
+	result = fio_gridded_isosurface(electron_temperature, temp, x,
+					axis, 0.001, 1., 0.01,
+					nphi, ntheta, phi, theta,
+					path_surf, h);
+      } else {
+	result = fio_gridded_isosurface(electron_temperature, temp, x,
+					axis, 0.001, 1., 0.01,
+					nphi, ntheta, phi, theta,
+					path_surf, h);
+      }
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error constructing surface at psi_norm = "
 		  << psi_norm << std::endl;
       }
 
-      /*
-      result = fio_gridded_isosurface(electron_temperature, temp, x,
-				      axis, 1., 0.1,
-				      nphi, ntheta, &path_surf, h);
-      */
-	/*
-      double** temp_path;
-      int temp_n;
-      //      std::cerr << "finding isosurface..." << std::endl;
-      result = fio_isosurface(electron_temperature, temp, x,
-			      axis, 0.01, 1., 0.1, 
-			      2.*M_PI/nphi, &temp_n, &temp_path, h);
-
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error finding surface" << std::endl;
-	std::cerr << " psi_norm = " << psi_norm << std::endl;
-	break;
-      }
-      //      std::cerr << "Found isosurface with " << temp_n  << " points" << std::endl;
-
-      //      std::cerr << "Gridifying isosurface..." << std::endl;
-      result = fio_gridify_surface(temp_n, temp_path, axis, 
-				   nphi, ntheta, 
-				   path_surf, phi, theta);
-            
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error gridifying surface" << std::endl;
-	std::cerr << " psi_norm = " << psi_norm << std::endl;
-	break;
-      }
-      //      std::cerr << "Successfully gridified surface" << std::endl;
-
-      delete[] temp_path[0];
-      delete[] temp_path[1];
-      delete[] temp_path[2];
-      delete[] temp_path;
-	*/
 
       // Estimate q by averaging q over each toroidal plane
       double q_plane;
@@ -358,7 +389,7 @@ int main(int argc, char* argv[])
 	path_plane[0] = &(path_surf[0][i*ntheta]);
 	path_plane[1] = &(path_surf[1][i*ntheta]);
 	path_plane[2] = &(path_surf[2][i*ntheta]);
-	result = fio_q_at_surface(mag0, ntheta, path_plane, &q_plane, 
+	result = fio_q_at_surface(mag, ntheta, path_plane, &q_plane, 
 				  &(bpol[i*ntheta]), h);
 	//	std::cerr << "q_plane = " << q_plane << std::endl;
 
@@ -383,42 +414,73 @@ int main(int argc, char* argv[])
 				     &(ni[s]), bpol, h);
       }
 
-      
+      */      
       if(surfaces==1) {
 	// Write surface data
 	
-	if(result==FIO_SUCCESS) {	  
+	//	if(result==FIO_SUCCESS) {	  
 	  std::ofstream file;
 	  std::string surface_filename;
 	  
 	  surface_filename = "surface_" + std::to_string(s) + ".dat";
 	  file.open(surface_filename, std::ofstream::out|std::ofstream::trunc);
+
+	  /*
 	  int k=0;
 	  for(int j=0; j<nphi; j++) {
 	    if(j > 0) file << '\n';
 	    for(int i=0; i<ntheta; i++) {
 	      file << path_surf[1][k] << ", " 
 		   << path_surf[0][k] << ", " 
-		   << path_surf[2][k] << '\n';;
+		   << path_surf[2][k] << '\n';
 	      k++;
 	    }
 	  }
+	  */
+	  /*
+	  for(int j=0; j<n; j++) {
+	    file << path_tor0[1][j] << ", " 
+		 << path_tor0[0][j] << ", " 
+		 << path_tor0[2][j] << '\n';
+	  }
+	  */
+	  for(int j=0; j<nphi; j++) {
+	    file << path_tor[1][j] << ", " 
+		 << path_tor[0][j] << ", " 
+		 << path_tor[2][j] << '\n';
+	  }
 	  file.close();
 	  
-	  gplot << " '" << surface_filename << "' u 2:3 w l";
+	  gplot << " '" << surface_filename << "' u 1:2 w l";
 	  splot << " '" << surface_filename << "' w l";
 	  if(s<nr-1) {
 	    gplot << ", \\\n";
 	    splot << ", \\\n";
 	  }
-	}
+	  //}
       }
+
+      std::cerr << "deleting ... " << std::endl;
+      if(path_tor) {
+	delete[] path_tor[0];
+	delete[] path_tor[1];
+	delete[] path_tor[2];
+	delete[] path_tor;
+      }
+      path_tor = 0;
+      if(path_tor0) {
+	delete[] path_tor0[0];
+	delete[] path_tor0[1];
+	delete[] path_tor0[2];
+	delete[] path_tor0;
+      }
+
     }
-  }
+    //  }
 
   gplot.close();
   splot.close();
-
+  /*
   // Create netcdf file
   std::cerr << "Writing netcdf file" << std::endl;
 
@@ -484,6 +546,7 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, z_id, path[2]);
 
   nc_close(ncid);
+  */
 
   delete[] theta;
   delete[] phi;
@@ -510,8 +573,12 @@ int main(int argc, char* argv[])
   fio_close_field(&electron_temperature);
   fio_close_field(&ion_density);
   fio_close_field(&ion_temperature);
-  fio_close_field(&psin0);
-  fio_close_field(&mag0);
+  fio_close_field(&psin);
+  fio_close_field(&mag);
+  if(!pert_prof) {
+    fio_close_field(&te0);
+    fio_close_field(&psin0);
+  }
   fio_close_source(&src);
 
   return 0;
@@ -581,6 +648,13 @@ bool parse_args(int argc, char* argv[])
 	std::cerr << "Error opening m3dc1 file " << argv[1];
 	return false;
       }
+    }
+    if(strcmp(argv[i],"-pert_prof")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -pert_prof requires an argument" << std::endl;
+	return false;
+      }
+      pert_prof = (atoi(argv[i+1]) != 0);
     }
   }
 
