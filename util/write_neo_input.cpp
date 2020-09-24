@@ -12,13 +12,17 @@ int npsi = 50;   // number of psi points for profiles
 int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
+double dl = 0.001;     // step size when finding surfaces
+double tol = 1.;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
 double scalefac = 1.;
 fio_source* src = 0;
-bool pert_prof = false; // Use perturbed surfaces for calculating profiles
+bool pert_prof = true; // Use perturbed surfaces for calculating profiles
 
 bool parse_args(int argc, char* argv[]);
+void print_usage();
+
 
 int main(int argc, char* argv[])
 {
@@ -29,45 +33,19 @@ int main(int argc, char* argv[])
   fio_field *psin, *mag, *psin0, *te0;
   fio_option_list opt;
 
-  /*
   if(argc < 2) {
-    std::cerr << "Usage: example <source_type>\n"
-	      << " where <source_type> is one of \n"
-	      << " m3dc1, geqdsk, gpec" << std::endl;
+    print_usage();
     return 1;
   }
-
-
-  std::string source_type(argv[1]);
-  std::cerr << source_type << std::endl;
-
-  if( source_type == "gpec" ) {
-    std::cerr << "source_type = gpec" << std::endl;
-  }
-  std::cerr << source_type << std::endl;
-
-  if(source_type == "m3dc1") {
-    // Open an m3dc1 source
-    */
-    /*
-  } else if(source_type == "geqdsk") {
-    result = fio_open_source(&src, FIO_GEQDSK_SOURCE, "../examples/data/geqdsk/g158115.04701");
-
-  } else if(source_type == "gpec") {
-    result = fio_open_source(&src, FIO_GPEC_SOURCE, "../examples/data/gpec");
-
-  } else {
-    std::cerr << "Error: source type " << argv[1]
-	      << " not recognized" << std::endl;
-    return 1;
-  };
-    */
   
-  if(!parse_args(argc, argv))
+  if(!parse_args(argc, argv)) {
+    print_usage();
     return 1;
+  }
 
   if(!src) {
     std::cerr << "Error, no source is loaded" << std::endl;
+    print_usage();
     return 1;
   }
 
@@ -189,7 +167,6 @@ int main(int argc, char* argv[])
     electron_temperature = 0;
   }
 
-
   if(!pert_prof) {
     opt.set_option(FIO_PART, FIO_EQUILIBRIUM_ONLY);
     result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin0, &opt);
@@ -229,11 +206,12 @@ int main(int argc, char* argv[])
 
   // Calculate 3D surfaces
   double** path = new double*[3];
-  double* theta = new double[ntheta];
-  double* phi = new double[nphi];
   path[0] = new double[nr*nphi*ntheta];
   path[1] = new double[nr*nphi*ntheta];
   path[2] = new double[nr*nphi*ntheta];
+
+  double* theta = new double[ntheta];
+  double* phi = new double[nphi];
   double** path_plane = new double*[3];  // contains path of one toroidal plane
   double** path_surf = new double*[3];   // contains path of one surface
   double* bpol = new double[nphi*ntheta];
@@ -254,10 +232,7 @@ int main(int argc, char* argv[])
   gplot << "plot ";
   splot << "set hidden3d\nsplot ";
 
-  int surfaces = 1;
-  /*
   for(int surfaces=0; surfaces<2; surfaces++) {
-  */
   
     int s_max;
     double psi_norm;
@@ -314,7 +289,6 @@ int main(int argc, char* argv[])
       }
 
       
-
       char* label;
       char surf_label[256];
       if(surfaces==1) {
@@ -323,11 +297,17 @@ int main(int argc, char* argv[])
       } else {
 	label = 0;
       }
-      path_surf[0] = &(path[0][s*nphi*ntheta]);
-      path_surf[1] = &(path[1][s*nphi*ntheta]);
-      path_surf[2] = &(path[2][s*nphi*ntheta]);
+      if(surfaces==1) {
+	path_surf[0] = &(path[0][s*nphi*ntheta]);
+	path_surf[1] = &(path[1][s*nphi*ntheta]);
+	path_surf[2] = &(path[2][s*nphi*ntheta]);
+      } else {
+	path_surf[0] = path[0];
+	path_surf[1] = path[1];
+	path_surf[2] = path[2];
+      }
       result = fio_gridded_isosurface(electron_temperature, temp, x,
-				      axis, 0.02, 1., 0.1,
+				      axis, dl, tol, 0.1,
 				      nphi, ntheta, 
 				      phi, theta,
 				      path_surf, label, h);
@@ -337,6 +317,44 @@ int main(int argc, char* argv[])
 	continue;
       }
 
+
+      // Estimate q by averaging q over each toroidal plane
+      double q_plane;
+      if(surfaces==1) {
+        q[s] = 0.;
+      } else {
+        ne[s] = 0.;
+      }
+      for(int i=0; i<nphi; i++) {
+        path_plane[0] = &(path_surf[0][i*ntheta]);
+        path_plane[1] = &(path_surf[1][i*ntheta]);
+        path_plane[2] = &(path_surf[2][i*ntheta]);
+        result = fio_q_at_surface(mag, ntheta, path_plane, &q_plane,
+                                  &(bpol[i*ntheta]), h);
+        //      std::cerr << "q_plane = " << q_plane << std::endl;              
+        if(surfaces==1) {
+          q[s] += q_plane;
+        }
+      }
+
+      if(surfaces==1) {
+	// Calculate q
+        psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
+        q[s] /= nphi;
+	std::cerr <<  " q = " <<  q[s] << std::endl;                    
+      } else {
+
+	// Calculate flux surface averages for profiles
+        psi_prof[s] = psi_norm*(psi1 - psi0) + psi0;
+        te[s] = temp;
+        result = fio_surface_average(electron_density, nphi*ntheta, path_surf,
+                                     &(ne[s]), bpol, h);
+        result = fio_surface_average(ion_temperature, nphi*ntheta, path_surf,
+                                     &(ti[s]), bpol, h);
+        result = fio_surface_average(ion_density, nphi*ntheta, path_surf,
+                                     &(ni[s]), bpol, h);
+      }
+
       if(surfaces==1) {
 	gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
 	if(s < s_max-1)
@@ -344,12 +362,13 @@ int main(int argc, char* argv[])
       }
     }
 
-  //}
+  }
 
-    gplot << std::endl;  
+  gplot << std::endl;  
   gplot.close();
   splot.close();
-  /*
+
+
   // Create netcdf file
   std::cerr << "Writing netcdf file" << std::endl;
 
@@ -415,7 +434,7 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, z_id, path[2]);
 
   nc_close(ncid);
-  */
+
 
   delete[] theta;
   delete[] phi;
@@ -528,4 +547,9 @@ bool parse_args(int argc, char* argv[])
   }
 
   return true;
+}
+
+void print_usage()
+{
+
 }
