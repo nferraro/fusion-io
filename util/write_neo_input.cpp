@@ -12,7 +12,8 @@ int npsi = 50;   // number of psi points for profiles
 int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
-double dl = 0.001;     // step size when finding surfaces
+double dl_tor = 0.01;     // step size when finding surfaces
+double dl_pol = 0.001;     // step size when finding surfaces
 double tol = 1.;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
@@ -30,7 +31,7 @@ int main(int argc, char* argv[])
   const int timeslice = 1;
   fio_field *electron_density, *electron_temperature;
   fio_field *ion_density, *ion_temperature;
-  fio_field *psin, *mag, *psin0, *te0;
+  fio_field *psin, *mag, *psin0, *te0, *te_prof;
   fio_option_list opt;
 
   if(argc < 2) {
@@ -159,7 +160,6 @@ int main(int argc, char* argv[])
     std::cerr << "Error opening psi norm field" << std::endl;
     psin = 0;
   }
-
   opt.set_option(FIO_SPECIES, FIO_ELECTRON);
   result = src->get_field(FIO_TEMPERATURE, &electron_temperature, &opt);
   if(result != FIO_SUCCESS) {
@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
       std::cerr << "Error opening equilirbium psi norm field" << std::endl;
       psin0 = 0;
     }
-    result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &te0, &opt);
+    result = src->get_field(FIO_TEMPERATURE, &te0, &opt);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error opening equilibrium Te field" << std::endl;
       te0 = 0;
@@ -250,6 +250,12 @@ int main(int argc, char* argv[])
       s_end = 1. - 1./npsi;
     }
 
+    if(surfaces==0 && !pert_prof) {
+      te_prof = te0;
+    } else {
+      te_prof = electron_temperature;
+    }
+
     x[0] = axis[0] - 0.01;
 
     for(int s=0; s<s_max; s++) {
@@ -276,11 +282,8 @@ int main(int argc, char* argv[])
 
       // Find electron temperature on surface
       double temp;
-      if(surfaces==0 && !pert_prof) {
-	result = te0->eval(x, &temp, h);
-      } else {
-	result = electron_temperature->eval(x, &temp, h);
-      }
+      result = te_prof->eval(x, &temp, h);
+
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error evaluating electron temperature at psi_norm = "
 		  << psi_norm << std::endl;
@@ -311,8 +314,8 @@ int main(int argc, char* argv[])
 	path_surf[1] = path[1];
 	path_surf[2] = path[2];
       }
-      result = fio_gridded_isosurface(electron_temperature, temp, x,
-				      axis, dl, tol, 0.1,
+      result = fio_gridded_isosurface(te_prof, temp, x,
+				      axis, dl_tor, dl_pol, tol, 0.1,
 				      nphi, ntheta, 
 				      phi, theta,
 				      path_surf, label, h);
