@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <iomanip>
 #include <deque>
 #include <math.h>
 #include <string.h>
@@ -214,7 +216,7 @@ int fio_find_val(fio_field* f, const double val, double* x,
     x[1] += dx[1];
     x[2] += dx[2];
 
-    if(x[1] < 0.) x[1] = 0.;
+    if(x[1] < 0.) x[1] += toroidal_extent;
     if(x[1] >= toroidal_extent) x[1] -= toroidal_extent;
   }
 
@@ -242,7 +244,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 		      const double dl, const double tol, const double max_step,
 		      int* n, double*** path, fio_hint h=0)
 {
-  const int max_pts = 100000;
+  const int max_pts = 10000;
 
   int nn;
   double x[3];
@@ -636,6 +638,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 		     const int m, double** path, double* theta, 
 		     const int param=0)
 {
+  int dir = 0;
   double* l0 = new double[m0];
 
   for(int i=0; i<m0; i++) {
@@ -669,10 +672,13 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 
     if(i > 0) {
       double d = l0[i] - l0[i-1];
-      if(d< 0) {
+      
+      if(i==1)
+	dir = (d < 0) ? -1 : 1;
+      else if (d*dir < 0) {
 	std::cerr << "Error in fio_gridify_surface_2d: d < 0\n"
 		  << i << " " << l0[i] << " " << l0[i-1] << " " 
-		  << path[1][i] << std::endl;
+		  << path0[1][i] << std::endl;
 	return FIO_DIVERGED;
       }
     }
@@ -728,12 +734,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
       std::cerr << "Error interpolating " << i << std::endl;
     */
   }
-  /*
-  std::cerr << path0[0][0] << ", " << path0[0][m0-1] << ", "
-	    << path0[1][0] << ", " << path0[1][m0-1] << ", "
-	    << path0[2][0] << ", " << path0[2][m0-1] << ", "
-	    << theta[m-1] << std::endl;
-  */
+
   delete[] l0;
 
   return FIO_SUCCESS;
@@ -820,36 +821,155 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   const double tol, const double max_step,
 			   const int nphi, const int ntheta, 
 			   double* phi, double* theta,
-			   double** path, fio_hint h=0)
+			   double** path, const char* label, fio_hint h=0)
 {
-  int n;
   int result;
-  double** temp_path;
-  //  const double toroidal_extent = 2.*M_PI;
 
-  result = fio_isosurface(f, val, guess, axis, dl, tol, max_step, 
-			  nphi, &n, &temp_path, h);
+  // Calculate toroidal loop
 
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding surface" << std::endl;
+  int n;
+  double norm[3];
+  norm[0] = 0.;
+  norm[1] = 0.;
+  norm[2] = 1.;
+  double** path_tor0;
+  result = fio_isosurface_2d(f, val, guess,
+			     axis, norm, 
+			     dl, tol, max_step,
+			     &n, &path_tor0, h);
+
+  if(result!=FIO_SUCCESS) {
+    std::cerr << "Error finding toroidal loop." << std::endl;
+    return result;
+  }
+  std::ofstream file;
+  std::string filename;
+
+  if(label) {
+    filename = "tor_loop_raw_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+    for(int i=0; i<n; i++) {
+      file << std::setprecision(10) << std::setw(16) << path_tor0[1][i] 
+	   << std::setprecision(10) << std::setw(16) << path_tor0[0][i] 
+	   << std::setprecision(10) << std::setw(16) << path_tor0[2][i] 
+	   << std::endl;
+    }
+    file.close();
+  }
+
+  //  std::cerr << "Found toroidal loop with " << n << " points." << std::endl;
+
+
+  // gridify toroidal loop
+  double** path_tor = new double*[3];
+  path_tor[0] = new double[nphi];
+  path_tor[1] = new double[nphi];
+  path_tor[2] = new double[nphi];
+  result = fio_gridify_loop(n, path_tor0, 0, nphi, path_tor, phi, 2);
+  delete[] path_tor0[0];
+  delete[] path_tor0[1];
+  delete[] path_tor0[2];
+  delete[] path_tor0;
+  if(result!=FIO_SUCCESS) {
+    std::cerr << "Error gridifying toroidal loop" << std::endl;
+    delete[] path_tor[0];
+    delete[] path_tor[1];
+    delete[] path_tor[2];
+    delete[] path_tor;
     return result;
   }
 
-  //  std::cerr << "Isosurface has " << n << " points." << std::endl;
-
-  result = fio_gridify_surface(n, temp_path, axis, 
-			       nphi, ntheta, 
-			       path, phi, theta);
-
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error gridifying surface" << std::endl;
-    return result;
+  if(label) {
+    filename = "tor_loop_gridded_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+    for(int i=0; i<nphi; i++) {
+      file << std::setprecision(10) << std::setw(16) << path_tor[1][i]
+	   << std::setprecision(10) << std::setw(16) << path_tor[0][i]
+	   << std::setprecision(10) << std::setw(16) << path_tor[2][i] 
+	   << std::endl;
+    }
+    file.close();
   }
 
-  delete[] temp_path[0];
-  delete[] temp_path[1];
-  delete[] temp_path[2];
-  delete[] temp_path;
+
+  // calculate poloidal loops
+  //  std::cerr << "Calculating poloidal loops.." << std::endl;
+
+  norm[0] = 0.;
+  norm[1] = 1.;
+  norm[2] = 0.;
+
+  if(label) {
+    filename = "pol_loop_raw_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+  }
+
+  // Loop over each toroidal point and calculate poloidal path
+  for(int i=0; i<nphi; i++) {
+    double** path_pol0;
+    double x[3];
+    x[0] = path_tor[0][i];
+    x[1] = path_tor[1][i];
+    x[2] = path_tor[2][i];
+    result = fio_isosurface_2d(f, val, x,
+			       axis, norm, 
+			       dl, tol, max_step,
+			       &n, &path_pol0, h);
+    
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding poloidal loop at phi = " << path_tor[1][i]
+		<< std::endl;
+      continue;
+    }
+    
+    if(label) {
+      for(int j=0; j<n; j++) {
+	file << std::setprecision(10) << std::setw(16) << path_pol0[1][j] 
+	     << std::setprecision(10) << std::setw(16) << path_pol0[0][j] 
+	     << std::setprecision(10) << std::setw(16) << path_pol0[2][j] 
+	     << std::endl;
+      }
+    }
+
+    double* path_pol[3];
+    path_pol[0] = &(path[0][i*ntheta]);
+    path_pol[1] = &(path[1][i*ntheta]);
+    path_pol[2] = &(path[2][i*ntheta]);
+
+    result = fio_gridify_loop(n, path_pol0, 0, ntheta, path_pol, theta, 0);
+    
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error gridifying poloidal path " << std::endl;
+      continue;
+    }
+  }
+
+  delete[] path_tor[0];
+  delete[] path_tor[1];
+  delete[] path_tor[2];
+  delete[] path_tor;
+
+
+  //  std::cerr << "Writing final path data" << std::endl;
+  if(label) {
+    file.close();
+
+    filename = "surface_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+
+    int k=0;
+    for(int i=0; i<nphi; i++) {
+      for(int j=0; j<ntheta; j++) {
+	file << std::setprecision(10) << std::setw(16) << path[1][k] 
+	     << std::setprecision(10) << std::setw(16) << path[0][k] 
+	     << std::setprecision(10) << std::setw(16) << path[2][k] 
+	     << std::endl;
+	k++;
+      }
+      file << std::endl;
+    }
+    file.close();
+  }
 
   return FIO_SUCCESS;
 }

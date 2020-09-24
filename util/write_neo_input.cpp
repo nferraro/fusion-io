@@ -313,171 +313,40 @@ int main(int argc, char* argv[])
 		  << ") with Te = " << temp << std::endl;
       }
 
-      int n;
-      double norm[3];
-      norm[0] = 0.;
-      norm[1] = 0.;
-      norm[2] = 1.;
-      double** path_tor0;
-      result = fio_isosurface_2d(electron_temperature, temp, x,
-				 axis, norm, 
-				 0.01, 1., 0.01,
-				 &n, &path_tor0, h);
-
-      if(result!=FIO_SUCCESS) {
-	std::cerr << "Error finding toroidal loop." << std::endl;
-	continue;
-      }
-      std::cerr << "Found toroidal loop with " << n << " points." << std::endl;
-
-
-      double** path_tor = new double*[3];
-      path_tor[0] = new double[nphi];
-      path_tor[1] = new double[nphi];
-      path_tor[2] = new double[nphi];
-      result = fio_gridify_loop(n, path_tor0, 0, nphi, path_tor, phi, 2);
-      if(result!=FIO_SUCCESS) {
-	std::cerr << "Error gridifying toroidal loop" << std::endl;
-	/*
-	delete[] path_tor[0];
-	delete[] path_tor[1];
-	delete[] path_tor[2];
-	delete[] path_tor;
-	continue;
-	*/
-      }
-	  
-
-      /*
       
-      // Calculate 3D surface
-      int ind;
+
+      char* label;
+      char surf_label[256];
       if(surfaces==1) {
-	ind = s*nphi*ntheta;
+	sprintf(surf_label, "%d", s);
+	label = surf_label;
       } else {
-	ind = 0;
+	label = 0;
       }
-      path_surf[0] = &(path[0][ind]);
-      path_surf[1] = &(path[1][ind]);
-      path_surf[2] = &(path[2][ind]);
+      path_surf[0] = &(path[0][s*nphi*ntheta]);
+      path_surf[1] = &(path[1][s*nphi*ntheta]);
+      path_surf[2] = &(path[2][s*nphi*ntheta]);
+      result = fio_gridded_isosurface(electron_temperature, temp, x,
+				      axis, 0.02, 1., 0.1,
+				      nphi, ntheta, 
+				      phi, theta,
+				      path_surf, label, h);
 
-      if(surfaces==0 && !pert_prof) {
-	result = fio_gridded_isosurface(electron_temperature, temp, x,
-					axis, 0.001, 1., 0.01,
-					nphi, ntheta, phi, theta,
-					path_surf, h);
-      } else {
-	result = fio_gridded_isosurface(electron_temperature, temp, x,
-					axis, 0.001, 1., 0.01,
-					nphi, ntheta, phi, theta,
-					path_surf, h);
-      }
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error constructing surface at psi_norm = "
-		  << psi_norm << std::endl;
-      }
-
-
-      // Estimate q by averaging q over each toroidal plane
-      double q_plane;
-      if(surfaces==1) {
-	q[s] = 0.;
-      } else {
-	ne[s] = 0.;
-      }
-      for(int i=0; i<nphi; i++) {
-	path_plane[0] = &(path_surf[0][i*ntheta]);
-	path_plane[1] = &(path_surf[1][i*ntheta]);
-	path_plane[2] = &(path_surf[2][i*ntheta]);
-	result = fio_q_at_surface(mag, ntheta, path_plane, &q_plane, 
-				  &(bpol[i*ntheta]), h);
-	//	std::cerr << "q_plane = " << q_plane << std::endl;
-
-
-	if(surfaces==1) {
-	  q[s] += q_plane;
-	}
+      if(result!=FIO_SUCCESS) {
+	std::cerr << "Error finding surface" << std::endl;
+	continue;
       }
 
       if(surfaces==1) {
-	psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
-	q[s] /= nphi;
-	//	std::cerr <<  " q = " <<  q[s] << std::endl;
-      } else {
-	psi_prof[s] = psi_norm*(psi1 - psi0) + psi0;
-	te[s] = temp;
-	result = fio_surface_average(electron_density, nphi*ntheta, path_surf, 
-				     &(ne[s]), bpol, h);
-	result = fio_surface_average(ion_temperature, nphi*ntheta, path_surf, 
-				     &(ti[s]), bpol, h);
-	result = fio_surface_average(ion_density, nphi*ntheta, path_surf, 
-				     &(ni[s]), bpol, h);
+	gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
+	if(s < s_max-1)
+	  gplot << ", \\\n";
       }
-
-      */      
-      if(surfaces==1) {
-	// Write surface data
-	
-	//	if(result==FIO_SUCCESS) {	  
-	  std::ofstream file;
-	  std::string surface_filename;
-	  
-	  surface_filename = "surface_" + std::to_string(s) + ".dat";
-	  file.open(surface_filename, std::ofstream::out|std::ofstream::trunc);
-
-	  /*
-	  int k=0;
-	  for(int j=0; j<nphi; j++) {
-	    if(j > 0) file << '\n';
-	    for(int i=0; i<ntheta; i++) {
-	      file << path_surf[1][k] << ", " 
-		   << path_surf[0][k] << ", " 
-		   << path_surf[2][k] << '\n';
-	      k++;
-	    }
-	  }
-	  */
-	  /*
-	  for(int j=0; j<n; j++) {
-	    file << path_tor0[1][j] << ", " 
-		 << path_tor0[0][j] << ", " 
-		 << path_tor0[2][j] << '\n';
-	  }
-	  */
-	  for(int j=0; j<nphi; j++) {
-	    file << path_tor[1][j] << ", " 
-		 << path_tor[0][j] << ", " 
-		 << path_tor[2][j] << '\n';
-	  }
-	  file.close();
-	  
-	  gplot << " '" << surface_filename << "' u 1:2 w l";
-	  splot << " '" << surface_filename << "' w l";
-	  if(s<nr-1) {
-	    gplot << ", \\\n";
-	    splot << ", \\\n";
-	  }
-	  //}
-      }
-
-      std::cerr << "deleting ... " << std::endl;
-      if(path_tor) {
-	delete[] path_tor[0];
-	delete[] path_tor[1];
-	delete[] path_tor[2];
-	delete[] path_tor;
-      }
-      path_tor = 0;
-      if(path_tor0) {
-	delete[] path_tor0[0];
-	delete[] path_tor0[1];
-	delete[] path_tor0[2];
-	delete[] path_tor0;
-      }
-
     }
-    //  }
 
+  //}
+
+    gplot << std::endl;  
   gplot.close();
   splot.close();
   /*

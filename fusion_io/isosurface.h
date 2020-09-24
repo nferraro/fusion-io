@@ -29,7 +29,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   const double tol, const double max_step,
 			   const int nphi, const int ntheta, 
 			   double* phi, double* theta,
-			   double** path, fio_hint h=0);
+			   double** path, const char* label, fio_hint h=0);
 
 int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
 		     double* bpol, fio_hint h=0);
