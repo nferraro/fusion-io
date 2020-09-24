@@ -345,7 +345,22 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 
   std::cerr << "Error in fio_isosurface: surface not closed after max_pts"
 	    << std::endl;
+  /*
+  std::ofstream dump_file;
+  std::string filename = "dump_" + std::to_string(guess[1])
+    + "_" + std::to_string(guess[0]) + "_" + std::to_string(guess[2]);
+  std::cerr << "Dumping to " << filename << std::endl;
 
+  dump_file.open(filename, std::ofstream::out|std::ofstream::trunc);
+  for(int i=0; i<nn; i++) {
+    dump_file << std::setprecision(10) << std::setw(16) << p[1][i]
+	      << std::setprecision(10) << std::setw(16) << p[0][i]
+	      << std::setprecision(10) << std::setw(16) << p[2][i]
+	      << std::endl;
+  }
+
+  dump_file.close();
+  */
   return FIO_DIVERGED;
 }
 
@@ -817,7 +832,8 @@ int fio_gridify_surface(const int m0, double** path0, const double* axis,
 //    h: hint for last point on path
 //
 int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
-			   const double* axis, const double dl, 
+			   const double* axis, 
+			   const double dl_tor, const double dl_pol,
 			   const double tol, const double max_step,
 			   const int nphi, const int ntheta, 
 			   double* phi, double* theta,
@@ -833,9 +849,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   norm[1] = 0.;
   norm[2] = 1.;
   double** path_tor0;
-  result = fio_isosurface_2d(f, val, guess,
-			     axis, norm, 
-			     dl, tol, max_step,
+  result = fio_isosurface_2d(f, val, guess, axis, norm, dl_tor, tol, max_step,
 			     &n, &path_tor0, h);
 
   if(result!=FIO_SUCCESS) {
@@ -911,9 +925,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     x[0] = path_tor[0][i];
     x[1] = path_tor[1][i];
     x[2] = path_tor[2][i];
-    result = fio_isosurface_2d(f, val, x,
-			       axis, norm, 
-			       dl, tol, max_step,
+    result = fio_isosurface_2d(f, val, x, axis, norm, dl_pol, tol, max_step,
 			       &n, &path_pol0, h);
     
     if(result != FIO_SUCCESS) {
