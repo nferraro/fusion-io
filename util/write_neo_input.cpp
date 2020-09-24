@@ -551,5 +551,26 @@ bool parse_args(int argc, char* argv[])
 
 void print_usage()
 {
+  std::cerr << "write_neo_input"
+	    << " -m3dc1 <m3dc1_source>"
+	    << " -nphi <nphi>"
+	    << " -npsi <npsi>"
+	    << " -nr <nr>"
+	    << " -ntheta <ntheta>"
+	    << " -psi_end <psi_end>"
+	    << " -psi_start <psi_start>"
+	    << " -scale <scale> "
+	    << std::endl;
 
+  std::cerr 
+    << "<m3dc1_source>: filename of M3D-C1 source file\n"
+    << "<nphi>:         number of toroidal points per surface\n"
+    << "<npsi>:         number of radial points for T, n profiles\n"
+    << "<nr>:           number of surfaces\n"
+    << "<ntheta>:       number of poloidal points per surface\n"
+    << "<pert_prof>:    if 1, use perturbed surfaces for T, n profiles\n"
+    << "                if 0, use unperturbed surfaces\n"
+    << "<psi_end>:      psi_norm of outermost surface\n"
+    << "<psi_start>:    psi_norm of innermost surface\n"
+    << "<scale>:        scale factor for linear perturbation\n";
 }
