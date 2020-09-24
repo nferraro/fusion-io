@@ -235,14 +235,19 @@ int main(int argc, char* argv[])
   for(int surfaces=0; surfaces<2; surfaces++) {
   
     int s_max;
+    double s_start, s_end;
     double psi_norm;
     
     if(surfaces==1) {
       std::cerr << "Calculating surfaces..." << std::endl;
       s_max = nr;
+      s_start = psi_start;
+      s_end = psi_end;
     } else {
       std::cerr << "Calculating profiles..." << std::endl; 
       s_max = npsi;
+      s_start = 1./npsi;
+      s_end = 1. - 1./npsi;
     }
 
     x[0] = axis[0] - 0.01;
@@ -250,9 +255,9 @@ int main(int argc, char* argv[])
     for(int s=0; s<s_max; s++) {
       
       if(s_max==1) {
-	psi_norm = psi_start;
+	psi_norm = s_start;
       } else {
-	psi_norm = (psi_end-psi_start)*s/(s_max-1.) + psi_start;
+	psi_norm = (s_end-s_start)*s/(s_max-1.) + s_start;
       }
       
       x[1] = axis[1];
@@ -266,7 +271,6 @@ int main(int argc, char* argv[])
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding psi_norm = " << psi_norm
 		  << std::endl;
-	std::cerr << " psi_norm = " << psi_norm << std::endl;
 	break;
       }
 
@@ -278,7 +282,8 @@ int main(int argc, char* argv[])
 	result = electron_temperature->eval(x, &temp, h);
       }
       if(result != FIO_SUCCESS) {
-	std::cerr << "Error evaluating electron temperature" << std::endl;
+	std::cerr << "Error evaluating electron temperature at psi_norm = "
+		  << psi_norm << std::endl;
 	break;
       }
 
@@ -313,7 +318,8 @@ int main(int argc, char* argv[])
 				      path_surf, label, h);
 
       if(result!=FIO_SUCCESS) {
-	std::cerr << "Error finding surface" << std::endl;
+	std::cerr << "Error finding surface at psi_norm = " 
+		  << psi_norm << " and Te = " << temp << std::endl;
 	continue;
       }
 
