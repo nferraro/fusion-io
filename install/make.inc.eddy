@@ -1,6 +1,6 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -fPIC
+CFLAGS = -O3 -fPIC -std=c++11
 
 F90 = mpif90
 F90FLAGS = -O3 -r8 -fPIC
@@ -15,6 +15,8 @@ LAPACK = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -
 
 HDF5_LIBS = -L$(HDF5DIR)/lib64 -lhdf5 -lz -Wl,-rpath,$(HDF5DIR)/lib64
 HDF5_INCLUDE = -I$(HDF5DIR)/include
+
+NETCDF_LIBS = -lnetcdf
 
 PYTHON = python
 
