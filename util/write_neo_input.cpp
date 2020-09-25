@@ -18,6 +18,7 @@ double tol = 1.;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
 double scalefac = 1.;
+int timeslice = 0;
 fio_source* src = 0;
 bool pert_prof = true; // Use perturbed surfaces for calculating profiles
 
@@ -28,7 +29,6 @@ void print_usage();
 int main(int argc, char* argv[])
 {
   int result;
-  const int timeslice = 1;
   fio_field *electron_density, *electron_temperature;
   fio_field *ion_density, *ion_temperature;
   fio_field *psin, *mag, *psin0, *te0, *te_prof;
@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
 
   std::cerr << "Input parameters\n=======================\n";
   std::cerr << "Scale factor (scale) = " << scalefac << '\n';
+  std::cerr << "Time slice (time) = " << timeslice << '\n';
   std::cerr << "Radial grid points (nr) = " << nr << '\n';
   std::cerr << "Toroidal grid points (nphi) = " << nphi << '\n';
   std::cerr << "Poloidal grid points (ntheta) = " << ntheta << '\n';
@@ -485,27 +486,26 @@ int main(int argc, char* argv[])
 
 bool parse_args(int argc, char* argv[])
 {
+
   for(int i=1; i<argc; i++) {
-    if(strcmp(argv[i],"-psi_start")==0) {
+
+    if(strcmp(argv[i],"-m3dc1")==0) {
       if(i+1 >= argc) {
-	std::cerr << "Error: -psi_start requires an argument" << std::endl;
+	std::cerr << "Error: -m3dc1 requires an argument" << std::endl;
 	return false;
       }
-      psi_start = atof(argv[i+1]);
+      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[i+1]);
+      if(result != FIO_SUCCESS) {
+	std::cerr << "Error opening m3dc1 file " << argv[1];
+	return false;
+      }
     }
-    if(strcmp(argv[i],"-psi_end")==0) {
+    if(strcmp(argv[i],"-nphi")==0) {
       if(i+1 >= argc) {
-	std::cerr << "Error: -psi_end requires an argument" << std::endl;
+	std::cerr << "Error: -nphi requires an argument" << std::endl;
 	return false;
       }
-      psi_end = atof(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-scale")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -scale requires an argument" << std::endl;
-	return false;
-      }
-      scalefac = atof(argv[i+1]);
+      nphi = atoi(argv[i+1]);
     }
     if(strcmp(argv[i],"-npsi")==0) {
       if(i+1 >= argc) {
@@ -528,30 +528,40 @@ bool parse_args(int argc, char* argv[])
       }
       ntheta = atoi(argv[i+1]);
     }
-    if(strcmp(argv[i],"-nphi")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -nphi requires an argument" << std::endl;
-	return false;
-      }
-      nphi = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-m3dc1")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -m3dc1 requires an argument" << std::endl;
-	return false;
-      }
-      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[i+1]);
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error opening m3dc1 file " << argv[1];
-	return false;
-      }
-    }
     if(strcmp(argv[i],"-pert_prof")==0) {
       if(i+1 >= argc) {
 	std::cerr << "Error: -pert_prof requires an argument" << std::endl;
 	return false;
       }
       pert_prof = (atoi(argv[i+1]) != 0);
+    }
+    if(strcmp(argv[i],"-psi_end")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -psi_end requires an argument" << std::endl;
+	return false;
+      }
+      psi_end = atof(argv[i+1]);
+    }
+    if(strcmp(argv[i],"-psi_start")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -psi_start requires an argument" << std::endl;
+	return false;
+      }
+      psi_start = atof(argv[i+1]);
+    }
+    if(strcmp(argv[i],"-scale")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -scale requires an argument" << std::endl;
+	return false;
+      }
+      scalefac = atof(argv[i+1]);
+    }
+    if(strcmp(argv[i],"-time")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -time requires and argument" << std::endl;
+	return false;
+      }
+      timeslice = atoi(argv[i+1]);
     }
   }
 
@@ -569,6 +579,7 @@ void print_usage()
 	    << " -psi_end <psi_end>"
 	    << " -psi_start <psi_start>"
 	    << " -scale <scale> "
+	    << " -time <time> "
 	    << std::endl;
 
   std::cerr 
@@ -581,5 +592,6 @@ void print_usage()
     << "                if 0, use unperturbed surfaces\n"
     << "<psi_end>:      psi_norm of outermost surface\n"
     << "<psi_start>:    psi_norm of innermost surface\n"
-    << "<scale>:        scale factor for linear perturbation\n";
+    << "<scale>:        scale factor for linear perturbation\n"
+    << "<time>:         time slice\n";
 }
