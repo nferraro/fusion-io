@@ -390,6 +390,19 @@ int main(int argc, char* argv[])
 	      << std::endl;
   }
 
+  // swap indices
+  double* R = new double[nr*nphi*ntheta];
+  double* Z = new double[nr*nphi*ntheta];
+
+  for(int i=0; i<nr; i++) {
+    for(int j=0; j<nphi; j++) {
+      for(int k=0; k<ntheta; k++) {
+	R[i + j*nr + k*nr*nphi] = path[0][k + j*ntheta + i*ntheta*nphi];
+	Z[i + j*nr + k*nr*nphi] = path[2][k + j*ntheta + i*ntheta*nphi];
+      }
+    }
+  }
+
   double ion_mass = 2.;  // TODO: generalize this
   int version = 2;
 
@@ -425,9 +438,9 @@ int main(int argc, char* argv[])
 
     int r_id, z_id;
   int dims[3];
-  dims[0] = nr_dimid;
+  dims[2] = nr_dimid;
   dims[1] = nt_dimid;
-  dims[2] = np_dimid;
+  dims[0] = np_dimid;
   nc_def_var(ncid, "R", NC_FLOAT, 3, dims, &r_id);
   nc_def_var(ncid, "Z", NC_FLOAT, 3, dims, &z_id);
 
@@ -441,11 +454,13 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, te_id, te);
   nc_put_var_double(ncid, ni_id, ni);
   nc_put_var_double(ncid, ti_id, ti);
-  nc_put_var_double(ncid, r_id, path[0]);
-  nc_put_var_double(ncid, z_id, path[2]);
+  nc_put_var_double(ncid, r_id, R);
+  nc_put_var_double(ncid, z_id, Z);
 
   nc_close(ncid);
 
+  delete[] R;
+  delete[] Z;
 
   delete[] theta;
   delete[] phi;
