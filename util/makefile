@@ -29,7 +29,7 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 all : write_neo_input
 
 write_neo_input : write_neo_input.o
-	$(CXX) -o $@ $< $(LIBS)
+	$(CXX) -o $@ $< $(LIBS) $(CFLAGS)
 
 install : write_neo_input
 	mkdir -p $(FIO_INSTALL_DIR)/bin
