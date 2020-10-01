@@ -14,7 +14,7 @@ int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 double dl_tor = 0.01;     // step size when finding surfaces
 double dl_pol = 0.001;     // step size when finding surfaces
-double tol = 1.;      // Tolerance for Te when finding isosurface
+double tol = 0.1;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
 double scalefac = 1.;
@@ -68,6 +68,7 @@ int main(int argc, char* argv[])
 	    << psi_end << '\n';
   std::cerr << "Use perturbed surfaces for profiles (pert_prof)? "
 	    << pert_prof << '\n';
+  std::cerr << "Tolerance for finding isosurface (tol) = " << tol << " eV\n";
   std::cerr << "=======================" << std::endl;
 
   double slice_time = 0;
@@ -563,6 +564,14 @@ bool parse_args(int argc, char* argv[])
       }
       timeslice = atoi(argv[i+1]);
     }
+    if(strcmp(argv[i],"-tol")==0) {
+      if(i+1 >= argc) {
+	std::cerr << "Error: -tol requires and argument" << std::endl;
+	return false;
+      }
+      tol = atof(argv[i+1]);
+    }
+
   }
 
   return true;
@@ -580,6 +589,7 @@ void print_usage()
 	    << " -psi_start <psi_start>"
 	    << " -scale <scale> "
 	    << " -time <time> "
+	    << " -tol <tol> "
 	    << std::endl;
 
   std::cerr 
@@ -593,5 +603,6 @@ void print_usage()
     << "<psi_end>:      psi_norm of outermost surface\n"
     << "<psi_start>:    psi_norm of innermost surface\n"
     << "<scale>:        scale factor for linear perturbation\n"
-    << "<time>:         time slice\n";
+    << "<time>:         time slice\n"
+    << "<tol>:          tolerance for finding Te isourface (in eV)\n";
 }
