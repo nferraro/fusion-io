@@ -301,7 +301,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
     de2 = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2];
     
     bool looped;
-    looped = ((de2 < dl*dl) && nn > 3);
+    looped = ((de2 < 4.*dl*dl) && nn > 3);
 
     if(looped) {
       /*
@@ -345,7 +345,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 
   std::cerr << "Error in fio_isosurface: surface not closed after max_pts"
 	    << std::endl;
-  /*
+
   std::ofstream dump_file;
   std::string filename = "dump_" + std::to_string(guess[1])
     + "_" + std::to_string(guess[0]) + "_" + std::to_string(guess[2]);
@@ -360,7 +360,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
   }
 
   dump_file.close();
-  */
+
   return FIO_DIVERGED;
 }
 
