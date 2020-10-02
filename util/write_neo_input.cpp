@@ -17,37 +17,37 @@ double dl_pol = 0.001;     // step size when finding surfaces
 double tol = 0.1;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
-double scalefac = 1.;
-int timeslice = 0;
-fio_source* src = 0;
+std::deque<fio_source*> sources;
+fio_compound_field electron_density, electron_temperature;
+fio_compound_field ion_density, ion_temperature, psin, mag;
+fio_field *psin0, *te0, *te_prof;
+double axis[3];
+double psi0, psi1;
+
 bool pert_prof = true; // Use perturbed surfaces for calculating profiles
 
 void print_usage();
-bool process_command_line(int argc, char* argv[]);
-bool process_line(const std::string& opt, const int argc, 
+int process_command_line(int argc, char* argv[]);
+int process_line(const std::string& opt, const int argc, 
 		  const std::string argv[]);
-
+void delete_sources();
 
 
 int main(int argc, char* argv[])
 {
   int result;
-  fio_field *electron_density, *electron_temperature;
-  fio_field *ion_density, *ion_temperature;
-  fio_field *psin, *mag, *psin0, *te0, *te_prof;
-  fio_option_list opt;
 
   if(argc < 2) {
     print_usage();
     return 1;
   }
   
-  if(!process_command_line(argc, argv)) {
+  if(process_command_line(argc, argv) != FIO_SUCCESS) {
     print_usage();
     return 1;
   }
 
-  if(!src) {
+  if(sources.size()==0) {
     std::cerr << "Error, no source is loaded" << std::endl;
     print_usage();
     return 1;
@@ -59,8 +59,6 @@ int main(int argc, char* argv[])
   if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nr;
 
   std::cerr << "Input parameters\n=======================\n";
-  std::cerr << "Scale factor (scale) = " << scalefac << '\n';
-  std::cerr << "Time slice (time) = " << timeslice << '\n';
   std::cerr << "Radial grid points (nr) = " << nr << '\n';
   std::cerr << "Toroidal grid points (nphi) = " << nphi << '\n';
   std::cerr << "Poloidal grid points (ntheta) = " << ntheta << '\n';
@@ -74,137 +72,31 @@ int main(int argc, char* argv[])
   std::cerr << "Tolerance for finding isosurface (tol) = " << tol << " eV\n";
   std::cerr << "=======================" << std::endl;
 
-  double slice_time = 0;
-  src->get_slice_time(timeslice, &slice_time);
-  
-  std::cerr << "Slice time = " << slice_time << std::endl;
 
   // Find magnetic axis
-  fio_series* magaxis[2];
-  double axis[3];
   axis[1] = 0.;
 
-  if((result = src->get_series(FIO_MAGAXIS_R, &magaxis[0])) != FIO_SUCCESS) {
-    std::cerr << "Couldn't load MAGAXIS_R" << std::endl;
-    delete(src);
-    return result;
-  }
-  if((result = src->get_series(FIO_MAGAXIS_Z, &magaxis[1])) != FIO_SUCCESS) {
-    std::cerr << "Couldn't load MAGAXIS_Z" << std::endl;
-    delete(src);
-    return result;
-  }
-  if((result = magaxis[0]->eval(slice_time, &axis[0])) != FIO_SUCCESS)
-    {
-      std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
-      delete(src);
-      return result;
-    }
-  if((result = magaxis[1]->eval(slice_time, &axis[2])) != FIO_SUCCESS)
-    {
-      std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
-      delete(src);
-      return result;
-    }
-  delete(magaxis[0]);
-  delete(magaxis[1]);
-
-  std::cerr << "Magnetic axis found at (" 
-	    << axis[0] << ", " << axis[2] << ")." << std::endl;
-
-
-  // Find magnetic axis
-  fio_series *magaxis_psi, *lcfs_psi;
-  double psi0, psi1;
-
-  if((result = src->get_series(FIO_MAGAXIS_PSI, &magaxis_psi)) != FIO_SUCCESS)
-    {
-      std::cerr << "Couldn't load MAGAXIS_PSI" << std::endl;
-      delete(src);
-      return result;
-    }
-  if((result = src->get_series(FIO_LCFS_PSI, &lcfs_psi)) != FIO_SUCCESS) 
-    {
-      std::cerr << "Couldn't load LCFS_PSI" << std::endl;
-      delete(src);
-      return result;
-    }
-  if((result = magaxis_psi->eval(slice_time, &psi0)) != FIO_SUCCESS)
-    {
-      std::cerr << "Couldn't evaluate MAGAXIS_PSI" << std::endl;
-      delete(src);
-      return result;
-    }
-  if((result = lcfs_psi->eval(slice_time, &psi1)) != FIO_SUCCESS)
-    {
-      std::cerr << "Couldn't evaluate LCFS_PSI" << std::endl;
-      delete(src);
-      return result;
-    }
-  delete(magaxis_psi);
-  delete(lcfs_psi);
-
-  std::cerr << "psi0 = " << psi0 << std::endl;
-  std::cerr << "psi1 = " << psi1 << std::endl;
-
-
-  // set options for fields obtained from this source
-  src->get_field_options(&opt);
-  opt.set_option(FIO_TIMESLICE, timeslice);
-  opt.set_option(FIO_PART, FIO_TOTAL);
-  opt.set_option(FIO_LINEAR_SCALE, scalefac);
-
-  // open fields
-  result = src->get_field(FIO_MAGNETIC_FIELD, &mag, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening magnetic field field" << std::endl;
-    mag = 0;
-  }
-  result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening psi norm field" << std::endl;
-    psin = 0;
-  }
-  opt.set_option(FIO_SPECIES, FIO_ELECTRON);
-  result = src->get_field(FIO_TEMPERATURE, &electron_temperature, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening electron temperature field" << std::endl;
-    electron_temperature = 0;
-  }
+  fio_source* src0 = sources[0];
 
   if(!pert_prof) {
+    fio_option_list opt;
+    src0->get_field_options(&opt);
+
     opt.set_option(FIO_PART, FIO_EQUILIBRIUM_ONLY);
-    result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &psin0, &opt);
+    result = src0->get_field(FIO_POLOIDAL_FLUX_NORM, &psin0, &opt);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error opening equilirbium psi norm field" << std::endl;
       psin0 = 0;
     }
-    result = src->get_field(FIO_TEMPERATURE, &te0, &opt);
+    result = src0->get_field(FIO_TEMPERATURE, &te0, &opt);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error opening equilibrium Te field" << std::endl;
       te0 = 0;
     }
   }
-  result = src->get_field(FIO_DENSITY, &electron_density, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening density field" << std::endl;
-    electron_density = 0;
-  }
-  opt.set_option(FIO_SPECIES, FIO_MAIN_ION);
-  result = src->get_field(FIO_DENSITY, &ion_density, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening density field" << std::endl;
-    ion_density = 0;
-  }
-  result = src->get_field(FIO_TEMPERATURE, &ion_temperature, &opt);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error opening electron temperature field" << std::endl;
-    ion_temperature = 0;
-  }
-
 
   void* h;
-  src->allocate_search_hint(&h);
+  src0->allocate_search_hint(&h);
 
   double x[3];
 
@@ -258,7 +150,7 @@ int main(int argc, char* argv[])
     if(surfaces==0 && !pert_prof) {
       te_prof = te0;
     } else {
-      te_prof = electron_temperature;
+      te_prof = &electron_temperature;
     }
 
     x[0] = axis[0] - 0.01;
@@ -277,7 +169,7 @@ int main(int argc, char* argv[])
       if(surfaces==0 && !pert_prof) {
 	result = fio_find_val(psin0, psi_norm, x, 1e-4, 0.1, 1, axis, h);
       } else {
-	result = fio_find_val(psin, psi_norm, x, 1e-4, 0.1, 1, axis, h);
+	result = fio_find_val(&psin, psi_norm, x, 1e-4, 0.1, 1, axis, h);
       }
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding psi_norm = " << psi_norm
@@ -343,7 +235,7 @@ int main(int argc, char* argv[])
         path_plane[0] = &(path_surf[0][i*ntheta]);
         path_plane[1] = &(path_surf[1][i*ntheta]);
         path_plane[2] = &(path_surf[2][i*ntheta]);
-        result = fio_q_at_surface(mag, ntheta, path_plane, &q_plane,
+        result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
                                   &(bpol[i*ntheta]), h);
         //      std::cerr << "q_plane = " << q_plane << std::endl;              
         if(surfaces==1) {
@@ -361,11 +253,11 @@ int main(int argc, char* argv[])
 	// Calculate flux surface averages for profiles
         psi_prof[s] = psi_norm*(psi1 - psi0) + psi0;
         te[s] = temp;
-        result = fio_surface_average(electron_density, nphi*ntheta, path_surf,
+        result = fio_surface_average(&electron_density, nphi*ntheta, path_surf,
                                      &(ne[s]), bpol, h);
-        result = fio_surface_average(ion_temperature, nphi*ntheta, path_surf,
+        result = fio_surface_average(&ion_temperature, nphi*ntheta, path_surf,
                                      &(ti[s]), bpol, h);
-        result = fio_surface_average(ion_density, nphi*ntheta, path_surf,
+        result = fio_surface_average(&ion_density, nphi*ntheta, path_surf,
                                      &(ni[s]), bpol, h);
       }
 
@@ -484,38 +376,263 @@ int main(int argc, char* argv[])
 
 
   // Deallocate fields
-  src->deallocate_search_hint(&h);
+  src0->deallocate_search_hint(&h);
 
-  fio_close_field(&electron_density);
-  fio_close_field(&electron_temperature);
-  fio_close_field(&ion_density);
-  fio_close_field(&ion_temperature);
-  fio_close_field(&psin);
-  fio_close_field(&mag);
+  /*
+  electron_density.close();
+  electron_temperature.close();
+  ion_density.close();
+  ion_temperature.close();
+  psin.close();
+  mag.close();
+  */
   if(!pert_prof) {
-    fio_close_field(&te0);
-    fio_close_field(&psin0);
+    delete(te0);
+    delete(psin0);
   }
-  fio_close_source(&src);
+  delete_sources();
 
   return 0;
 }
 
 
+bool create_source(const int type, const int argc, const std::string argv[]) 
+{
+  fio_source* src;
+  fio_option_list fopt;
+  int result;
+  double slice_time = 0.;
+  int timeslice = 0;
 
-bool process_command_line(int argc, char* argv[])
+  switch(type) {
+  case(FIO_M3DC1_SOURCE):
+    src = new m3dc1_source();
+    if(argc>=1) {
+      result = src->open(argv[0].c_str());
+    } else {
+      result = src->open("C1.h5");
+    }
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error opening file" << std::endl;
+      delete(src);
+      return false;
+    };
+    // set options for fields obtained from this source
+    src->get_field_options(&fopt);
+    fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
+    if(argc<2) fopt.set_option(FIO_TIMESLICE,-1);  // default to timeslice=-1
+    break;
+
+  case(FIO_GEQDSK_SOURCE):
+    src = new geqdsk_source();
+    if(argc>=1) {
+      if((result = src->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	delete(src);
+	return false;
+      };
+    } else {
+      std::cerr << "Filename must be provided for geqdsk files." << std::endl;
+      delete(src);
+      return false;
+    }
+    src->get_field_options(&fopt);
+    break;
+
+  case(FIO_GPEC_SOURCE):
+    src = new gpec_source();
+    if(argc>=1) {
+      if((result = src->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	delete(src);
+	return false;
+      };
+    } else {
+      std::cerr << "Directory must be provided for gpec files." << std::endl;
+      delete(src);
+      return false;
+    }
+    src->get_field_options(&fopt);
+    break;
+
+  default:
+    return false;
+  }
+
+  if(argc>=2) {
+    timeslice = atoi(argv[1].c_str());
+    std::cerr << "Time slice " << timeslice << std::endl;
+    fopt.set_option(FIO_TIMESLICE, timeslice);
+    if(src->get_slice_time(timeslice, &slice_time)==FIO_SUCCESS) {
+      std::cerr << "Slice time = " << slice_time << std::endl;
+    }
+  }
+  if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
+  if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
+
+  // Allocate search hint
+  fio_hint hint;
+  result = src->allocate_search_hint(&hint);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Warning: couldn't allocate search hint" << std::endl;
+  }
+
+
+
+  if(sources.size()==0) {
+    // If this is the first source being read, use this source to 
+    // determine equilibrium fields and magnetic axis.
+
+    fio_series *magaxis[2];
+    fio_series *magaxis_psi, *lcfs_psi;
+
+    // Find magnetic axis
+    if((result = src->get_series(FIO_MAGAXIS_R, &magaxis[0])) != FIO_SUCCESS) {
+      std::cerr << "Couldn't load MAGAXIS_R" << std::endl;
+      delete(src);
+      return result;
+    }
+    if((result = src->get_series(FIO_MAGAXIS_Z, &magaxis[1])) != FIO_SUCCESS) {
+      std::cerr << "Couldn't load MAGAXIS_Z" << std::endl;
+      delete(src);
+      return result;
+    }
+    if((result = magaxis[0]->eval(slice_time, &(axis[0]))) != FIO_SUCCESS)
+      {
+	std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
+	delete(src);
+	return result;
+    }
+    if((result = magaxis[1]->eval(slice_time, &(axis[2]))) != FIO_SUCCESS)
+      {
+	std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
+	delete(src);
+	return result;
+      }
+    delete(magaxis[0]);
+    delete(magaxis[1]);
+
+
+    std::cerr << "Magnetic axis found at (" 
+	      << axis[0] << ", " << axis[2] << ")." << std::endl;
+
+
+    if((result = src->get_series(FIO_MAGAXIS_PSI, &magaxis_psi)) != FIO_SUCCESS)
+      {
+	std::cerr << "Couldn't load MAGAXIS_PSI" << std::endl;
+	delete(src);
+	return result;
+      }
+    if((result = src->get_series(FIO_LCFS_PSI, &lcfs_psi)) != FIO_SUCCESS) 
+      {
+	std::cerr << "Couldn't load LCFS_PSI" << std::endl;
+	delete(src);
+	return result;
+      }
+    if((result = magaxis_psi->eval(slice_time, &psi0)) != FIO_SUCCESS)
+      {
+	std::cerr << "Couldn't evaluate MAGAXIS_PSI" << std::endl;
+	delete(src);
+	return result;
+      }
+    if((result = lcfs_psi->eval(slice_time, &psi1)) != FIO_SUCCESS)
+      {
+	std::cerr << "Couldn't evaluate LCFS_PSI" << std::endl;
+	delete(src);
+	return result;
+      }
+    delete(magaxis_psi);
+    delete(lcfs_psi);
+    
+    std::cerr << "psi0 = " << psi0 << std::endl;
+    std::cerr << "psi1 = " << psi1 << std::endl;
+
+
+    fopt.set_option(FIO_PART, FIO_TOTAL);
+    
+  } else {
+    fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
+  }
+
+  // Read fields
+  fio_field* field;
+
+  result = src->get_field(FIO_MAGNETIC_FIELD, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening magnetic field field" << std::endl;
+    delete(src);
+    return result;
+  }
+  mag.add_field(field, FIO_ADD, 1., hint);
+  
+  result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening psi norm field" << std::endl;
+    delete(src);
+    return result;
+  }
+  psin.add_field(field, FIO_ADD, 1., hint);
+
+
+  // open fields
+  fopt.set_option(FIO_SPECIES, FIO_ELECTRON);
+  result = src->get_field(FIO_TEMPERATURE, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening electron temperature field" << std::endl;
+    delete(src);
+    return result;
+  }
+  electron_temperature.add_field(field, FIO_ADD, 1., hint);
+
+  result = src->get_field(FIO_DENSITY, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening electron density field" << std::endl;
+    delete(src);
+    return result;
+  }
+  electron_density.add_field(field, FIO_ADD, 1., hint);
+
+  fopt.set_option(FIO_SPECIES, FIO_MAIN_ION);
+  result = src->get_field(FIO_DENSITY, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening ion density field" << std::endl;
+    delete(src);
+    return result;
+  }
+  ion_density.add_field(field, FIO_ADD, 1., hint);
+
+  result = src->get_field(FIO_TEMPERATURE, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening ion temperature field" << std::endl;
+    delete(src);
+    return result;
+  }
+  ion_temperature.add_field(field, FIO_ADD, 1., hint);
+  
+
+  // Add source to list
+  sources.push_back(src);
+    
+
+  return FIO_SUCCESS;
+}
+
+
+
+
+int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 11;
+  const int num_opts = 9;
   std::string arg_list[num_opts] = 
     { "-m3dc1", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-scale","-time", 
-      "-tol" };
+      "-ntheta", "-psi_end", "-psi_start", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
   bool is_opt;
   bool processed = true;
+  int result;
 
   for(int i=1; i<argc; i++) {
     // determine if current cl arg is an option
@@ -529,7 +646,8 @@ bool process_command_line(int argc, char* argv[])
     
     if(is_opt) {     // if so, process current option
       if(!processed)
-	if(!process_line(opt, args, arg)) return false;
+	if((result = process_line(opt, args, arg)) != FIO_SUCCESS) 
+	  return result;
 
       opt = argv[i];
       args = 0;
@@ -544,26 +662,20 @@ bool process_command_line(int argc, char* argv[])
   }
 
   if(!processed)
-    if(!process_line(opt, args, arg)) return false;
+    if((result = process_line(opt, args, arg)) != FIO_SUCCESS)
+      return result;
 
-  return true;
+  return FIO_SUCCESS;
 
 }
 
-bool process_line(const std::string& opt, const int argc, const std::string argv[])
+int process_line(const std::string& opt, const int argc, const std::string argv[])
 {
   bool argc_err = false;
 
   if(opt=="-m3dc1") {
     std::cerr << "M3DC1!" << std::endl;
-    if(argc==1) {
-      std::cerr << "opening!" << std::endl;
-      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[0].c_str());
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error opening m3dc1 file " << argv[0].c_str();
-	return false;
-      }
-    } else argc_err = true;
+    return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-nphi") {
     if(argc==1) nphi = atoi(argv[0].c_str());
     else argc_err = true;
@@ -585,34 +697,28 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
   } else if(opt=="-psi_start") {
     if(argc==1) psi_start = atof(argv[0].c_str());
     else argc_err = true;
-  } else if(opt=="-scale") {
-    if(argc==1) scalefac = atof(argv[0].c_str());
-    else argc_err = true;
-  } else if(opt=="-time") {
-    if(argc==1) timeslice = atoi(argv[0].c_str());
-    else argc_err = true;
   } else if(opt=="-tol") {
     if(argc==1) tol = atof(argv[0].c_str());
     else argc_err = true;
   } else {
     std::cerr << "Unrecognized option " << opt << std::endl;
-    return false;
+    return FIO_UNSUPPORTED;
   }
 
   if(argc_err) {
     std::cerr << "Incorrect number of arguments for option " 
 	      << opt << std::endl;
-    return false;
+    return FIO_UNSUPPORTED;
   }
 
-  return true;
+  return FIO_SUCCESS;
 }
 
 
 void print_usage()
 {
   std::cerr << "write_neo_input"
-	    << " -m3dc1 <m3dc1_source>"
+	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"
 	    << " -nphi <nphi>"
 	    << " -npsi <npsi>"
 	    << " -nr <nr>"
@@ -620,8 +726,6 @@ void print_usage()
 	    << " -psi_end <psi_end>"
 	    << " -psi_start <psi_start>"
 	    << " -scale <scale> "
-	    << " -time <time> "
-	    << " -tol <tol> "
 	    << std::endl;
 
   std::cerr 
@@ -632,9 +736,20 @@ void print_usage()
     << "<ntheta>:       number of poloidal points per surface\n"
     << "<pert_prof>:    if 1, use perturbed surfaces for T, n profiles\n"
     << "                if 0, use unperturbed surfaces\n"
+    << "<phase>:        phase factor to apply to fields\n"
     << "<psi_end>:      psi_norm of outermost surface\n"
     << "<psi_start>:    psi_norm of innermost surface\n"
-    << "<scale>:        scale factor for linear perturbation\n"
-    << "<time>:         time slice\n"
+    << "<scale>:        scale factor to apply to linear perturbation\n"
+    << "<time>:         timeslice of fields to read\n"
     << "<tol>:          tolerance for finding Te isourface (in eV)\n";
+}
+
+void delete_sources()
+{
+  for(auto it = sources.cbegin(); it != sources.end(); it++) {
+    (*it)->close();
+    delete(*it);
+  }
+
+  sources.clear();
 }
