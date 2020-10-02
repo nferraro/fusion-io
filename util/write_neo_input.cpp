@@ -22,8 +22,11 @@ int timeslice = 0;
 fio_source* src = 0;
 bool pert_prof = true; // Use perturbed surfaces for calculating profiles
 
-bool parse_args(int argc, char* argv[]);
 void print_usage();
+bool process_command_line(int argc, char* argv[]);
+bool process_line(const std::string& opt, const int argc, 
+		  const std::string argv[]);
+
 
 
 int main(int argc, char* argv[])
@@ -39,7 +42,7 @@ int main(int argc, char* argv[])
     return 1;
   }
   
-  if(!parse_args(argc, argv)) {
+  if(!process_command_line(argc, argv)) {
     print_usage();
     return 1;
   }
@@ -500,97 +503,111 @@ int main(int argc, char* argv[])
 
 
 
-bool parse_args(int argc, char* argv[])
+bool process_command_line(int argc, char* argv[])
 {
+  const int max_args = 4;
+  const int num_opts = 11;
+  std::string arg_list[num_opts] = 
+    { "-m3dc1", "-nphi", "-nphi", "-npsi", "-nr",
+      "-ntheta", "-psi_end", "-psi_start", "-scale","-time", 
+      "-tol" };
+  std::string opt = "";
+  std::string arg[max_args];
+  int args = 0;
+  bool is_opt;
+  bool processed = true;
 
   for(int i=1; i<argc; i++) {
-
-    if(strcmp(argv[i],"-m3dc1")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -m3dc1 requires an argument" << std::endl;
-	return false;
+    // determine if current cl arg is an option
+    is_opt = false;
+    for(int j=0; j<num_opts; j++) {
+      if(argv[i]==arg_list[j]) {
+	is_opt = true;
+	break;
       }
-      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[i+1]);
+    }
+    
+    if(is_opt) {     // if so, process current option
+      if(!processed)
+	if(!process_line(opt, args, arg)) return false;
+
+      opt = argv[i];
+      args = 0;
+      processed = false;
+      
+    } else {         // otherwise, add argument
+      if(args >= max_args)
+	std::cerr << "Too many arguments for " << opt << std::endl;
+      else 
+	arg[args++] = argv[i];
+    }
+  }
+
+  if(!processed)
+    if(!process_line(opt, args, arg)) return false;
+
+  return true;
+
+}
+
+bool process_line(const std::string& opt, const int argc, const std::string argv[])
+{
+  bool argc_err = false;
+
+  if(opt=="-m3dc1") {
+    std::cerr << "M3DC1!" << std::endl;
+    if(argc==1) {
+      std::cerr << "opening!" << std::endl;
+      int result = fio_open_source(&src, FIO_M3DC1_SOURCE, argv[0].c_str());
       if(result != FIO_SUCCESS) {
-	std::cerr << "Error opening m3dc1 file " << argv[1];
+	std::cerr << "Error opening m3dc1 file " << argv[0].c_str();
 	return false;
       }
-    }
-    if(strcmp(argv[i],"-nphi")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -nphi requires an argument" << std::endl;
-	return false;
-      }
-      nphi = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-npsi")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -npsi requires an argument" << std::endl;
-	return false;
-      }
-      npsi = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-nr")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -nr requires an argument" << std::endl;
-	return false;
-      }
-      nr = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-ntheta")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -ntheta requires an argument" << std::endl;
-	return false;
-      }
-      ntheta = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-pert_prof")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -pert_prof requires an argument" << std::endl;
-	return false;
-      }
-      pert_prof = (atoi(argv[i+1]) != 0);
-    }
-    if(strcmp(argv[i],"-psi_end")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -psi_end requires an argument" << std::endl;
-	return false;
-      }
-      psi_end = atof(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-psi_start")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -psi_start requires an argument" << std::endl;
-	return false;
-      }
-      psi_start = atof(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-scale")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -scale requires an argument" << std::endl;
-	return false;
-      }
-      scalefac = atof(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-time")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -time requires and argument" << std::endl;
-	return false;
-      }
-      timeslice = atoi(argv[i+1]);
-    }
-    if(strcmp(argv[i],"-tol")==0) {
-      if(i+1 >= argc) {
-	std::cerr << "Error: -tol requires and argument" << std::endl;
-	return false;
-      }
-      tol = atof(argv[i+1]);
-    }
+    } else argc_err = true;
+  } else if(opt=="-nphi") {
+    if(argc==1) nphi = atoi(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-npsi") {
+    if(argc==1) npsi = atoi(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-nr") {
+    if(argc==1) nr = atoi(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-ntheta") {
+    if(argc==1) ntheta = atoi(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-pert_prof") {
+    if(argc==1) pert_prof = (atoi(argv[0].c_str()) != 0);
+    else argc_err = true;
+  } else if(opt=="-psi_end") {
+    if(argc==1) psi_end = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-psi_start") {
+    if(argc==1) psi_start = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-scale") {
+    if(argc==1) scalefac = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-time") {
+    if(argc==1) timeslice = atoi(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-tol") {
+    if(argc==1) tol = atof(argv[0].c_str());
+    else argc_err = true;
+  } else {
+    std::cerr << "Unrecognized option " << opt << std::endl;
+    return false;
+  }
 
+  if(argc_err) {
+    std::cerr << "Incorrect number of arguments for option " 
+	      << opt << std::endl;
+    return false;
   }
 
   return true;
 }
+
 
 void print_usage()
 {
