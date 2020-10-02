@@ -32,7 +32,8 @@ int fio_compound_field::dimension() const
   return dim;
 }
 
-int fio_compound_field::add_field(fio_field* f, const int op, const double d)
+int fio_compound_field::add_field(fio_field* f, const int op, const double d,
+				  const fio_hint h)
 {
   if(fields.empty()) {
     dim = f->dimension();
@@ -50,7 +51,7 @@ int fio_compound_field::add_field(fio_field* f, const int op, const double d)
     }
   }
 
-  fields.push_back(component_field(f, op, d));
+  fields.push_back(component_field(f, op, d, h));
   return FIO_SUCCESS;
 }
 
@@ -59,7 +60,7 @@ int fio_compound_field::eval(const double* x, double* v, fio_hint h)
   double* z = new double[dimension()];
 
   for(int j=0; j<dimension(); j++)
-    v[j] = 0;
+    v[j] = 0.;
 
   field_list::iterator i = fields.begin();
   while(i != fields.end()) {
@@ -79,3 +80,31 @@ int fio_compound_field::eval(const double* x, double* v, fio_hint h)
 
   return FIO_SUCCESS;
 }
+
+int fio_compound_field::eval_deriv(const double* x, double* v, fio_hint h)
+{
+  double* z = new double[3*dimension()];
+
+  for(int j=0; j<3*dimension(); j++)
+    v[j] = 0.;
+
+  field_list::iterator i = fields.begin();
+  while(i != fields.end()) {
+    int result = i->field->eval_deriv(x, z, i->hint);
+    if(result != FIO_SUCCESS) return result;
+
+    for(int j=0; j<3*dimension(); j++)
+      switch(i->op) {
+      case(FIO_ADD):       v[j] += i->factor*z[j]; break;
+      default:
+	std::cerr << "Eval deriv for op != FIO_ADD unsupported" << std::endl;
+	return FIO_UNSUPPORTED;
+      }     
+    i++;
+  }
+
+  delete[] z;
+
+  return FIO_SUCCESS;
+}
+

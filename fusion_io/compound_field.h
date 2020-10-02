@@ -24,7 +24,8 @@ class fio_compound_field : public fio_field {
   fio_compound_field* clone() const { return new fio_compound_field(*this); }
   int dimension() const;
   int eval(const double*, double*, fio_hint=0);
-  int add_field(fio_field*, const int, const double);
+  int eval_deriv(const double*, double*, fio_hint=0);
+  int add_field(fio_field*, const int, const double, const fio_hint h=0);
 };
 
 #endif
