@@ -13,7 +13,7 @@ int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 double dl_tor = 0.01;     // step size when finding surfaces
-double dl_pol = 0.001;     // step size when finding surfaces
+double dl_pol = 0.002;     // step size when finding surfaces
 double tol = 0.1;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
@@ -88,6 +88,7 @@ int main(int argc, char* argv[])
       std::cerr << "Error opening equilirbium psi norm field" << std::endl;
       psin0 = 0;
     }
+    opt.set_option(FIO_SPECIES, FIO_ELECTRON);
     result = src0->get_field(FIO_TEMPERATURE, &te0, &opt);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error opening equilibrium Te field" << std::endl;
@@ -404,8 +405,11 @@ bool create_source(const int type, const int argc, const std::string argv[])
   double slice_time = 0.;
   int timeslice = 0;
 
+  std::cerr << "Opening source\n";
+
   switch(type) {
   case(FIO_M3DC1_SOURCE):
+    std::cerr << " Type: M3DC1\n";
     src = new m3dc1_source();
     if(argc>=1) {
       result = src->open(argv[0].c_str());
@@ -424,6 +428,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
     break;
 
   case(FIO_GEQDSK_SOURCE):
+    std::cerr << " Type: GEQDSK\n";
     src = new geqdsk_source();
     if(argc>=1) {
       if((result = src->open(argv[0].c_str())) != FIO_SUCCESS) {
@@ -440,6 +445,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
     break;
 
   case(FIO_GPEC_SOURCE):
+    std::cerr << " Type: GPEC\n";
     src = new gpec_source();
     if(argc>=1) {
       if((result = src->open(argv[0].c_str())) != FIO_SUCCESS) {
@@ -461,10 +467,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 
   if(argc>=2) {
     timeslice = atoi(argv[1].c_str());
-    std::cerr << "Time slice " << timeslice << std::endl;
+    std::cerr << " Time slice: " << timeslice << std::endl;
     fopt.set_option(FIO_TIMESLICE, timeslice);
     if(src->get_slice_time(timeslice, &slice_time)==FIO_SUCCESS) {
-      std::cerr << "Slice time = " << slice_time << std::endl;
+      std::cerr << "  Slice time = " << slice_time << std::endl;
     }
   }
   if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
@@ -623,10 +629,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 9;
+  const int num_opts = 10;
   std::string arg_list[num_opts] = 
     { "-m3dc1", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-tol" };
+      "-ntheta", "-pert_prof", "-psi_end", "-psi_start", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -674,7 +680,6 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
   bool argc_err = false;
 
   if(opt=="-m3dc1") {
-    std::cerr << "M3DC1!" << std::endl;
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-nphi") {
     if(argc==1) nphi = atoi(argv[0].c_str());
