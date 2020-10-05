@@ -13,7 +13,8 @@ int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 double dl_tor = 0.01;     // step size when finding surfaces
-double dl_pol = 0.002;     // step size when finding surfaces
+double dl_pol = 0.002;    // step size when finding surfaces
+double max_step = 0.02;   // Maximum step size for Newton iterations
 double tol = 0.1;      // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
@@ -59,6 +60,8 @@ int main(int argc, char* argv[])
   if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nr;
 
   std::cerr << "Input parameters\n=======================\n";
+  std::cerr << "Maximum Newton iteration step (max_step) = " << max_step
+	    << '\n';
   std::cerr << "Radial grid points (nr) = " << nr << '\n';
   std::cerr << "Toroidal grid points (nphi) = " << nphi << '\n';
   std::cerr << "Poloidal grid points (ntheta) = " << ntheta << '\n';
@@ -213,7 +216,7 @@ int main(int argc, char* argv[])
 	path_surf[2] = path[2];
       }
       result = fio_gridded_isosurface(te_prof, temp, x,
-				      axis, dl_tor, dl_pol, tol, 0.1,
+				      axis, dl_tor, dl_pol, tol, max_step,
 				      nphi, ntheta, 
 				      phi, theta,
 				      path_surf, label, h);
@@ -629,9 +632,9 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 10;
+  const int num_opts = 11;
   std::string arg_list[num_opts] = 
-    { "-m3dc1", "-nphi", "-nphi", "-npsi", "-nr",
+    { "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
       "-ntheta", "-pert_prof", "-psi_end", "-psi_start", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
@@ -681,6 +684,9 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 
   if(opt=="-m3dc1") {
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
+  } else if(opt=="-max_step") {
+    if(argc==1) max_step = atof(argv[0].c_str());
+    else argc_err = true;
   } else if(opt=="-nphi") {
     if(argc==1) nphi = atoi(argv[0].c_str());
     else argc_err = true;
