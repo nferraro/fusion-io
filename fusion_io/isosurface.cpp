@@ -164,7 +164,18 @@ int fio_find_val(fio_field* f, const double val, double* x,
       x2[2] = x[2] + del*n[2];
       result = f->eval(x2, &v2, h);
     } else {
+
       result = f->eval_deriv(x, dv, h);
+      /*
+      for(int j=0; j<3; j++) {
+	x2[0] = x[0];
+	x2[1] = x[1];
+	x2[2] = x[2];
+	x2[j] += del;
+	result = f->eval(x2, &v2, h);
+	dv[j] = (v2 - v)/del;
+      }
+      */
 
       // if dim==2, restrict to plane
       if(dim==2) {
@@ -931,7 +942,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     if(result != FIO_SUCCESS) {
       std::cerr << "Error finding poloidal loop at phi = " << path_tor[1][i]
 		<< std::endl;
-      continue;
+      break;
     }
     
     if(label) {
@@ -952,7 +963,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     
     if(result != FIO_SUCCESS) {
       std::cerr << "Error gridifying poloidal path " << std::endl;
-      continue;
+      break;
     }
   }
 
@@ -983,7 +994,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     file.close();
   }
 
-  return FIO_SUCCESS;
+  return result;
 }
 
 
