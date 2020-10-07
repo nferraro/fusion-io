@@ -15,7 +15,7 @@ int nphi = 32;    // number of toroidal points
 double dl_tor = 0.01;     // step size when finding surfaces
 double dl_pol = 0.002;    // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
-double tol = 0.1;      // Tolerance for Te when finding isosurface
+double tol = 0.1;         // Tolerance for Te when finding isosurface
 double psi_start = -1;
 double psi_end = -1;
 std::deque<fio_source*> sources;
@@ -476,8 +476,16 @@ bool create_source(const int type, const int argc, const std::string argv[])
       std::cerr << "  Slice time = " << slice_time << std::endl;
     }
   }
-  if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
-  if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
+  if(argc>=3) {
+    double scale = atof(argv[2].c_str());
+    std::cerr << " Linear scale factor: " << scale << std::endl;
+    fopt.set_option(FIO_LINEAR_SCALE, scale);
+  }
+  if(argc>=4) {
+    double phase = atof(argv[3].c_str())*M_PI/180.;
+    std::cerr << " Phase: " << phase << std::endl;
+    fopt.set_option(FIO_PHASE, phase);
+  }
 
   // Allocate search hint
   fio_hint hint;
@@ -736,7 +744,6 @@ void print_usage()
 	    << " -ntheta <ntheta>"
 	    << " -psi_end <psi_end>"
 	    << " -psi_start <psi_start>"
-	    << " -scale <scale> "
 	    << std::endl;
 
   std::cerr 
