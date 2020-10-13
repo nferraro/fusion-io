@@ -21,7 +21,7 @@ LDFLAGS =
 ARCH = ar cr
 LDD = $(CXX) --shared
 
-PYTHON = python
+PYTHON = python3
 
 LAPACK = -L$(ACML_HOME)/lib -lacml
 

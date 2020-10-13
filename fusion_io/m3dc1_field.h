@@ -147,6 +147,7 @@ class m3dc1_magnetic_field : public m3dc1_fio_field {
   m3dc1_field *psi0, *psi1, *psix;
   m3dc1_field *i0, *i1, *ix;
   m3dc1_field *f0, *f1, *fx;
+  m3dc1_field *rst, *zst;
  public:
   m3dc1_magnetic_field(m3dc1_source* s) 
     : m3dc1_fio_field(s) { }

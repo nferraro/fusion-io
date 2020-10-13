@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
       if(!result) {
 	double RR, PP, ZZ;
 	tracer.get_pos(&RR, &PP, &ZZ);
-	std::cerr << "lost at (" << RR << ", " << ZZ <<  ")" << std::endl;
+	std::cerr << "lost at (" << RR << ", " << PP << ", " << ZZ <<  ")" << std::endl;
       }
 
       // write connection length

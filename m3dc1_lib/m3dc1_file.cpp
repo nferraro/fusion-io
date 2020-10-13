@@ -193,6 +193,12 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
     mesh->period = 2.*M_PI;
   }
 
+  hid_t period_attr = H5Aopen(mesh_group, "period", H5P_DEFAULT);
+  H5Aread(period_attr, H5T_NATIVE_DOUBLE, &(mesh->period));
+  H5Aclose(period_attr);
+  
+  std::cerr << "Mesh period " << mesh->period << std::endl;
+
   read_parameter("nplanes", &(mesh->nplanes));
 
   // Calculate connectivity tree
