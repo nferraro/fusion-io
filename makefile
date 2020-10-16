@@ -2,7 +2,7 @@ libs = m3dc1_lib fusion_io
 bins = trace
 alldirs = $(libs) $(bins) util examples doc
 
-.PHONY : install clean dist python $(alldirs)
+.PHONY : install clean dist python $(alldirs) c1_lp
 
 all : $(alldirs)
 
@@ -20,5 +20,5 @@ shared : $(libs)
 clean : $(alldirs)
 	rm -f *~
 
-$(alldirs) : 
+$(alldirs) c1_lp : 
 	cd $@ ; $(MAKE) $(MAKECMDGOALS)
