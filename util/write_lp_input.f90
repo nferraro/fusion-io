@@ -25,9 +25,10 @@ program write_lp_input
   integer :: Npol        ! number of points to average in poloidal plane
   integer :: iall_slices ! 1: get all slices from 0 to slice
   integer :: iprint      ! 1: print debug statements to standard error
+  integer :: ioutput_fl  ! (+/-)1: output path of (positive/negative) field line
   character(len=*), parameter :: input_nml = 'write_lp.nml'
   namelist /PARAMS/ R0, phi0, Z0, rpol, L, Nstep, Npol, slice, ipellet, &
-       iprint, iall_slices
+       iprint, iall_slices, ioutput_fl
 
   real, parameter :: dummy = huge(0.)
 
@@ -49,6 +50,9 @@ program write_lp_input
 
   integer :: i, j, ierr, fu
   type(fio_search_hint) :: hint
+
+  integer :: flu
+  character(len=15) :: fl_file
 
   integer(HID_T) :: file_id, root_id, group_id, attr_id
   integer(HID_T) :: dset_id, space_id, mem_id
@@ -86,6 +90,7 @@ program write_lp_input
   Nstep = 100
   iall_slices = 0
   iprint = 0
+  ioutput_fl = 0
 
   !----------------------------------
   ! Read pellet location of C1.h5
@@ -111,7 +116,7 @@ program write_lp_input
   call h5gopen_f(root_id, "pellet", group_id, ierr)
   ! itime starts at 0, but indexing from 1
   dim2(1) = 1
-  dim2(2) = itime+1 
+  dim2(2) = itime+1
   off(1) = ipellet-1
   off(2) = 0
   call h5screate_simple_f(2, dim2, mem_id, ierr)
@@ -126,7 +131,7 @@ program write_lp_input
   call h5sclose_f(space_id, ierr)
   call h5dclose_f(dset_id, ierr)
   Rs = Rs*l0_norm
-  
+
   ! phi0 = pellet_phi
   allocate(phis(0:itime))
   call h5dopen_f(group_id, "pellet_phi", dset_id, ierr)
@@ -172,7 +177,7 @@ program write_lp_input
 
   call h5sclose_f(mem_id, ierr)
   call h5gclose_f(group_id, ierr)
-  
+
 
   ! Overwrite with namelist
   open(file=input_nml, iostat=ierr, newunit=fu, status="OLD", position="REWIND")
@@ -185,7 +190,7 @@ program write_lp_input
   if(phi0.ne.dummy) phis = phi0
   if(Z0.ne.dummy)   Zs = Z0
   if(rpol.ne.dummy) rpols = rpol
-  
+
   ! Open C1.h5 file
   call fio_open_source_f(FIO_M3DC1_SOURCE, trim(filename), isrc, ierr)
   if(ierr.ne.0) goto 100
@@ -203,7 +208,7 @@ program write_lp_input
   do s = start, slice
 
      if(iprint.eq.1) write(stderr, '("Time slice = ",I3)') s
-     
+
      ! get time step for this slice
      write(time_group_name, '("time_",I3.3)') s
      call h5gopen_f(root_id, time_group_name, group_id, ierr)
@@ -220,7 +225,7 @@ program write_lp_input
      if(iprint.eq.1) write(stderr, '("  Pellet R, phi, Z, rpol = ",1p4E12.4)') R0, phi0, Z0, rpol
 
      call fio_set_int_option_f(FIO_TIMESLICE, s, ierr)
-  
+
      ! read fields
      call fio_get_field_f(isrc, FIO_MAGNETIC_FIELD, imag, ierr)
      call fio_set_int_option_f(FIO_SPECIES, FIO_ELECTRON, ierr)
@@ -263,6 +268,12 @@ program write_lp_input
            write(stderr, '("    Starting R, phi, Z, Psi = ", 1p4E12.4)') xp, Psi
         end if
 
+        if(ioutput_fl.ne.0) then
+           write(fl_file, '("fl_",I3.3,"_",I4.4,".txt")') s, i
+           open(file=fl_file, iostat=ierr, newunit=flu, status="REPLACE")
+           write(flu, '(1p6E16.8)') xp(1)*cos(xp(2)), xp(1)*sin(xp(2)), xp(3)
+        end if
+
         ! step along this field line using RK4
         ! Cylindrical coordinates so
         ! dR/ds = Br/|B|
@@ -293,6 +304,10 @@ program write_lp_input
 
            xp = xp + dl*(k1 + 2.*k2 + 2.*k3 + k4)/6.
 
+           if(ioutput_fl.eq.1) then
+              write(flu, '(1p3E16.8)') xp(1)*cos(xp(2)), xp(1)*sin(xp(2)), xp(3)
+           end if
+
         end do
 
         do j=1, Nstep
@@ -319,6 +334,10 @@ program write_lp_input
 
            xm = xm - dl*(k1 + 2.*k2 + 2.*k3 + k4)/6.
 
+           if(ioutput_fl.eq.-1) then
+              write(flu, '(1p3E16.8)') xm(1)*cos(xm(2)), xm(1)*sin(xm(2)), xm(3)
+           end if
+
         end do
 
         call fio_eval_field_f(ipsi, xp, Psi, ierr, hint=hint)
@@ -340,6 +359,7 @@ program write_lp_input
         call fio_eval_field_f(imag, xm, B, ierr, hint=hint)
         B_avg = B_avg + B
 
+        if(ioutput_fl.ne.0) close(flu)
      end do
 
      ne_avg = ne_avg/(2.*Npol)
