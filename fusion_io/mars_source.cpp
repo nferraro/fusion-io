@@ -138,6 +138,12 @@ int mars_source::open(const char* )
   std::cerr << "R0EXP  = " << r0exp << "\n";
   std::cerr << "B0EXP  = " << b0exp << "\n";
 
+  bfac = 4.e-7*M_PI/r0exp;
+  vfac = 4.e-7*M_PI/b0exp;
+
+  std::cerr << "bfac = " << bfac << " T\n";
+  std::cerr << "vfac = " << vfac << " \n";
+
 
   std::cerr << "Allocating data structures for MARS data" << std::endl;
   psiiso = new double[2*nrp1];
@@ -194,9 +200,18 @@ int mars_source::open(const char* )
 
 int mars_source::close()
 {
-  if(psiiso) delete(psiiso);    psiiso = 0;
-  if(eqdata) delete(eqdata);    eqdata = 0;
-  if(eqdatam) delete(eqdatam);  eqdatam = 0;
+  if(psiiso) { 
+    delete(psiiso);    
+    psiiso = 0;
+  }
+  if(eqdata) {
+    delete(eqdata);    
+    eqdata = 0;
+  }
+  if(eqdatam) {
+    delete(eqdatam);  
+    eqdatam = 0;
+  }
 
   return FIO_SUCCESS;
 }

@@ -16,7 +16,8 @@ class mars_field : public fio_field {
     { source = s; }
   virtual int load(const fio_option_list*) = 0;
 
-  int get_indices(const double*, int*, int*, double*, double*);
+  int get_indices(const double*, int*, int*, double*, double*,
+		  double*, double*, double*, double*);
 };
 
 
@@ -30,7 +31,7 @@ class mars_fluid_velocity : public mars_field {
   { return new mars_fluid_velocity(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 
@@ -44,7 +45,7 @@ class mars_magnetic_field : public mars_field {
   { return new mars_magnetic_field(*this); }
   int load(const fio_option_list*);
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 

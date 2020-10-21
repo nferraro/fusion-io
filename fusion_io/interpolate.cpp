@@ -1,3 +1,5 @@
+#include <string.h>
+
 //=====================================================
 // bicubic_interpolation_coeffs
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,67 +71,58 @@ bool bicubic_interpolation_coeffs(const double** x, const int m, const int n,
 bool cubic_interpolation_coeffs(const double* x, const int m, const int i,
 				double* a)
 {
-  int ihermite;
-  double xpi, xpip;
-
-  ihermite = 0;
-  switch(ihermite)
-    {
-    case 0:
-    a[0] = x[i];
-    if(i==0) {
-      a[1] = (-3.*x[i] + 4.*x[i+1] - x[i+2])/2.;
-      a[2] = (    x[i] - 2.*x[i+1] + x[i+2])/2.;
-      a[3] = 0.;
-    } else if(i == m-2) {
-      a[1] = (-2.*x[i-1] - 3.*x[i] + 5.*x[i+1])/6.;
-      a[2] = (    x[i-1] - 2.*x[i]    + x[i+1])/2.;
-      a[3] = (   -x[i-1] + 3.*x[i] - 2.*x[i+1])/6.;
-    } else if(i == m-1) {
-      a[1] = (-x[i-1] + x[i])/3.;
+  a[0] = x[i];
+  if(i==0) {
+    a[1] = (-3.*x[i] + 4.*x[i+1] - x[i+2])/2.;
+    a[2] = (    x[i] - 2.*x[i+1] + x[i+2])/2.;
+    a[3] = 0.;
+  } else if(i == m-2) {
+    a[1] = (-2.*x[i-1] - 3.*x[i] + 5.*x[i+1])/6.;
+    a[2] = (    x[i-1] - 2.*x[i]    + x[i+1])/2.;
+    a[3] = (   -x[i-1] + 3.*x[i] - 2.*x[i+1])/6.;
+  } else if(i == m-1) {
+    a[1] = (-x[i-1] + x[i])/3.;
+    a[2] = ( x[i-1] - x[i])/2.;
+    a[3] = (-x[i-1] + x[i])/6.;
+    /*
+      a[1] = (-x[i-1] + x[i])/4.;
       a[2] = ( x[i-1] - x[i])/2.;
-      a[3] = (-x[i-1] + x[i])/6.;
-      /*
-        a[1] = (-x[i-1] + x[i])/4.;
-        a[2] = ( x[i-1] - x[i])/2.;
-        a[3] = (-x[i-1] + x[i])/4.;
-      */
-    } else {
-      a[1] = (-2.*x[i-1] - 3.*x[i] + 6.*x[i+1] - x[i+2])/6.;
-      a[2] = (    x[i-1] - 2.*x[i]    + x[i+1]         )/2.;
-      a[3] = (   -x[i-1] + 3.*x[i] - 3.*x[i+1] + x[i+2])/6.;
-    }
-    break;
-
-    case 1:
-    a[0] = x[i];
-    if(i==0) {
-      xpip= .5*(x[i+2]-x[i]);
-      a[1] = -2.*x[i] +2.*x[i+1] - xpip;
-      a[2] =     x[i] -   x[i+1] + xpip;
-      a[3] = 0.;
-    } else if(i == m-1) {
-      xpi = .5*(x[i+1]-x[i-1]);
-      xpip=    (x[i+1]-x[i]);
-      a[1] = xpi;
-      a[2] = -.5*x[i+1] + 2.0*x[i] - 2.5*x[i-1] +     x[i-2];
-      a[3] =  .5*x[i+1] - 1.5*x[i] + 1.5*x[i-1] - 0.5*x[i-2];
-    } else if(i == m) {
-      xpi = .5*(x[i+1]-x[i-1]);
-      xpip=     x[i] - x[i-1];
-      a[1] = xpip;
-      a[2] = -.5*x[i] + 2.0*x[i-1] - 2.5*x[i-2] +     x[i-3];
-      a[3] =  .5*x[i] - 1.5*x[i-1] + 1.5*x[i-2] - 0.5*x[i-3];
-    } else {
-      xpi = .5*(x[i+1]-x[i-1]);
-      xpip= .5*(x[i+2]-x[i]);
-      a[1] = xpi;
-      a[2] = -3*x[i] +3*x[i+1] - 2*xpi - xpip;
-      a[3] =  2*x[i] -2*x[i+1] +   xpi + xpip;
-    }
-    }
+      a[3] = (-x[i-1] + x[i])/4.;
+    */
+  } else {
+    a[1] = (-2.*x[i-1] - 3.*x[i] + 6.*x[i+1] - x[i+2])/6.;
+    a[2] = (    x[i-1] - 2.*x[i]    + x[i+1]         )/2.;
+    a[3] = (   -x[i-1] + 3.*x[i] - 3.*x[i+1] + x[i+2])/6.;
+  }
+ 
   return true;
 }
+
+bool cubic_interpolation_coeffs_cyc(const double* x, const int m, const int i,
+				double* a)
+{
+  a[0] = x[i];
+  if(i==0) {
+    a[1] = (-2.*x[m-1] - 3.*x[i] + 6.*x[i+1] - x[i+2])/6.;
+    a[2] = (    x[m-1] - 2.*x[i]    + x[i+1]         )/2.;
+    a[3] = (   -x[m-1] + 3.*x[i] - 3.*x[i+1] + x[i+2])/6.;
+  } else if(i == m-2) {
+    a[1] = (-2.*x[i-1] - 3.*x[i] + 6.*x[i+1] - x[0])/6.;
+    a[2] = (    x[i-1] - 2.*x[i]    + x[i+1]       )/2.;
+    a[3] = (   -x[i-1] + 3.*x[i] - 3.*x[i+1] + x[0])/6.;
+  } else if(i == m-1) {
+    a[1] = (-2.*x[i-1] - 3.*x[i] + 6.*x[0] - x[1])/6.;
+    a[2] = (    x[i-1] - 2.*x[i]    + x[0]       )/2.;
+    a[3] = (   -x[i-1] + 3.*x[i] - 3.*x[0] + x[1])/6.;
+  } else {
+    a[1] = (-2.*x[i-1] - 3.*x[i] + 6.*x[i+1] - x[i+2])/6.;
+    a[2] = (    x[i-1] - 2.*x[i]    + x[i+1]         )/2.;
+    a[3] = (   -x[i-1] + 3.*x[i] - 3.*x[i+1] + x[i+2])/6.;
+  }
+ 
+  return true;
+}
+
 
 //=====================================================
 // cubic_interpolation
@@ -139,7 +132,7 @@ bool cubic_interpolation_coeffs(const double* x, const int m, const int i,
 // where f and p are arrays of length m
 //=====================================================
 bool cubic_interpolation(const int m, const double* p, const double p0, 
-			 const double* f, double* f0)
+			 const double* f, double* f0, bool cyc=false)
 {
   double a[4];
   int i, iguess;
@@ -201,7 +194,12 @@ bool cubic_interpolation(const int m, const double* p, const double p0,
   if(i < 0) i = 0;
   if(i > m-1) i = m-1;
 
-  bool result = cubic_interpolation_coeffs(f,m,i,a);
+  bool result;
+  if(cyc) {
+    result = cubic_interpolation_coeffs_cyc(f,m,i,a);
+  } else {
+    result = cubic_interpolation_coeffs(f,m,i,a);
+  }
   if(!result) return false;
 
   if(i >= m-1) {
@@ -210,5 +208,42 @@ bool cubic_interpolation(const int m, const double* p, const double p0,
     dp = (p0-p[i])/(p[i+1]-p[i]);
     *f0 = a[0] + (a[1] + (a[2] + a[3]*dp)*dp)*dp;
   }
+  return true;
+}
+
+
+// shift array so that index s becomes index 0
+bool shift_array(const int m, double* x, const int s)
+{
+  if(s >= m || s < 0) return false;
+
+  double* tmp = new double[m];
+
+  for(int i=0; i<m-s; i++)
+      tmp[i] = x[i+s];
+
+  for(int i=m-s; i<m; i++)
+      tmp[i] = x[i+s-m];
+
+  memcpy(x, tmp, m*sizeof(double));
+
+  delete[] tmp;
+
+  return true;
+}
+
+
+// reverse elements of array
+bool reverse_array(const int m, double* x)
+{
+  double* tmp = new double[m];
+
+  for(int i=0; i<m; i++)
+      tmp[i] = x[m-i-1];
+
+  memcpy(x, tmp, m*sizeof(double));
+
+  delete[] tmp;
+
   return true;
 }

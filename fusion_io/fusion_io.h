@@ -3,6 +3,7 @@
 
 #include "fusion_io_defs.h"
 #include "fusion_io_species.h"
+#include "fusion_io_series.h"
 #include "fusion_io_source.h"
 #include "fusion_io_field.h"
 #include "fio_operations.h"
@@ -15,7 +16,11 @@
 #include "m3dc1_field.h"
 #include "mars_source.h"
 #include "mars_field.h"
+#include "gpec_source.h"
+#include "gpec_field.h"
 #include "fusion_io_c.h"
+#include "interpolate.h"
+#include "isosurface.h"
 
 #include <string>
 

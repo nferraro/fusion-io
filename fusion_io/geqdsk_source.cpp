@@ -38,20 +38,22 @@ int geqdsk_source::open(const char* filename)
   }
 
   double rdim, zdim, rcentr;
-  double simag, sibry, bcentr, current;
+  double bcentr, current;
     
   for(int i=0; i<5; i++) gfile >> dum;
-  gfile >> nw >> nh;
-  gfile >> rdim >> zdim >> rcentr >> rleft >> zmid;
-  gfile >> rmaxis >> zmaxis >> simag >> sibry >> bcentr;
-  gfile >> current >> simag >> dum >> rmaxis >> dum;
-  gfile >> zmaxis >> dum >> sibry >> dum >> dum;
+  gfile >> std::setw(16) >> nw >> nh;
+  gfile >> std::setw(16) >> rdim >> zdim >> rcentr >> rleft >> zmid;
+  gfile >> std::setw(16) >> rmaxis >> zmaxis >> simag >> sibry >> bcentr;
+  gfile >> std::setw(16) >> current >> simag >> dum >> rmaxis >> dum;
+  gfile >> std::setw(16) >> zmaxis >> dum >> sibry >> dum >> dum;
+  zbottom = zmid - zdim/2.;
 
   std::cout << "nw = " << nw << ", nh = " << nh << std::endl;
   std::cout << "rmaxis = " << rmaxis << ", zmaxis = " << zmaxis << std::endl;
   std::cout << "rleft = " << rleft << ", zmid = " << zmid << std::endl;
   std::cout << "rdim = " << rdim << ", zdim = " << zdim << std::endl;
   std::cout << "simag = " << simag << std::endl;
+  std::cout << "dum = " << dum << std::endl;
 
   psirz = new double*[nh];
   for(int i=0; i<nh; i++)
@@ -64,7 +66,7 @@ int geqdsk_source::open(const char* filename)
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> press[i];
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> ffprime[i];
   for(int i=0; i<nw; i++) gfile >> std::setw(16) >> dum;      // pprime
-  for(int i=0; i<nh; i++) 
+  for(int i=0; i<nh; i++)
     for(int j=0; j<nw; j++)
       gfile >> std::setw(16) >> psirz[i][j];
 
@@ -115,8 +117,8 @@ int geqdsk_source::extent(double* r0, double* r1, double* z0, double* z1)
 {
   *r0 = rleft;
   *r1 = rleft + dx*(double)(nw-1);
-  *z0 = zmid - dz*(double)((nh-1)/2);
-  *z1 = zmid + dz*(double)((nh-1)/2);
+  *z0 = zbottom;
+  *z1 = zbottom + dz*(double)(nh-1);
 
   return FIO_SUCCESS;
 }
@@ -133,6 +135,8 @@ int geqdsk_source::get_available_fields(fio_field_list* fields) const
   fields->clear();
   fields->push_back(FIO_CURRENT_DENSITY);
   fields->push_back(FIO_MAGNETIC_FIELD);
+  fields->push_back(FIO_POLOIDAL_FLUX);
+  fields->push_back(FIO_POLOIDAL_FLUX_NORM);
   fields->push_back(FIO_TOTAL_PRESSURE);
 
   return FIO_SUCCESS;
@@ -141,29 +145,62 @@ int geqdsk_source::get_available_fields(fio_field_list* fields) const
 int geqdsk_source::get_field(const field_type t,fio_field** f,
 			     const fio_option_list* opt)
 {
-  *f = 0;
-  fio_field* mf;
-
   switch(t) {
   case(FIO_CURRENT_DENSITY):
-    mf = new geqdsk_current_density(this);
+    *f = new geqdsk_current_density(this);
     break;
 
   case(FIO_MAGNETIC_FIELD):
-    mf = new geqdsk_magnetic_field(this);
+    *f = new geqdsk_magnetic_field(this);
+    break;
+
+  case(FIO_POLOIDAL_FLUX):
+    *f = new geqdsk_psi_field(this, 2.*M_PI);
+    break;
+
+  case(FIO_POLOIDAL_FLUX_NORM):
+    *f = new geqdsk_psi_field(this, 1./(sibry-simag), simag);
     break;
 
   case(FIO_TOTAL_PRESSURE):
-    mf = new geqdsk_pressure_field(this);
+    *f = new geqdsk_pressure_field(this);
     break;
 
   default:
+    *f = 0;
     return FIO_UNSUPPORTED;
   };
  
-  *f = mf;
   return FIO_SUCCESS;
 }
+
+int geqdsk_source::get_series(const series_type t,fio_series** s)
+{
+  switch(t) {
+  case(FIO_MAGAXIS_PSI):
+    *s = new fio_scalar_series(simag);
+    break;
+
+  case(FIO_LCFS_PSI):
+    *s = new fio_scalar_series(sibry);
+    break;
+
+  case(FIO_MAGAXIS_R):
+    *s = new fio_scalar_series(rmaxis);
+    break;
+
+  case(FIO_MAGAXIS_Z):
+    *s = new fio_scalar_series(zmaxis);
+    break;
+
+  default:
+    *s = 0;
+    return FIO_UNSUPPORTED;
+  };
+
+  return FIO_SUCCESS;
+}
+
 
 int geqdsk_source::interpolate_psi(const double r0, const double z0,
 				   double* si) const
@@ -171,15 +208,10 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
   double a[4][4];
 
   double p = (r0-rleft)/dx;
-  double q = (z0-zmid)/dz + (double)nh/2.;
+  double q = (z0-zbottom)/dz;
   int i = (int)p;
   int j = (int)q;
 
-  if(i < 1 || i > nw) return FIO_OUT_OF_BOUNDS;
-  if(j < 1 || j > nh) return FIO_OUT_OF_BOUNDS;
-
-  // convert i, j to fortran indices
-  i++; j++; p++; q++;
   bool result = 
     bicubic_interpolation_coeffs((const double**)psirz,nh,nw,q,p,a);
 
@@ -187,7 +219,7 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
     return FIO_OUT_OF_BOUNDS;
 
   for(int n=0; n<6; n++)
-    si[i] = 0.;
+    si[n] = 0.;
 
   double temp;
   for(int n=0; n<4; n++) {
@@ -210,6 +242,6 @@ int geqdsk_source::interpolate_psi(const double r0, const double z0,
       si[5] += temp/(dz*dz);
     }
   }
-  
+
   return FIO_SUCCESS;
 }

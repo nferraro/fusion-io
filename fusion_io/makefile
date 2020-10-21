@@ -27,9 +27,11 @@ DLIB = libfusionio.so
 OBJS = 	interpolate.o \
 	options.o \
 	fusion_io_species.o \
+	fusion_io_series.o \
 	fusion_io_field.o \
 	fio_operations.o \
 	compound_field.o \
+	isosurface.o \
 	m3dc1_source.o \
 	m3dc1_field.o \
 	mars_source.o \
@@ -38,9 +40,10 @@ OBJS = 	interpolate.o \
 	geqdsk_field.o \
 	gato_source.o \
 	gato_field.o \
+	gpec_source.o \
+	gpec_field.o \
 	fusion_io.o \
 	c_interface.o \
-	fortran_interface.o \
 	fusion_io_fortran.o
 
 PUSH_LIB = libfio_push.a
@@ -72,12 +75,13 @@ python : fio_setup.py python_interface.cpp
 install :
 	mkdir -p $(FIO_INSTALL_DIR)/lib
 	-cp $(LIB) $(DLIB) $(FIO_INSTALL_DIR)/lib
+	-cp $(SRCDIR)/fpy.py $(FIO_INSTALL_DIR)/lib/
 	mkdir -p $(FIO_INSTALL_DIR)/include/
 	cp $(SRCDIR)/fusion_io_defs.h $(FIO_INSTALL_DIR)/include/
 	cp $(SRCDIR)/fusion_io_c.h $(FIO_INSTALL_DIR)/include/
 	mkdir -p $(FIO_INSTALL_DIR)/include
 	-cp *.mod $(FIO_INSTALL_DIR)/include
-	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py.so $(FIO_INSTALL_DIR)/lib
+	-cp $(SRCDIR)/_$(FIO_ARCH)/build/lib.*/fio_py*.so $(FIO_INSTALL_DIR)/lib/fio_py.so
 	mkdir -p $(FIO_INSTALL_DIR)/modules
 	-cp $(SRCDIR)/fusion-io.module $(FIO_INSTALL_DIR)/modules/fusion-io
 	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io

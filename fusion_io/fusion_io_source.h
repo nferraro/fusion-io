@@ -2,6 +2,7 @@
 #define FUSION_IO_SOURCE_H
 
 #include "fusion_io_species.h"
+#include "fusion_io_series.h"
 #include "fusion_io_field.h"
 #include "options.h"
 
@@ -20,6 +21,13 @@ class fio_source {
     { }
   virtual int open(const char*) = 0;
   virtual int close() = 0;
+
+  virtual int sizeof_search_hint() const
+  { return 0; }
+  virtual int allocate_search_hint(fio_hint* s)
+  { *s = 0; return FIO_UNSUPPORTED; }
+  virtual int deallocate_search_hint(fio_hint* s)
+  { return FIO_SUCCESS; };
 
   virtual int get_field_options(fio_option_list*) const = 0;
   virtual int get_field(const field_type, fio_field**, const fio_option_list*)
@@ -40,6 +48,11 @@ class fio_source {
     case FIO_PERIOD:      *p = 2.*M_PI;      return FIO_SUCCESS;
     default:                                 return FIO_UNSUPPORTED; 
     }
+  }
+  virtual int get_slice_time(const int slice, double* t)
+  {
+    *t = 0.;
+    return FIO_UNSUPPORTED;
   }
 };
 

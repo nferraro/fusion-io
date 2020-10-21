@@ -1,7 +1,9 @@
 #include "trace_integrator.h"
-#include "m3dc1_source.h"
-#include "geqdsk_source.h"
-#include "diiid_coils.h"
+
+#include <fusion_io_source.h>
+#include <m3dc1_source.h>
+#include <geqdsk_source.h>
+#include <gpec_source.h>
 
 #include <iostream>
 #include <fstream>
@@ -69,11 +71,6 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  if(!tracer.load()) {
-    std::cerr << " Error loading tracer" << std::endl;
-    return 1;
-  }
-
   double R_axis, Z_axis;
   tracer.center(&R_axis, &Z_axis);
 
@@ -83,7 +80,7 @@ int main(int argc, char* argv[])
   if(!R0_set) R0 = R_axis;
   if(!Z0_set) Z0 = Z_axis;
 
-  if(dR0<=0.) dR0 = dR;
+  if(dR0==0.) dR0 = dR;
 
   print_parameters();
 
@@ -241,7 +238,6 @@ int main(int argc, char* argv[])
   }
   time_t t2 = time(0);
   std::cerr << "Computation completed in " << t2 - t1 << " s." << std::endl;
-
   
   // assemble and write data
   // ~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,7 +263,6 @@ int main(int argc, char* argv[])
     gather(my_q_mean, total_q_mean);
     gather(my_phase, total_phase);
   }
-
   /*
   MPI_Gatherv(my_r, local_surfaces[rank], MPI_DOUBLE, 
 	      total_r, local_surfaces, offset, MPI_DOUBLE, 
@@ -328,7 +323,6 @@ int main(int argc, char* argv[])
   std::cerr << "===============================\n" 
 	    << "Poincare computation complete.\n"
 	    << "To view Poincare plot, use 'gnuplot gplot'" << std::endl;
-
   MPI_Finalize();
 
   return 0;
@@ -340,7 +334,7 @@ void delete_sources()
   i = tracer.sources.begin();
 
   while(i != tracer.sources.end()) {
-    delete *i;
+    i->free();
     i++;
   }
 }
@@ -348,9 +342,9 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 18;
+  const int num_opts = 19;
   std::string arg_list[num_opts] = 
-    { "-geqdsk", "-m3dc1", "-diiid-i",
+    { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0", 
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
@@ -414,7 +408,7 @@ void gather(const double* in, double* out)
 {
   double* buf = new double[surfaces];
 
-  MPI_Gatherv(in, local_surfaces[rank], MPI_DOUBLE, 
+  MPI_Gatherv((void*)in, local_surfaces[rank], MPI_DOUBLE, 
 	      buf, local_surfaces, offset, MPI_DOUBLE, 
 	      0, MPI_COMM_WORLD); 
 
@@ -434,22 +428,146 @@ void gather(const double* in, double* out)
   delete[] buf;
 }
 
+bool create_source(const int type, const int argc, const std::string argv[]) 
+{
+  trace_source src;
+  fio_option_list fopt;
+  fio_series* magaxis[2];
+  int result;
+  double slice_time = 0.;
+
+  switch(type) {
+  case(FIO_M3DC1_SOURCE):
+    src.source = new m3dc1_source();
+    if(argc>=1) {
+      result = src.source->open(argv[0].c_str());
+    } else {
+      result = src.source->open("C1.h5");
+    }
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error opening file" << std::endl;
+      src.free();
+      return false;
+    };
+    // set options for fields obtained from this source
+    src.source->get_field_options(&fopt);
+    fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
+    if(argc<2) fopt.set_option(FIO_TIMESLICE,-1);  // default to timeslice=-1
+    break;
+
+  case(FIO_GEQDSK_SOURCE):
+    src.source = new geqdsk_source();
+    if(argc>=1) {
+      if((result = src.source->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	src.free();
+	return false;
+      };
+    } else {
+      std::cerr << "Filename must be provided for geqdsk files." << std::endl;
+      src.free();
+      return false;
+    }
+    src.source->get_field_options(&fopt);
+    break;
+
+  case(FIO_GPEC_SOURCE):
+    src.source = new gpec_source();
+    if(argc>=1) {
+      if((result = src.source->open(argv[0].c_str())) != FIO_SUCCESS) {
+	std::cerr << "Error opening file" << std::endl;
+	src.free();
+	return false;
+      };
+    } else {
+      std::cerr << "Directory must be provided for gpec files." << std::endl;
+      src.free();
+      return false;
+    }
+    src.source->get_field_options(&fopt);
+    break;
+
+  default:
+    return false;
+  }
+
+  if(argc>=2) {
+    int timeslice = atoi(argv[1].c_str());
+    std::cerr << "Time slice " << timeslice << std::endl;
+    fopt.set_option(FIO_TIMESLICE, timeslice);
+    if(src.source->get_slice_time(timeslice, &slice_time)==FIO_SUCCESS) {
+      std::cerr << "Slice time = " << slice_time << std::endl;
+    }
+  }
+  if(argc>=3) fopt.set_option(FIO_LINEAR_SCALE, atof(argv[2].c_str()));
+  if(argc>=4) fopt.set_option(FIO_PHASE, atof(argv[3].c_str())*M_PI/180.);
+
+  // Read magnetic field
+  result = src.source->get_field(FIO_MAGNETIC_FIELD, &src.field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error reading magnetic field" << std::endl;
+    src.free();
+    return false;
+  };
+
+  // Read Psi_Norm field
+  fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
+  result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Warning: couldn't open psi_norm field" << std::endl;
+  };
+  
+  // Allocate search hint
+  result = src.source->allocate_search_hint(&src.hint);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Warning: couldn't allocate search hint" << std::endl;
+  }
+
+  // Find magnetic axis
+  if((result = src.source->get_series(FIO_MAGAXIS_R, &magaxis[0])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't load MAGAXIS_R" << std::endl;
+    src.free();
+    return false;
+  }
+  if((result = src.source->get_series(FIO_MAGAXIS_Z, &magaxis[1])) != FIO_SUCCESS) {
+    std::cerr << "Couldn't load MAGAXIS_Z" << std::endl;
+    src.free();
+    return false;
+  }
+  if((result = magaxis[0]->eval(slice_time, &src.magaxis[0])) != FIO_SUCCESS)
+    {
+      std::cerr << "Couldn't evaluate MAGAXIS_R" << std::endl;
+      src.free();
+      return false;
+    }
+  if((result = magaxis[1]->eval(slice_time, &src.magaxis[1])) != FIO_SUCCESS)
+    {
+      std::cerr << "Couldn't evaluate MAGAXIS_Z" << std::endl;
+      src.free();
+      return false;
+    }
+  delete(magaxis[0]);
+  delete(magaxis[1]);
+
+
+  // Add source to list
+  tracer.sources.push_back(src);
+    
+  return true;
+}
+
 bool process_line(const std::string& opt, const int argc, const std::string argv[])
 {
   bool argc_err = false;
 
   if(opt=="-m3dc1") {
-    m3dc1_source* s = new m3dc1_source();
-    if(argc>=1) s->filename = argv[0];
-    if(argc>=2) s->time = atoi(argv[1].c_str());
-    if(argc>=3) s->factor = atof(argv[2].c_str());
-    if(argc>=4) s->shift = atof(argv[3].c_str())*M_PI/180.;
-    tracer.sources.push_back(s);
+    return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-geqdsk") {
-    geqdsk_source* s = new geqdsk_source();
-    if(argc>=1) s->filename = argv[0];
-    tracer.sources.push_back(s);
+    return create_source(FIO_GEQDSK_SOURCE, argc, argv);
+  } else if(opt=="-gpec") {
+    return create_source(FIO_GPEC_SOURCE, argc, argv);
   } else if(opt=="-diiid-i") {
+    /*
     coil_source* s = new coil_source();
     double current;
     int n;
@@ -459,6 +577,7 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     if(argc>=3) phase = atof(argv[2].c_str());   else phase = 0.;
     diiid_icoils(s, current, n, 0., phase);
     tracer.sources.push_back(s);
+    */
   } else if(opt=="-dR") {
     if(argc==1) dR = atof(argv[0].c_str());
     else argc_err = true;

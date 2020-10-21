@@ -26,11 +26,12 @@ program fio_example
   real :: p(1), ne(1), ni(1), b(3), x(3), curr(3), curr2(3), db(9)
 
   integer, parameter :: ifile = 22
-  integer, parameter :: npts = 10
+  integer, parameter :: npts = 40
   real :: R0, R1, Z0, Z1, phi0, phi1, period, tmin, tmax, time
   integer :: i, j, cs, ntime, ierr
+  type(fio_search_hint) :: hint
 
-  filename_m3dc1 = 'C1.h5'
+  filename_m3dc1 = 'data/m3dc1/C1.h5'
 
   ! read files and fields
   print *, 'Reading ', trim(filename_m3dc1)
@@ -115,28 +116,37 @@ program fio_example
 !!$  call fio_get_field_f(isrc_gato, FIO_MAGNETIC_FIELD, imag_gato, ierr);
 !!$  call fio_get_field_f(isrc_gato, FIO_TOTAL_PRESSURE, ipres_gato, ierr);
 
-  ! open mars file
+!!$  ! open mars file
 !!$  filename_mars = ''
 !!$  call fio_open_source_f(FIO_MARS_SOURCE,trim(filename_mars),isrc_mars,ierr)
 !!$  if(ierr.ne.FIO_SUCCESS) then
 !!$     print *, 'Error reading MARS source'
 !!$     goto 100
 !!$  end if
+!!$
+!!$  call fio_get_options_f(isrc_mars, ierr)
+!!$  call fio_set_int_option_f(FIO_PART, FIO_PERTURBED_ONLY, ierr)
+!!$
 !!$  call fio_get_field_f(isrc_mars, FIO_MAGNETIC_FIELD, imag_mars, ierr);
 !!$  if(ierr.ne.FIO_SUCCESS) then
 !!$     print *, 'Error reading MARS magnetic field'
 !!$     goto 100
-!!$  end if
+!!$  end if 
 
 !!$  x(1) = 1.02
 !!$  x(2) = 0.
 !!$  x(3) = 0.05
+!!$  print *, 'Evaluating field'
 !!$  call fio_eval_field_f(imag_mars, x, b, ierr)
+!!$  print *, 'Done. ierr = ', ierr
 
-  R0 = 0.9;
-  R1 = 1.1;
-  Z0 = -0.1;
-  Z1 =  0.1;
+  ! initialize hint
+  call fio_allocate_search_hint_f(isrc, hint, ierr)
+
+  R0 = 0.4;
+  R1 = 2.4;
+  Z0 = -1.0;
+  Z1 =  1.0;
   phi0 = 0.;
   phi1 = 0.;
 
@@ -151,17 +161,17 @@ program fio_example
 !        write(*, '("(",3F12.4,"):")') x
 
 !!$        call fio_eval_field_f(imag_mars, x, b, ierr)
-!!$!        write(*, '("        efit b = ", 1p3E12.4)') b
+!        write(*, '("        efit b = ", 1p3E12.4)') b
 !!$     
 !!$        write(ifile, '(6e14.5)') x(1), x(3), x(2), b(1), b(3), b(2)
-
-     call fio_eval_field_f(ipres, x, p, ierr)
-     call fio_eval_field_f(ine, x, ne, ierr)
-     call fio_eval_field_f(ini, x, ni, ierr)
-     call fio_eval_field_f(imag, x, b, ierr)
-     call fio_eval_field_f(ij, x, curr, ierr)
-     call fio_eval_field_deriv_f(imag, x, db, ierr)
 !!$
+     call fio_eval_field_f(ipres, x, p, ierr, hint=hint)
+     call fio_eval_field_f(ine, x, ne, ierr, hint=hint)
+     call fio_eval_field_f(ini, x, ni, ierr, hint=hint)
+     call fio_eval_field_f(imag, x, b, ierr, hint=hint)
+     call fio_eval_field_f(ij, x, curr, ierr, hint=hint)
+     call fio_eval_field_deriv_f(imag, x, db, ierr, hint=hint)
+
      write(*, '("        pressure = ",1pE12.4)') p
      write(*, '("        electron density = ",1pE12.4)') ne
      write(*, '("        ion density = ",1pE12.4)') ni
@@ -189,12 +199,15 @@ program fio_example
 !!$     write(*, '("        gato press = ", 1pE12.4)') p
 !!$     write(*, '("        gato b = ", 1p3E12.4)') b
      end do
+
 !!$     write(ifile, *)
   end do
 
 !!$  close(ifile)
 
 100 continue 
+
+  call fio_deallocate_search_hint_f(isrc, hint, ierr)
 
   call fio_close_field_f(ine, ierr)
   call fio_close_field_f(ini, ierr)

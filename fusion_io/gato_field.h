@@ -15,7 +15,7 @@ class gato_field : public fio_field {
     { }
 
   virtual int dimension() const = 0;
-  virtual int eval(const double*, double*) = 0;
+  virtual int eval(const double*, double*, void* =0) = 0;
 };
 
 class gato_magnetic_field : public gato_field {
@@ -25,7 +25,7 @@ class gato_magnetic_field : public gato_field {
   gato_magnetic_field* clone() const 
   { return new gato_magnetic_field(*this); }
   int dimension() const { return 3; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 class gato_pressure_field : public gato_field {
@@ -35,7 +35,7 @@ class gato_pressure_field : public gato_field {
   gato_pressure_field* clone() const 
   { return new gato_pressure_field(*this); }
   int dimension() const { return 1; }
-  int eval(const double*, double*);
+  int eval(const double*, double*, void* =0);
 };
 
 

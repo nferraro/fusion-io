@@ -38,6 +38,11 @@ int fio_species::charge() const
   return protons - electrons;
 }
 
+int fio_species::atomic_number() const
+{
+  return protons;
+}
+
 int fio_species::mass() const
 {
   return nucleons;

@@ -35,10 +35,10 @@ examples : example example_c example_fortran example_push
 push : $(EXAMPLE_PUSH_BIN)
 
 example : example.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_c : example_c.o
-	$(CC) $(LDFLAGS) $< $(LIBS) -o $@
+	$(CXX) $(LDFLAGS) $< $(LIBS) -o $@
 
 example_fortran : example_fortran.o
 	$(F90) $(LDFLAGS) $< $(LIBS) -o $@
@@ -46,20 +46,30 @@ example_fortran : example_fortran.o
 example_push : example_push.o
 	$(F90) $(LDFLAGS) $< -lfio_push $(LIBS) -o $@
 
+korc_example : main.cpp #korc_example.cpp
+	mpicxx $< -std=c++11 $(INCLUDE) $(LIBS) -o $@
+
 exmk :
 	echo FIO_DIR=$(FIO_INSTALL_DIR) > $@
 	cat $(FIO_ROOT)/install/make.inc.$(FIO_ARCH) >> $@
 	cat $(FIO_ROOT)/examples/example.mk >> $@
 	cat $(FIO_ROOT)/install/common_footer.mk >> $@
 
+.PHONE: setup_data
+setup_data : 
+	tar xvfz $(FIO_ROOT)/examples/data/mars/mars_data.tar.gz -C $(FIO_ROOT)/examples/data/mars
+	gunzip -c $(FIO_ROOT)/examples/data/gato/diagnostics.dat.gz > $(FIO_ROOT)/examples/data/gato/diagnostics.dat
+
 .PHONY: install
-install: exmk
+install : exmk setup_data
 	mkdir -m 755 -p $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example.cpp $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_fortran.f90 $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_c.c $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_python.py $(FIO_INSTALL_DIR)/examples
+	cp $(SRCDIR)/python_fpy_example.py $(FIO_INSTALL_DIR)/examples
 	cp $(SRCDIR)/example_push.f90 $(FIO_INSTALL_DIR)/examples
+	cp -r $(SRCDIR)/data $(FIO_INSTALL_DIR)/examples
 	cp exmk $(FIO_INSTALL_DIR)/examples/makefile
 	rm exmk
 

@@ -1,0 +1,10 @@
+_*
+*~
+*.out
+*.aux
+*.dvi
+*.log
+*.pdf
+*.toc
+examples/out*
+examples/gplot*

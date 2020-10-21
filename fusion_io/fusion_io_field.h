@@ -6,15 +6,7 @@
 
 typedef int field_attribute;
 typedef int field_parameter;
-
-class fio_series {
- public:
-  virtual ~fio_series()
-    { }
-
-  virtual int eval(const double, double*) = 0;
-  virtual int bounds(double*, double*) const = 0;
-};
+typedef void* fio_hint;
 
 class fio_field {
  public:
@@ -23,10 +15,10 @@ class fio_field {
 
   virtual fio_field* clone() const = 0;
   virtual int dimension() const = 0;
-  virtual int eval(const double*, double*) = 0;
+  virtual int eval(const double*, double*, fio_hint =0) = 0;
 
   // partial derivatives (first index = partial deriv, second index = coord)
-  virtual int eval_deriv(const double*, double*)
+  virtual int eval_deriv(const double*, double*, fio_hint =0)
   {  return FIO_UNSUPPORTED; }
 
   virtual int get_real_parameter(const field_parameter, double*)
@@ -34,6 +26,9 @@ class fio_field {
 
   fio_field& operator+(const fio_field&);
   fio_field& operator*(const fio_field&);
+
+  int find_val_on_line(const double, const double*, const double*, 
+		       double*, fio_hint =0, const double=1e-4);
 };
 
 #endif
