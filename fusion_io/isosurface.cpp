@@ -585,7 +585,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
 int fio_geom_isosurface(fio_field* f, const double val, const double* guess,
 			const double* axis, const double tol,
 			const double max_step,
-			const double nphi, const double ntheta, 
+			const int nphi, const int ntheta, 
 			double*** path, fio_hint h=0)
 {
   const double toroidal_period = 2.*M_PI; // TODO: generalize this
