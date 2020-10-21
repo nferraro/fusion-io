@@ -15,7 +15,7 @@ LDFLAGS =
 
 LDD = $(CXX) --shared -fPIC
 
-LIBS =
+LIBS = -lstdc++
 
 HDF5_LIBS = -L${HDF5_DIR}/lib -lhdf5 -lz
 HDF5_INCLUDE = -I${HDF5_DIR}/include 
