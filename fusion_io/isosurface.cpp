@@ -641,8 +641,8 @@ int fio_geom_isosurface(fio_field* f, const double val, const double* guess,
 }
 
 
-// fio_gridify_surface
-// ~~~~~~~~~~~~~~~~~~~
+// fio_gridify_loop
+// ~~~~~~~~~~~~~~~~
 // interpolates a path in (R, Z) onto a points regularly spaced in the
 // geometric angle.
 //
