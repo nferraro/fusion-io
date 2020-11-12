@@ -1,0 +1,25 @@
+CC = mpicc
+CXX = mpicxx
+
+CFLAGS = -fPIC -Wall -O
+
+F90 = mpiifort
+F90FLAGS = -r8 -warn all -fPIC -xMIC-AVX512 -O
+
+PYTHON = python
+
+ARCH = ar cr
+
+LD = $(CXX)
+LDFLAGS = 
+
+LDD = $(CXX) --shared -fPIC
+
+LIBS =
+
+HDF5_LIBS = -L/project/projectdirs/mp288/carl/hdf5-1.8.18/lib -lhdf5
+HDF5_INCLUDE = -I/project/projectdirs/mp288/carl/hdf5-1.8.18/include
+
+LAPACK =  -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+
+INCLUDE =

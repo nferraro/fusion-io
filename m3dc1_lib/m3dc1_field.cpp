@@ -121,6 +121,10 @@ bool m3dc1_complex_field::eval(const double r, const double phi,
   m3dc1_get_op new_op = (m3dc1_get_op)(op - (op & GET_PVAL) 
 				       - (op & GET_PPVAL));
 
+  // GET_PVAL and GET_PPVAL require GET_VAL also being set.
+  if(((op & GET_PVAL) == GET_PVAL) || ((op & GET_PPVAL) == GET_PPVAL))
+    new_op = (m3dc1_get_op)(new_op | GET_VAL);
+
   double val_r[OP_NUM];
   double val_i[OP_NUM];
   double* temp;
@@ -170,6 +174,9 @@ bool m3dc1_3d_field::eval(const double r, const double phi, const double z,
   double xi, zi, eta, temp, co2, sn2, cosn;
   double v[6];
   int e;
+  bool getval = ((op & GET_VAL) == GET_VAL)
+    || ((op & GET_PVAL) == GET_PVAL)
+    || ((op & GET_PPVAL) == GET_PPVAL);
 
   int guess = (element ? *element : -1);
 
@@ -188,7 +195,7 @@ bool m3dc1_3d_field::eval(const double r, const double phi, const double z,
   int j = e*nbasis*tbasis;
   for(int q=0; q<tbasis; q++) {
     for(int p=0; p<nbasis; p++) {      
-      if((op & GET_VAL) == GET_VAL) {
+      if(getval) {
 	temp = data[j]*pow(xi,mi[p])*pow(eta,ni[p]);
 	v[OP_1] = temp;
       }
@@ -236,9 +243,7 @@ bool m3dc1_3d_field::eval(const double r, const double phi, const double z,
 
       if((op & GET_PVAL) == GET_PVAL) {
 	temp = pow(zi, li[q]-1)*li[q];
-	if((op & GET_VAL) == GET_VAL) {
-	  val[OP_DP  ] += v[OP_1  ]*temp;
-	}
+	val[OP_DP  ] += v[OP_1  ]*temp;
 	if((op & GET_DVAL) == GET_DVAL) {
 	  val[OP_DRP ] += v[OP_DR ]*temp;
 	  val[OP_DZP ] += v[OP_DZ ]*temp;
@@ -252,9 +257,7 @@ bool m3dc1_3d_field::eval(const double r, const double phi, const double z,
 
       if((op & GET_PPVAL) == GET_PPVAL) {
 	temp = pow(zi, li[q]-2)*li[q]*(li[q]-1);
-	if((op & GET_VAL) == GET_VAL) {
-	  val[OP_DPP  ] += v[OP_1  ]*temp;
-	}
+	val[OP_DPP  ] += v[OP_1  ]*temp;
 	if((op & GET_DVAL) == GET_DVAL) {
 	  val[OP_DRPP ] += v[OP_DR ]*temp;
 	  val[OP_DZPP ] += v[OP_DZ ]*temp;
