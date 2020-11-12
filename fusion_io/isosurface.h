@@ -19,7 +19,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 int fio_geom_isosurface(fio_field* f, const double val, const double* guess,
 			   const double* axis, const double tol,
 			   const double max_step,
-			   const double nphi, const double ntheta, 
+			   const int nphi, const int ntheta, 
 			   double*** path, fio_hint h=0);
 int fio_gridify_surface(const int m0, double** path0, const double* axis, 
 			const int nphi, const int ntheta, 
