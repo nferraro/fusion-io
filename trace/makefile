@@ -24,11 +24,14 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 	-I$(FIO_ROOT)/m3dc1_lib \
 	$(HDF5_INCLUDE) $(INCLUDE)
 
-OBJS = trace_integrator.o
+OBJS = trace_integrator.o trace_integrator_s.o
 
-all : trace plot_dr
+all : trace plot_dr trace_s
 
 trace : main.o libtrace.a
+	$(LD) $(LDFLAGS) $< -L. -ltrace $(LIBS) -o $@
+
+trace_s : main_s.o libtrace.a
 	$(LD) $(LDFLAGS) $< -L. -ltrace $(LIBS) -o $@
 
 plot_dr : plot_dr.o
@@ -37,9 +40,9 @@ plot_dr : plot_dr.o
 libtrace.a : $(OBJS)
 	$(ARCH) $@ $(OBJS) 
 
-install : trace plot_dr
+install : trace plot_dr trace_s
 	mkdir -p $(FIO_INSTALL_DIR)/bin
-	cp plot_dr trace $(FIO_INSTALL_DIR)/bin/
+	cp plot_dr trace trace_s $(FIO_INSTALL_DIR)/bin/
 
 include $(FIO_ROOT)/install/common_footer.mk
 

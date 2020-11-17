@@ -155,7 +155,8 @@ int m3dc1_scalar_field::eval(const double* x, double* v, void* s)
 int m3dc1_scalar_field::eval_deriv(const double* x, double* v, void* s)
 {
   const m3dc1_field::m3dc1_get_op get = (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
+    (m3dc1_field::GET_VAL |
+     m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
 
   double val[m3dc1_field::OP_NUM];
 
