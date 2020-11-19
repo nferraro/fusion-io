@@ -578,7 +578,11 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
   i1 = source->file.load_field("I", time);
   if(!i1) return 1;
   if(use_f) {
-    f1 = source->file.load_field("f", time);
+    if(source->ifprime==0) {
+      f1 = source->file.load_field("f", time);
+    } else {
+      f1 = source->file.load_field("fp", time);
+    }
     if(!f1) return 1;
   }
 
@@ -595,7 +599,11 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
     ix = source->file.load_field("I_ext", time);
     if(!ix) return 1;
     if(use_f) {
-      fx = source->file.load_field("f_ext", time);
+      if(source->ifprime==0) {
+        fx = source->file.load_field("f_ext", time);
+      } else {
+        fx = source->file.load_field("fp_ext", time);
+      }
       if(!fx) return 1;
     }
   }
@@ -694,24 +702,29 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, void* s)
     if((source->igeometry==1)) {
       fr = (zy*val[m3dc1_field::OP_DR]-zx*val[m3dc1_field::OP_DZ])/dd;
       fz = (rx*val[m3dc1_field::OP_DZ]-ry*val[m3dc1_field::OP_DR])/dd;
-      frr = (zy*zy*val[m3dc1_field::OP_DRR] + zx*zx*val[m3dc1_field::OP_DZZ]
-            - 2*zx*zy*val[m3dc1_field::OP_DRZ] - gg*fr
-            + (zy*zxy - zx*zyy)*val[m3dc1_field::OP_DR]
-            + (zx*zxy - zy*zxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
-      fzz = (ry*ry*val[m3dc1_field::OP_DRR] + rx*rx*val[m3dc1_field::OP_DZZ]
-            - 2*rx*ry*val[m3dc1_field::OP_DRZ] - ff*fz
-            + (ry*rxy - rx*ryy)*val[m3dc1_field::OP_DR]
-            + (rx*rxy - ry*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
-      frz = (-zy*ry*val[m3dc1_field::OP_DRR] - zx*rx*val[m3dc1_field::OP_DZZ]
-            + (rx*zy + ry*zx)*val[m3dc1_field::OP_DRZ] - gg*fz
-            - (zy*rxy - zx*ryy)*val[m3dc1_field::OP_DR]
-            - (zx*rxy - zy*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
-      v[0] -= ((zy*val[m3dc1_field::OP_DRP]-zx*val[m3dc1_field::OP_DZP])/dd 
-             + (zyz*val[m3dc1_field::OP_DR]-zxz*val[m3dc1_field::OP_DZ])/dd
-             - rz*frr - zz*frz - (ddz/dd)*fr)*linfac;
-      v[2] -= ((rx*val[m3dc1_field::OP_DZP]-ry*val[m3dc1_field::OP_DRP])/dd 
-             + (rxz*val[m3dc1_field::OP_DZ]-ryz*val[m3dc1_field::OP_DR])/dd
-             - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
+      if(source->ifprime==1) {
+        v[0] -= linfac*fr;
+        v[2] -= linfac*fz;
+      } else {
+        frr = (zy*zy*val[m3dc1_field::OP_DRR] + zx*zx*val[m3dc1_field::OP_DZZ]
+              - 2*zx*zy*val[m3dc1_field::OP_DRZ] - gg*fr
+              + (zy*zxy - zx*zyy)*val[m3dc1_field::OP_DR]
+              + (zx*zxy - zy*zxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+        fzz = (ry*ry*val[m3dc1_field::OP_DRR] + rx*rx*val[m3dc1_field::OP_DZZ]
+              - 2*rx*ry*val[m3dc1_field::OP_DRZ] - ff*fz
+              + (ry*rxy - rx*ryy)*val[m3dc1_field::OP_DR]
+              + (rx*rxy - ry*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+        frz = (-zy*ry*val[m3dc1_field::OP_DRR] - zx*rx*val[m3dc1_field::OP_DZZ]
+              + (rx*zy + ry*zx)*val[m3dc1_field::OP_DRZ] - gg*fz
+              - (zy*rxy - zx*ryy)*val[m3dc1_field::OP_DR]
+              - (zx*rxy - zy*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+        v[0] -= ((zy*val[m3dc1_field::OP_DRP]-zx*val[m3dc1_field::OP_DZP])/dd 
+               + (zyz*val[m3dc1_field::OP_DR]-zxz*val[m3dc1_field::OP_DZ])/dd
+               - rz*frr - zz*frz - (ddz/dd)*fr)*linfac;
+        v[2] -= ((rx*val[m3dc1_field::OP_DZP]-ry*val[m3dc1_field::OP_DRP])/dd 
+               + (rxz*val[m3dc1_field::OP_DZ]-ryz*val[m3dc1_field::OP_DR])/dd
+               - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
+      }
     } else {
       v[0] -= linfac*val[m3dc1_field::OP_DRP];
       v[2] -= linfac*val[m3dc1_field::OP_DZP];
