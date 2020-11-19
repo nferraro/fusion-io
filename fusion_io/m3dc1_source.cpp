@@ -236,19 +236,34 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     break;
 
   case(FIO_POLOIDAL_FLUX_NORM):
+    int t;
+    double slice_time;
+    opt->get_option(FIO_TIMESLICE, &t);
+    if((result = get_slice_time(t, &slice_time)) != FIO_SUCCESS)
+      break;
+
     if((result = get_series(FIO_MAGAXIS_PSI, &psi0)) != FIO_SUCCESS)
       break;
     if((result = get_series(FIO_LCFS_PSI,    &psi1)) != FIO_SUCCESS)
       break;
-    if((result = psi0->eval(0, &psi0_val)) != FIO_SUCCESS)
+    if((result = psi0->eval(slice_time, &psi0_val)) != FIO_SUCCESS)
        break;
-    if((result = psi1->eval(0, &psi1_val)) != FIO_SUCCESS)
+    if((result = psi1->eval(slice_time, &psi1_val)) != FIO_SUCCESS)
        break;
     delete(psi0);
     delete(psi1);
+
+    double offset;
+    int part;
+    opt->get_option(FIO_PART, &part);
+    if(part==FIO_PERTURBED_ONLY) {
+      offset = 0.;
+    } else {
+      offset = psi0_val;
+    }
     mf = new m3dc1_scalar_field(this, "psi",
 				1./(psi1_val - psi0_val), 
-				psi0_val);
+				offset);
     if(s!=0) unneeded_species = true;
     break;
 
@@ -361,5 +376,14 @@ int m3dc1_source::get_series(const series_type t,fio_series** s)
     delete(ms);
   }
   return result;
+}
+
+int m3dc1_source::get_slice_time(const int slice, double* time)
+{
+  if(!file.get_slice_time(slice, time)) {
+    return FIO_OUT_OF_BOUNDS;
+  }
+  *time *= t0;
+  return FIO_SUCCESS;
 }
 

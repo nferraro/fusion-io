@@ -19,6 +19,8 @@
 #include "gpec_source.h"
 #include "gpec_field.h"
 #include "fusion_io_c.h"
+#include "interpolate.h"
+#include "isosurface.h"
 
 #include <string>
 

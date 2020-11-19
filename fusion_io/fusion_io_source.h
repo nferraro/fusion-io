@@ -24,9 +24,9 @@ class fio_source {
 
   virtual int sizeof_search_hint() const
   { return 0; }
-  virtual int allocate_search_hint(void** s)
+  virtual int allocate_search_hint(fio_hint* s)
   { *s = 0; return FIO_UNSUPPORTED; }
-  virtual int deallocate_search_hint(void** s)
+  virtual int deallocate_search_hint(fio_hint* s)
   { return FIO_SUCCESS; };
 
   virtual int get_field_options(fio_option_list*) const = 0;
@@ -48,6 +48,11 @@ class fio_source {
     case FIO_PERIOD:      *p = 2.*M_PI;      return FIO_SUCCESS;
     default:                                 return FIO_UNSUPPORTED; 
     }
+  }
+  virtual int get_slice_time(const int slice, double* t)
+  {
+    *t = 0.;
+    return FIO_UNSUPPORTED;
   }
 };
 

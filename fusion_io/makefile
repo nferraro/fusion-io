@@ -31,6 +31,7 @@ OBJS = 	interpolate.o \
 	fusion_io_field.o \
 	fio_operations.o \
 	compound_field.o \
+	isosurface.o \
 	m3dc1_source.o \
 	m3dc1_field.o \
 	mars_source.o \
