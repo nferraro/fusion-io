@@ -115,20 +115,21 @@ class sim_data:
                 'Please feel free to add to my functionality and add to the sim_data library!')
 
         # Dictionary contains the field abbreviation, the type of field, and the species
-        self.typedict = {'j' : ('current density',  'vector',  None ),
-                         'ni': ('density',          'scalar', 'main ion'),
-                         'ne': ('density',          'scalar', 'electron'),
-                         'v' : ('fluid velocity',   'vector',  None ),
-                         'B' : ('magnetic field',   'vector',  None ),
-                         'p' : ('total pressure',   'scalar',  None ),
-                         'pi': ('pressure',         'scalar', 'main ion'),
-                         'pe': ('pressure',         'scalar', 'electron'),
-                         'alpha': ('alpha',         'scalar', None),
-                         'ti': ('temperature',      'scalar', 'main ion'),
-                         'te': ('temperature',      'scalar', 'electron'),
-                         'A' : ('vector potential', 'vector',  None ),
-                         'gradA' : ('grad vector potential', 'tensor',  None ),
-                         'E' : ('electric field',   'vector',  None )}
+        self.typedict = {'j' : ('current density',  'vector',  None , 'simple'),
+                         'ni': ('density',          'scalar', 'main ion' , 'simple'),
+                         'ne': ('density',          'scalar', 'electron' , 'simple'),
+                         'v' : ('fluid velocity',   'vector',  None , 'simple'),
+                         'B' : ('magnetic field',   'vector',  None , 'simple'),
+                         'p' : ('total pressure',   'scalar',  None , 'simple'),
+                         'pi': ('pressure',         'scalar', 'main ion' , 'simple'),
+                         'pe': ('pressure',         'scalar', 'electron' , 'simple'),
+                         'alpha': ('alpha',         'scalar', None , 'simple'),
+                         'ti': ('temperature',      'scalar', 'main ion' , 'simple'),
+                         'te': ('temperature',      'scalar', 'electron' , 'simple'),
+                         'A' : ('vector potential', 'vector',  None , 'simple'),
+                         'gradA' : ('grad vector potential', 'tensor',  None , 'simple'),
+                         'E' : ('electric field',   'vector',  None , 'simple'),
+                         'psi' : ('psi',   'scalar',  None , 'composite')}
         self.available_fields = self.typedict
         self._all_attrs       = h5py.File(filename, 'r')
         self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
@@ -422,7 +423,7 @@ class flux_coordinates:
     """
     Class that represents a flux surface coordinate system, e.g. PEST, Boozer or Hamada coordinates.
     """
-    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin):
+    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin,points):
         """
         Initializes the flux_coordinates.
         """
@@ -454,3 +455,4 @@ class flux_coordinates:
         self.r0 = r0
         self.current = current
         self.dpsi_dchi = dpsi_dpsin
+        self.points = points
