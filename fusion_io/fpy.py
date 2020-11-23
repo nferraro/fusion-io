@@ -280,7 +280,7 @@ class sim_data:
         def evaluate(self, x):
             """
             Evaluates the required field, returns a one-tuple (scalar quantity required)
-            or a three-tuple (vector) evaluated at the location x
+            or a three-tuple (vector) or a nine-tuple (tensor) evaluated at the location x
 
             Arguments:
 
@@ -302,6 +302,29 @@ class sim_data:
                     return (fio_py.eval_scalar_field(self._ifield, x, self.sim_data.hint),)
                 except:
                     return (None,)
+            else:
+                print('ftype not recognized!')
+        
+        def evaluate_deriv(self, x):
+            """
+            Evaluates the derivative of the required field, returns a three-tuple (scalar quantity required)
+            or a nine-tuple (vector) evaluated at the location x
+
+            Arguments:
+
+            **x**
+                Three-tuple with the R, phi, z coordinate where the field is to be evaluated.
+            """
+            if self.ftype == 'vector':
+                try:
+                    return fio_py.eval_vector_field_deriv(self._ifield, x, self.sim_data.hint)
+                except:
+                    return (None,None,None)
+            elif self.ftype == 'scalar':
+                try:
+                    return (fio_py.eval_scalar_field_deriv(self._ifield, x, self.sim_data.hint),)
+                except:
+                    return (None,None,None)
             else:
                 print('ftype not recognized!')
 
@@ -359,11 +382,11 @@ class sim_data:
         def __init__(self, sim_data, scalar):
             self.sim_data = sim_data
             self.time      = self.sim_data._all_traces['time'][()]
-            if scalar is not 'bharmonics' and scalar is not 'keharmonics':
+            if scalar != 'bharmonics' and scalar != 'keharmonics':
                 self.values    = self.sim_data._all_traces[scalar][()]
-            if scalar is 'bharmonics':
+            if scalar == 'bharmonics':
                 self.values    = self.sim_data._all_attrs['bharmonics/bharmonics'][()]
-            if scalar is 'keharmonics':
+            if scalar == 'keharmonics':
                 self.values    = self.sim_data._all_attrs['keharmonics/keharmonics'][()]
 
     class diagnostic:
