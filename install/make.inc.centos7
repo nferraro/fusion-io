@@ -11,7 +11,7 @@ LDFLAGS =
 ARCH = ar cr
 LDD = $(CXX) --shared
 
-PYTHON = python
+PYTHON = python3
 
 LAPACK = -llapack
 
