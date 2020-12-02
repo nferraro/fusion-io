@@ -88,6 +88,11 @@ install :
 #	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
 #	$(PYTHON) $(SRCDIR)/fio_setup.py install
 
+.PHONY: conda_install
+	ARCHFLAGS='$(LIBS)' CXX='$(CXX)' CC='$(CXX)' \
+	CFLAGS='$(CFLAGS) $(INCLUDE) $(LIBS)' \
+	$(PYTHON) $< install $(PYFLAGS)
+
 include $(FIO_ROOT)/install/common_footer.mk
 
 endif
