@@ -12,6 +12,7 @@
 import fio_py
 import numpy as np
 import h5py
+import os
 
 class sim_data:
     """
@@ -219,7 +220,7 @@ class sim_data:
 
         return self.field(self, field=self.typedict[field][0], time=time, species=self.typedict[field][2], ftype=self.typedict[field][1])
 
-    def get_mesh(self, time=0):
+    def get_mesh(self, file_name='C1.h5', time=0):
         """
         Returns a mesh object.
 
@@ -228,7 +229,7 @@ class sim_data:
         **time**
             Timeslice for field to be read out
         """
-        return self.mesh(self, time)
+        return self.mesh(self, file_name, time)
 
     def get_signal(self,filename,signame):
         """
@@ -334,21 +335,26 @@ class sim_data:
         and stores the elements in an array. It also reads the output version and nplanes.
         The latter variable is needed for plotting 3D meshes.
         """
-        def __init__(self, sim_data, time=0):
+        def __init__(self, sim_data, file_name='C1.h5', time=0):
             self.sim_data = sim_data
             fio_py.set_int_option(fio_py.FIO_TIMESLICE, int(time))
             itype  = sim_data._available_fields['magnetic field']
             #'magnetic field' is just used as a dummy field to read time
             self.time = fio_py.get_real_field_parameter(fio_py.get_field(sim_data._isrc, itype), fio_py.FIO_TIME)
-            self.elements, self.version, self.nplanes = self.read_mesh(sim_data, time)
+            self.elements, self.version, self.nplanes = self.read_mesh(sim_data, file_name, time)
 
-        def read_mesh(self, sim_data, time):
+        def read_mesh(self, sim_data, file_name, time):
+            path = file_name.split('/')
+            if len(path)>1:
+                fname = '/'.join(path[:-1])+'/'
+            else:
+                fname = ''
             self.sim_data = sim_data
             timestr = str(time)
             if timestr == '-1':
-                fname = 'equilibrium.h5'
+                fname = fname+"equilibrium.h5"
             else:
-                fname = "time_"+timestr.zfill(3)+'.h5'
+                fname = fname+"time_"+timestr.zfill(3)+".h5"
             f     = h5py.File(fname, 'r')
             mesh  = np.asarray(f['mesh/elements'])
 
