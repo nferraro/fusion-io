@@ -67,6 +67,7 @@ $(PUSH_LIB) : $(PUSH_OBJS)
 	$(ARCH) $@ $(PUSH_OBJS)
 
 python : fio_setup.py python_interface.cpp
+	cp $(SRCDIR)/fpy.py $(SRCDIR)/_$(FIO_ARCH)
 	ARCHFLAGS='$(LIBS)' CXX='$(CXX)' CC='$(CXX)' \
 	CFLAGS='$(CFLAGS) $(INCLUDE) $(LIBS)' \
 	$(PYTHON) $< build $(PYFLAGS)
@@ -85,8 +86,13 @@ install :
 	mkdir -p $(FIO_INSTALL_DIR)/modules
 	-cp $(SRCDIR)/fusion-io.module $(FIO_INSTALL_DIR)/modules/fusion-io
 	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io
-#	CFLAGS='$(CFLAGS)' ARCHFLAGS='$(LIBS)' \
-#	$(PYTHON) $(SRCDIR)/fio_setup.py install
+
+.PHONY: conda_install
+conda_install : fio_setup.py python_interface.cpp
+	cp $(SRCDIR)/fpy.py $(SRCDIR)/_$(FIO_ARCH)
+	ARCHFLAGS='$(LIBS)' CXX='$(CXX)' CC='$(CXX)' \
+	CFLAGS='$(CFLAGS) $(INCLUDE) $(LIBS)' \
+	$(PYTHON) $< install $(PYFLAGS) --user
 
 include $(FIO_ROOT)/install/common_footer.mk
 
