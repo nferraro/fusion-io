@@ -191,7 +191,7 @@ class sim_data:
         trace.time
         trace.values
         """
-        return self.time_trace(self,scalar,ipellet=ipellet)
+        return self.time_trace(scalar,sim_data=self,ipellet=ipellet)
 
     def get_diagnostic(self, diagnostic):
         """
@@ -386,17 +386,145 @@ class sim_data:
         time_trace class: init routine calls read_scalars() that reads all possible scalars
         from the C1.h5 file.
         """
-        def __init__(self, sim_data, scalar, ipellet=None):
-            self.sim_data = sim_data
-            self.time = np.asarray(self.sim_data._all_traces['time'])
-            if scalar in ['bharmonics','keharmonics']:
-                self.values = np.asarray(self.sim_data._all_attrs['%s/%s'%(scalar,scalar)])
-            elif 'pellet/%s'%scalar in self.sim_data._all_attrs:
-                self.values = np.asarray(self.sim_data._all_attrs['pellet/%s'%scalar])
-                if ipellet is not None:
-                    self.values = self.values[:,ipellet]
+        def __init__(self, scalar, time=None, sim_data=None, ipellet=None):
+            if (time is None) and (sim_data is None):
+                raise ValueError('time or sim_data must not be None')
+
+            if time is None:
+                time = np.asarray(sim_data._all_traces['time'])
+
+            if isinstance(scalar,str):
+                if scalar in ['bharmonics','keharmonics']:
+                    values = np.asarray(sim_data._all_attrs['%s/%s'%(scalar,scalar)])
+                elif 'pellet/%s'%scalar in sim_data._all_attrs:
+                    values = np.asarray(sim_data._all_attrs['pellet/%s'%scalar])
+                    if ipellet is not None:
+                        values = values[:,ipellet]
+                else:
+                    values = np.asarray(sim_data._all_traces[scalar])
             else:
-                self.values = np.asarray(self.sim_data._all_traces[scalar])
+                values = np.asarray(scalar)
+
+            if len(time) != len(values):
+                raise ValueError('time_trace time and values are different lengths')
+            else:
+                self.time = time
+                self.values = values
+
+        # Addition
+        def __add__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values + other.values
+            else:
+                values = self.values + other
+            return sim_data.time_trace(values,time=self.time)
+
+        __radd__ = __add__
+
+        def __iadd__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values + other.values
+            else:
+                self.values = self.values + other
+            return self
+
+        # Subtraction
+        def __sub__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values - other.values
+            else:
+                values = self.values - other
+            return sim_data.time_trace(values,time=self.time)
+
+        def __rsub__(self,other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = other.values - self.values
+            else:
+                values = other - self.values
+            return sim_data.time_trace(values,time=self.time)
+
+        def __isub__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values - other.values
+            else:
+                self.values = self.values - other
+            return self
+
+        # Multiplication
+        def __mul__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values*other.values
+            else:
+                values = self.values*other
+            return sim_data.time_trace(values,time=self.time)
+
+        __rmul__ = __mul__
+
+        def __imul__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values*other.values
+            else:
+                self.values = self.values*other
+            return self
+
+        # Division
+        def __truediv__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values/other.values
+            else:
+                values = self.values/other
+            return sim_data.time_trace(values,time=self.time)
+
+        def __rtruediv__(self,other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = other.values/self.values
+            else:
+                values = other/self.values
+            return sim_data.time_trace(values,time=self.time)
+
+        def __itruediv__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values/other.values
+            else:
+                self.values = self.values/other
+            return self
+
+        # Exponetiation
+        def __pow__(self, other):
+            return sim_data.time_trace(self.values**other,time=self.time)
+
+        #__rpow__ is intentionally NotImplemented
+
+        def __ipow__(self, other):
+            self.values = self.values**other
+            return self
+
+        def __abs__(self):
+            return sim_data.time_trace(abs(self.values),time=self.time)
+        def __pos__(self):
+            return sim_data.time_trace(+self.values,time=self.time)
+        def __neg__(self):
+            return sim_data.time_trace(-self.values,time=self.time)
 
     class diagnostic:
         def __init__(self, sim_data, diagnostic):
