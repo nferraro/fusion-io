@@ -361,7 +361,11 @@ class sim_data:
             f = self.sim_data._all_attrs
             mesh  = np.asarray(f[group+'/mesh/elements'])
 
-            version = f[group].attrs["version"]
+            if "version" in f[group].attrs:
+                version = f[group].attrs["version"]
+            else:
+                version = self.sim_data.get_constants().version
+
             nplanes= f[group+'/mesh'].attrs["nplanes"]
 
             if not self._quiet:
