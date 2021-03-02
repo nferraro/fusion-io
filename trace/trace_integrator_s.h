@@ -58,7 +58,7 @@ struct trace_source {
 typedef std::deque<trace_source> trace_source_list;
 
 class trace_integrator_s {
-  double R, Phi, Z;
+  double R, Phi, Z, Zp;
 
   double dr[4], dz[4];
   bool reverse;

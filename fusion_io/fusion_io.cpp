@@ -99,6 +99,7 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_RSTELLA):           *s = "rst";              break;
   case(FIO_ZSTELLA):           *s = "zst";              break;
   case(FIO_JPHI):              *s = "jphi";             break;
+  case(FIO_FPRIME):            *s = "fp";               break;
   case(FIO_WALL_DIST):         *s = "wall distance";    break;
   default:
     *s = "Unnamed field";

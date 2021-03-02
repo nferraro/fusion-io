@@ -268,6 +268,7 @@ bool trace_integrator::integrate(int transits, int steps_per_transit,
   }
 
   if(data) {
+    std::cerr << data->poloidal_transits << " pol. transits" << std::endl;
     double denom = data->poloidal_transits 
       + (double)steps_since_pol_transit/avg_steps_per_pol_transit;
     data->q = (double)data->toroidal_transits/denom;

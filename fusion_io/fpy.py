@@ -124,6 +124,7 @@ class sim_data:
                          'rst': ('rst',             'scalar',  None ),
                          'zst': ('zst',             'scalar',  None ),
                          'jphi': ('jphi',           'scalar',  None ),
+                         'fp': ('fp',               'scalar',  None ),
                          'wall_dist': ('wall distance', 'scalar',  None ),
                          'pi': ('pressure',         'scalar', 'main ion'),
                          'pe': ('pressure',         'scalar', 'electron'),

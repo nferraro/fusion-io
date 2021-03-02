@@ -122,6 +122,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_ELECTRIC_FIELD);
   fields->push_back(FIO_WALL_DIST);
   fields->push_back(FIO_JPHI);
+  fields->push_back(FIO_FPRIME);
   if (igeometry==1) {
     fields->push_back(FIO_RSTELLA);
     fields->push_back(FIO_ZSTELLA);
@@ -297,7 +298,12 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     if(s!=0) unneeded_species = true;
     break;
 
-  case(FIO_RSTELLA):
+  case(FIO_FPRIME):
+    mf = new m3dc1_scalar_field(this, "fp", L0);
+    if(s!=0) unneeded_species = true;
+    break;
+ 
+ case(FIO_RSTELLA):
     if (igeometry==1) {
       mf = new m3dc1_scalar_field(this, "rst", L0);
     } else {

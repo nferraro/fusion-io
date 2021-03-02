@@ -178,6 +178,17 @@ bool trace_integrator_s::set_pos(const double r,const double phi,const double z)
   Phi = phi;
   Z = z;
 
+  double z0, x[3] = {R, Phi, Z};
+  Zp = 0;
+  trace_source_list::iterator i = sources.begin();
+
+  while(i != sources.end()) {
+    int result = i->zst->eval(x, &z0, i->hint);
+    if(result != FIO_SUCCESS)
+      return false;
+    Zp += z0;
+    i++;
+  }
   return true;
 }
 
@@ -212,7 +223,7 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
 {
   double dphi;
   bool plot, result;
-  int i, k=0;
+  int i, k=0, iresult;
   int steps = transits*steps_per_transit + 1;
   bool ptrans, add = false;
   double avg_steps_per_pol_transit;
@@ -251,6 +262,7 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
     double last_R = R;
     double last_Phi = Phi;
     double last_Z = Z;
+    double last_Zp = Zp;
     double pl;
 
     // if Phi will pass through the plotting plane on this step, plot intercept
@@ -306,6 +318,17 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
 	data->toroidal_transits++;
       }
 
+      double zz0, xx[3] = {R, Phi, Z};
+      Zp = 0;
+      trace_source_list::iterator m = sources.begin();
+      while(m != sources.end()) {
+        iresult = m->zst->eval(xx, &zz0, m->hint);
+        if(iresult != FIO_SUCCESS)
+          return false;
+        Zp += zz0;
+        m++;
+      }
+
       // count poloidal transits
       ptrans = false;
       if     (last_Z < Z0 && Z >= Z0) ptrans = true;
@@ -343,12 +366,12 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
       double x[3] = {R_plot, pl, Z_plot};
 
       while(i != sources.end()) {
-        result = i->rst->eval(x, &r0, i->hint);
-        if(result != FIO_SUCCESS)
+        iresult = i->rst->eval(x, &r0, i->hint);
+        if(iresult != FIO_SUCCESS)
           return false;
         Rout += r0;
-        result = i->zst->eval(x, &z0, i->hint);
-        if(result != FIO_SUCCESS)
+        iresult = i->zst->eval(x, &z0, i->hint);
+        if(iresult != FIO_SUCCESS)
           return false;
         Zout += z0;
         i++;
@@ -373,6 +396,7 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
   }
 
   if(data) {
+    std::cerr << data->poloidal_transits << " pol. transits" << std::endl;
     double denom = data->poloidal_transits 
       + (double)steps_since_pol_transit/avg_steps_per_pol_transit;
     data->q = (double)data->toroidal_transits/denom;

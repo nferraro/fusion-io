@@ -726,8 +726,13 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
                - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
       }
     } else {
-      v[0] -= linfac*val[m3dc1_field::OP_DRP];
-      v[2] -= linfac*val[m3dc1_field::OP_DZP];
+      if(source->ifprime==1) {
+        v[0] -= linfac*val[m3dc1_field::OP_DR];
+        v[2] -= linfac*val[m3dc1_field::OP_DZ];
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DRP];
+        v[2] -= linfac*val[m3dc1_field::OP_DZP];
+      }
     }
   }
 
@@ -758,8 +763,13 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      v[0] -= linfac*val[m3dc1_field::OP_DRP];
-      v[1] -= linfac*val[m3dc1_field::OP_DZP];
+      if(source->ifprime==1) {
+        v[0] -= linfac*val[m3dc1_field::OP_DR];
+        v[2] -= linfac*val[m3dc1_field::OP_DZ];
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DRP];
+        v[1] -= linfac*val[m3dc1_field::OP_DZP];
+      }
     }
   }
 
@@ -919,7 +929,11 @@ int m3dc1_current_density::load(const fio_option_list* opt)
   i1 = source->file.load_field("I", time);
   if(!i1) return 1;
   if(use_f) {
-    f1 = source->file.load_field("f", time);
+    if(source->ifprime==0) {
+      f1 = source->file.load_field("f", time);
+    } else {
+      f1 = source->file.load_field("fp", time);
+    }
     if(!f1) return 1;
   }
 
@@ -936,7 +950,11 @@ int m3dc1_current_density::load(const fio_option_list* opt)
     ix = source->file.load_field("I_ext", time);
     if(!ix) return 1;
     if(use_f) {
-      fx = source->file.load_field("f_ext", time);
+      if(source->ifprime==0) {
+        fx = source->file.load_field("f_ext", time);
+      } else {
+        fx = source->file.load_field("fp_ext", time);
+      }
       if(!fx) return 1;
     }
   }
@@ -981,9 +999,13 @@ int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
   if(use_f) {
     if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
-
-    v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
-    v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+    if(source->ifprime==0) {
+      v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
+      v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+    } else {
+      v[0] -= linfac*val[m3dc1_field::OP_DZP]/r;
+      v[2] += linfac*val[m3dc1_field::OP_DRP]/r;
+    }
   }
 
   if(eqsub) {
@@ -1019,8 +1041,13 @@ int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
-      v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+      if(source->ifprime==0) {
+        v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
+        v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DZP]/r;
+        v[2] += linfac*val[m3dc1_field::OP_DRP]/r;
+      }
     }
   }
 

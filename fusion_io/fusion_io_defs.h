@@ -38,6 +38,7 @@ FIO_DEFINE_INT(FIO_WALL_DIST,         6)
 FIO_DEFINE_INT(FIO_JPHI,              7)
 FIO_DEFINE_INT(FIO_RSTELLA,           8)
 FIO_DEFINE_INT(FIO_ZSTELLA,           9)
+FIO_DEFINE_INT(FIO_FPRIME,           10)
 
 COMMENT(      species-dependent scalar fields      )
 FIO_DEFINE_INT(FIO_PRESSURE,          101)
