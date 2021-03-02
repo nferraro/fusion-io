@@ -545,7 +545,11 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
   i1 = source->file.load_field("I", time);
   if(!i1) return 1;
   if(use_f) {
-    f1 = source->file.load_field("f", time);
+    if(source->ifprime==0) {
+      f1 = source->file.load_field("f", time);
+    } else {
+      f1 = source->file.load_field("fp", time);
+    }
     if(!f1) return 1;
   }
 
@@ -562,7 +566,11 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
     ix = source->file.load_field("I_ext", time);
     if(!ix) return 1;
     if(use_f) {
-      fx = source->file.load_field("f_ext", time);
+      if(source->ifprime==0) {
+        fx = source->file.load_field("f_ext", time);
+      } else {
+        fx = source->file.load_field("fp_ext", time);
+      }
       if(!fx) return 1;
     }
   }
@@ -605,8 +613,13 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
     if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
 
-    v[0] -= linfac*val[m3dc1_field::OP_DRP];
-    v[2] -= linfac*val[m3dc1_field::OP_DZP];
+    if(source->ifprime==0) {
+      v[0] -= linfac*val[m3dc1_field::OP_DRP];
+      v[2] -= linfac*val[m3dc1_field::OP_DZP];
+    } else {
+      v[0] -= linfac*val[m3dc1_field::OP_DR];
+      v[2] -= linfac*val[m3dc1_field::OP_DZ];
+    }
   }
 
   if(eqsub) {
@@ -636,8 +649,13 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      v[0] -= linfac*val[m3dc1_field::OP_DRP];
-      v[1] -= linfac*val[m3dc1_field::OP_DZP];
+      if(source->ifprime==0) {
+        v[0] -= linfac*val[m3dc1_field::OP_DRP];
+        v[2] -= linfac*val[m3dc1_field::OP_DZP];
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DR];
+        v[2] -= linfac*val[m3dc1_field::OP_DZ];
+      }
     }
   }
 
@@ -696,13 +714,23 @@ int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, fio_hint s)
     if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
 
-    v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRRP];
-    v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRPP];
-    v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZP];
+    if(source->ifprime==0) {
+      v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRRP];
+      v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRPP];
+      v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZP];
 
-    v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZP];
-    v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZPP];
-    v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZP];
+      v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZP];
+      v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZPP];
+      v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZP];
+    } else {
+      v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRR];
+      v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRP];
+      v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZ];
+
+      v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZ];
+      v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZP];
+      v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZ];
+    }
   }
 
   if(eqsub) {
@@ -758,13 +786,23 @@ int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRRP];
-      v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRPP];
-      v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZP];
+      if(source->ifprime==0) {
+        v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRRP];
+        v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRPP];
+        v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZP];
 
-      v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZP];
-      v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZPP];
-      v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZP];
+        v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZP];
+        v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZPP];
+        v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZP];
+      } else {
+        v[FIO_DR_R  ] -= linfac*val[m3dc1_field::OP_DRR];
+        v[FIO_DPHI_R] -= linfac*val[m3dc1_field::OP_DRP];
+        v[FIO_DZ_R  ] -= linfac*val[m3dc1_field::OP_DRZ];
+
+        v[FIO_DR_Z  ] -= linfac*val[m3dc1_field::OP_DRZ];
+        v[FIO_DPHI_Z] -= linfac*val[m3dc1_field::OP_DZP];
+        v[FIO_DZ_Z  ] -= linfac*val[m3dc1_field::OP_DZZ];
+      }
     }
   }
 
@@ -797,7 +835,11 @@ int m3dc1_current_density::load(const fio_option_list* opt)
   i1 = source->file.load_field("I", time);
   if(!i1) return 1;
   if(use_f) {
-    f1 = source->file.load_field("f", time);
+    if(source->ifprime==0) {
+      f1 = source->file.load_field("f", time);
+    } else {
+      f1 = source->file.load_field("fp", time);
+    }
     if(!f1) return 1;
   }
 
@@ -814,7 +856,11 @@ int m3dc1_current_density::load(const fio_option_list* opt)
     ix = source->file.load_field("I_ext", time);
     if(!ix) return 1;
     if(use_f) {
-      fx = source->file.load_field("f_ext", time);
+      if(source->ifprime==0) {
+        fx = source->file.load_field("f_ext", time);
+      } else {
+        fx = source->file.load_field("fp_ext", time);
+      }
       if(!fx) return 1;
     }
   }
@@ -860,8 +906,13 @@ int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
     if(!f1->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
 
-    v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
-    v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+    if(source->ifprime==0) {
+      v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
+      v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+    } else {
+      v[0] -= linfac*val[m3dc1_field::OP_DZP]/r;
+      v[2] += linfac*val[m3dc1_field::OP_DRP]/r;
+    }
   }
 
   if(eqsub) {
@@ -897,8 +948,13 @@ int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
-      v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+      if(source->ifprime==0) {
+        v[0] -= linfac*val[m3dc1_field::OP_DZPP]/r;
+        v[2] += linfac*val[m3dc1_field::OP_DRPP]/r;
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DZP]/r;
+        v[2] += linfac*val[m3dc1_field::OP_DRP]/r;
+      }
     }
   }
 
