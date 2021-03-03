@@ -132,12 +132,12 @@ class sim_data:
                          'A' : ('vector potential', 'vector',  None , 'simple'),
                          'gradA' : ('grad vector potential', 'tensor',  None , 'simple'),
                          'E' : ('electric field',   'vector',  None , 'simple'),
-                         'psi' : ('psi',   'scalar',  None , 'composite')}
+                         'psi' : ('psi',   'scalar',  None , 'composite'),
                          'rst': ('rst',             'scalar',  None , 'simple'),
                          'zst': ('zst',             'scalar',  None , 'simple'),
                          'jphi': ('jphi',           'scalar',  None , 'simple'),
                          'fp': ('fp',               'scalar',  None , 'simple'),
-                         'wall_dist': ('wall distance', 'scalar',  None , 'simple'),
+                         'wall_dist': ('wall distance', 'scalar',  None , 'simple')}
         self.available_fields = self.typedict
         self.filename = os.path.abspath(filename)
         self._all_attrs       = h5py.File(self.filename, 'r')

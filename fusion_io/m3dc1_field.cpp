@@ -726,12 +726,13 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
                - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
       }
     } else {
-    if(source->ifprime==0) {
-      v[0] -= linfac*val[m3dc1_field::OP_DRP];
-      v[2] -= linfac*val[m3dc1_field::OP_DZP];
-    } else {
-      v[0] -= linfac*val[m3dc1_field::OP_DR];
-      v[2] -= linfac*val[m3dc1_field::OP_DZ];
+      if(source->ifprime==0) {
+        v[0] -= linfac*val[m3dc1_field::OP_DRP];
+        v[2] -= linfac*val[m3dc1_field::OP_DZP];
+      } else {
+        v[0] -= linfac*val[m3dc1_field::OP_DR];
+        v[2] -= linfac*val[m3dc1_field::OP_DZ];
+      }
     }
   }
 
