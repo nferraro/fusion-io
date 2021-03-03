@@ -5,13 +5,16 @@
 # coded by Christopher Berg Smiet on 18 January 2019
 # Edited by Ralf Mackenbach on the 14th of August 2019
 # Mesh added by Andreas Kleiner on 20 August 2019
+# Edited by Brendan C. Lyons on 9 December 2020
 # csmiet@pppl.gov
 # rmackenb@pppl.gov
 # akleiner@pppl.gov
+# lyonsbc@fusion.gat.com
 
 import fio_py
 import numpy as np
 import h5py
+import os
 
 class sim_data:
     """
@@ -41,7 +44,7 @@ class sim_data:
 
     -- Time traces--
     Time trace objects can be created by, for example,
-    dt = sim.get_time_traces('dt').
+    dt = sim.get_time_trace('dt').
     The object dt then has two attributes:
     dt.time, this is an array of all the times where dt is evaluated
     dt.values, this is an array of all values of dt.
@@ -115,43 +118,41 @@ class sim_data:
                 'Please feel free to add to my functionality and add to the sim_data library!')
 
         # Dictionary contains the field abbreviation, the type of field, and the species
-        self.typedict = {'j' : ('current density',  'vector',  None ),
-                         'ni': ('density',          'scalar', 'main ion'),
-                         'ne': ('density',          'scalar', 'electron'),
-                         'v' : ('fluid velocity',   'vector',  None ),
-                         'B' : ('magnetic field',   'vector',  None ),
-                         'p' : ('total pressure',   'scalar',  None ),
-                         'rst': ('rst',             'scalar',  None ),
-                         'zst': ('zst',             'scalar',  None ),
-                         'jphi': ('jphi',           'scalar',  None ),
-                         'fp': ('fp',               'scalar',  None ),
-                         'wall_dist': ('wall distance', 'scalar',  None ),
-                         'pi': ('pressure',         'scalar', 'main ion'),
-                         'pe': ('pressure',         'scalar', 'electron'),
-                         'alpha': ('alpha',         'scalar', None),
-                         'ti': ('temperature',      'scalar', 'main ion'),
-                         'te': ('temperature',      'scalar', 'electron'),
-                         'A' : ('vector potential', 'vector',  None )}
+        self.typedict = {'j' : ('current density',  'vector',  None , 'simple'),
+                         'ni': ('density',          'scalar', 'main ion' , 'simple'),
+                         'ne': ('density',          'scalar', 'electron' , 'simple'),
+                         'v' : ('fluid velocity',   'vector',  None , 'simple'),
+                         'B' : ('magnetic field',   'vector',  None , 'simple'),
+                         'p' : ('total pressure',   'scalar',  None , 'simple'),
+                         'pi': ('pressure',         'scalar', 'main ion' , 'simple'),
+                         'pe': ('pressure',         'scalar', 'electron' , 'simple'),
+                         'alpha': ('alpha',         'scalar', None , 'simple'),
+                         'ti': ('temperature',      'scalar', 'main ion' , 'simple'),
+                         'te': ('temperature',      'scalar', 'electron' , 'simple'),
+                         'A' : ('vector potential', 'vector',  None , 'simple'),
+                         'gradA' : ('grad vector potential', 'tensor',  None , 'simple'),
+                         'E' : ('electric field',   'vector',  None , 'simple'),
+                         'psi' : ('psi',   'scalar',  None , 'composite')}
+                         'rst': ('rst',             'scalar',  None , 'simple'),
+                         'zst': ('zst',             'scalar',  None , 'simple'),
+                         'jphi': ('jphi',           'scalar',  None , 'simple'),
+                         'fp': ('fp',               'scalar',  None , 'simple'),
+                         'wall_dist': ('wall distance', 'scalar',  None , 'simple'),
         self.available_fields = self.typedict
-        self._all_attrs       = h5py.File(filename, 'r')
-        self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
-        self._all_traces = h5py.File(filename, 'r')['scalars']
+        self.filename = os.path.abspath(filename)
+        self._all_attrs       = h5py.File(self.filename, 'r')
+        self._all_attrs_list  = list(self._all_attrs.keys())
+        self._all_traces = self._all_attrs['scalars']
         self.available_traces = list(self._all_traces.keys())
         self.available_traces.extend(['bharmonics','keharmonics'])
         self.available_diagnostics = ['slice times','timings','iterations']
         self.fields = []
         self.seriess = []
-        self._isrc  = fio_py.open_source(ifiletype, filename)
+        self._isrc  = fio_py.open_source(ifiletype, self.filename)
         self.hint   = fio_py.allocate_hint(self._isrc)
         fio_py.get_options(self._isrc)
-        #self.ntime = fio_py.get_int_parameter(self._isrc, fio_py.FIO_NUM_TIMESLICES)
         self.ntime = self._all_attrs.attrs["ntime"]
-        if time == 'last':
-            time = self.ntime - 1
-            print('last time slice = '+str(time))
-        fio_py.set_int_option(fio_py.FIO_TIMESLICE, int(time))
-        self._imag = fio_py.get_field(self._isrc, fio_py.FIO_MAGNETIC_FIELD)
-        self.fields.append(self._imag)
+        self.set_timeslice(time)
         self._cs = fio_py.get_int_parameter(self._isrc, fio_py.FIO_GEOMETRY)
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
         #available fields is a dictionary from names to assigned integers
@@ -159,11 +160,7 @@ class sim_data:
         self.ntor = fio_py.get_int_parameter(self._isrc, fio_py.FIO_TOROIDAL_MODE)
         self.period = fio_py.get_real_parameter(self._isrc, fio_py.FIO_PERIOD)
         self.fc = None #used to store flux coodinate object upon calculation of flux coordinates (see class definition below and flux_coordinates.py)
-        #if time == -1:
-        #    self.timeslice = int(0)
-        #else:
-        self.timeslice = int(time)
-        self.time = fio_py.get_real_field_parameter(self._imag, fio_py.FIO_TIME)
+
         if verbose:
             print('Available fields:')
             if self._cs == fio_py.FIO_CYLINDRICAL:
@@ -182,7 +179,16 @@ class sim_data:
             fio_py.close_series(iseries)
         fio_py.close_source(self._isrc)
 
-    def get_time_traces(self,scalar):
+    def set_timeslice(self,time):
+        if time == 'last':
+            time = self.ntime - 1
+            print('last time slice = '+str(time))
+        time = int(time)
+        self.timeslice = time
+        fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
+
+
+    def get_time_trace(self,scalar,ipellet=None):
         """
         Makes an object containing a time-array, and an
         array with the correspond values of the physical
@@ -190,7 +196,7 @@ class sim_data:
         trace.time
         trace.values
         """
-        return self.time_traces(self,scalar)
+        return self.time_trace(scalar,sim_data=self,ipellet=ipellet)
 
     def get_diagnostic(self, diagnostic):
         """
@@ -206,7 +212,7 @@ class sim_data:
         """
         return self.diagnostic(self,diagnostic)
 
-    def get_field(self, field, time):
+    def get_field(self, field, time=None):
         """
         Returns a field object.
 
@@ -217,11 +223,12 @@ class sim_data:
 
         **time**
             Timeslice for field to be read out
+            If none, it will read for self.timeslice
         """
 
         return self.field(self, field=self.typedict[field][0], time=time, species=self.typedict[field][2], ftype=self.typedict[field][1])
 
-    def get_mesh(self, time=0):
+    def get_mesh(self, time=None, quiet=False):
         """
         Returns a mesh object.
 
@@ -229,14 +236,15 @@ class sim_data:
 
         **time**
             Timeslice for field to be read out
+            If none, it will read for self.timeslice
         """
-        return self.mesh(self, time)
+        return self.mesh(self, time, quiet=quiet)
 
-    def get_signal(self,filename,signame):
+    def get_signal(self,signame):
         """
         Return a signal object
         """
-        return self.signal(self,filename,signame)
+        return self.signal(self,signame)
 
     def get_constants(self):
         return self.constants(self)
@@ -261,27 +269,28 @@ class sim_data:
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
-        def __init__(self, sim_data, field, time, species, ftype):
+        def __init__(self, sim_data, field, time=None, species=None, ftype='scalar'):
             self.sim_data = sim_data
             self.field = field
-            fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
-            if   species == 'electron':
+            if time is not None:
+                self.sim_data.set_timeslice(time)
+            if species == 'electron':
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_ELECTRON)
             elif species == 'main ion':
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_MAIN_ION)
             itype  = sim_data._available_fields[field]
             self._ifield = fio_py.get_field(sim_data._isrc, itype)
             self.sim_data.fields.append(self._ifield)
-            self.time  = fio_py.get_real_field_parameter(self._ifield, fio_py.FIO_TIME)
             self.ftype = ftype
 
         def __del__(self):
+            self.sim_data.fields.remove(self._ifield)
             fio_py.close_field(self._ifield)
 
         def evaluate(self, x):
             """
             Evaluates the required field, returns a one-tuple (scalar quantity required)
-            or a three-tuple (vector) evaluated at the location x
+            or a three-tuple (vector) or a nine-tuple (tensor) evaluated at the location x
 
             Arguments:
 
@@ -300,6 +309,29 @@ class sim_data:
                     return (None,)
             else:
                 print('ftype not recognized!')
+        
+        def evaluate_deriv(self, x):
+            """
+            Evaluates the derivative of the required field, returns a three-tuple (scalar quantity required)
+            or a nine-tuple (vector) evaluated at the location x
+
+            Arguments:
+
+            **x**
+                Three-tuple with the R, phi, z coordinate where the field is to be evaluated.
+            """
+            if self.ftype == 'vector':
+                try:
+                    return fio_py.eval_vector_field_deriv(self._ifield, x, self.sim_data.hint)
+                except:
+                    return (None,None,None)
+            elif self.ftype == 'scalar':
+                try:
+                    return (fio_py.eval_scalar_field_deriv(self._ifield, x, self.sim_data.hint),)
+                except:
+                    return (None,None,None)
+            else:
+                print('ftype not recognized!')
 
     class mesh:
         """
@@ -307,32 +339,37 @@ class sim_data:
         and stores the elements in an array. It also reads the output version and nplanes.
         The latter variable is needed for plotting 3D meshes.
         """
-        def __init__(self, sim_data, time=0):
+        def __init__(self, sim_data, time=None, quiet=False):
             self.sim_data = sim_data
-            fio_py.set_int_option(fio_py.FIO_TIMESLICE, int(time))
-            itype  = sim_data._available_fields['magnetic field']
-            #'magnetic field' is just used as a dummy field to read time
-            self.time = fio_py.get_real_field_parameter(fio_py.get_field(sim_data._isrc, itype), fio_py.FIO_TIME)
-            self.elements, self.version, self.nplanes = self.read_mesh(sim_data, time)
+            self._quiet = quiet
+            if time is not None:
+                self.sim_data.set_timeslice(time)
+            self.elements, self.version, self.nplanes = self.read_mesh()
 
-        def read_mesh(self, sim_data, time):
-            self.sim_data = sim_data
-            timestr = str(time)
-            if timestr == '-1':
-                fname = 'equilibrium.h5'
+        def __eq__(self, other):
+            return (np.array_equal(self.elements,other.elements) and
+                    (self.version==other.version) and
+                    (self.nplanes==other.nplanes))
+
+        def read_mesh(self):
+            if self.sim_data.timeslice == -1:
+                group = "equilibrium"
             else:
-                fname = "time_"+timestr.zfill(3)+'.h5'
-            f     = h5py.File(fname, 'r')
-            mesh  = np.asarray(f['mesh/elements'])
+                group = "time_%03d"%self.sim_data.timeslice
 
-            version = f.attrs["version"]
-            print('Output version: '+str(version))
+            f = self.sim_data._all_attrs
+            mesh  = np.asarray(f[group+'/mesh/elements'])
 
-            meshshape = mesh.shape
-            print('Mesh shape: '+str(meshshape))
+            if "version" in f[group].attrs:
+                version = f[group].attrs["version"]
+            else:
+                version = self.sim_data.get_constants().version
 
-            dset = f["mesh"]
-            nplanes = dset.attrs["nplanes"]
+            nplanes= f[group+'/mesh'].attrs["nplanes"]
+
+            if not self._quiet:
+                print('Output version: '+str(version))
+                print('Mesh shape: '+str(mesh.shape))
 
             return mesh, version, nplanes
 
@@ -340,27 +377,157 @@ class sim_data:
         """
         Signal class: for diagnostic signals from magnetic probes and flux loops
         """
-        def __init__(self, sim_data, filename, signame):
+        def __init__(self, sim_data, signame):
             self.sim_data = sim_data
-            self._all_attrs       = h5py.File(filename, 'r')
-            self._all_attrs_list  = list(h5py.File(filename, 'r').keys())
-            self.sigvalues = h5py.File(filename, 'r')[signame+'/value']
+            self._all_attrs  = self.sim_data._all_attrs
+            self._all_attrs_list = self.sim_data._all_attrs_list
+            self.sigvalues = np.asarray(self.sim_data[signame+'/value'])
             
 
-    class time_traces:
+    class time_trace:
         """
         time_trace class: init routine calls read_scalars() that reads all possible scalars
         from the C1.h5 file.
         """
-        def __init__(self, sim_data, scalar):
-            self.sim_data = sim_data
-            self.time      = self.sim_data._all_traces['time'][()]
-            if scalar is not 'bharmonics' and scalar is not 'keharmonics':
-                self.values    = self.sim_data._all_traces[scalar][()]
-            if scalar is 'bharmonics':
-                self.values    = self.sim_data._all_attrs['bharmonics/bharmonics'][()]
-            if scalar is 'keharmonics':
-                self.values    = self.sim_data._all_attrs['keharmonics/keharmonics'][()]
+        def __init__(self, scalar, time=None, sim_data=None, ipellet=None):
+            if (time is None) and (sim_data is None):
+                raise ValueError('time or sim_data must not be None')
+
+            if time is None:
+                time = np.asarray(sim_data._all_traces['time'])
+
+            if isinstance(scalar,str):
+                if scalar in ['bharmonics','keharmonics']:
+                    values = np.asarray(sim_data._all_attrs['%s/%s'%(scalar,scalar)])
+                elif 'pellet/%s'%scalar in sim_data._all_attrs:
+                    values = np.asarray(sim_data._all_attrs['pellet/%s'%scalar])
+                    if ipellet is not None:
+                        values = values[:,ipellet]
+                else:
+                    values = np.asarray(sim_data._all_traces[scalar])
+            else:
+                values = np.asarray(scalar)
+
+            if len(time) != len(values):
+                raise ValueError('time_trace time and values are different lengths')
+            else:
+                self.time = time
+                self.values = values
+
+        # Addition
+        def __add__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values + other.values
+            else:
+                values = self.values + other
+            return sim_data.time_trace(values,time=self.time)
+
+        __radd__ = __add__
+
+        def __iadd__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values + other.values
+            else:
+                self.values = self.values + other
+            return self
+
+        # Subtraction
+        def __sub__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values - other.values
+            else:
+                values = self.values - other
+            return sim_data.time_trace(values,time=self.time)
+
+        def __rsub__(self,other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = other.values - self.values
+            else:
+                values = other - self.values
+            return sim_data.time_trace(values,time=self.time)
+
+        def __isub__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values - other.values
+            else:
+                self.values = self.values - other
+            return self
+
+        # Multiplication
+        def __mul__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values*other.values
+            else:
+                values = self.values*other
+            return sim_data.time_trace(values,time=self.time)
+
+        __rmul__ = __mul__
+
+        def __imul__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values*other.values
+            else:
+                self.values = self.values*other
+            return self
+
+        # Division
+        def __truediv__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = self.values/other.values
+            else:
+                values = self.values/other
+            return sim_data.time_trace(values,time=self.time)
+
+        def __rtruediv__(self,other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                values = other.values/self.values
+            else:
+                values = other/self.values
+            return sim_data.time_trace(values,time=self.time)
+
+        def __itruediv__(self, other):
+            if isinstance(other,type(self)):
+                if not np.array_equal(self.time,other.time):
+                    raise ValueError('operands share different .time attributes')
+                self.values = self.values/other.values
+            else:
+                self.values = self.values/other
+            return self
+
+        # Exponetiation
+        def __pow__(self, other):
+            return sim_data.time_trace(self.values**other,time=self.time)
+
+        #__rpow__ is intentionally NotImplemented
+
+        def __ipow__(self, other):
+            self.values = self.values**other
+            return self
+
+        def __abs__(self):
+            return sim_data.time_trace(abs(self.values),time=self.time)
+        def __pos__(self):
+            return sim_data.time_trace(+self.values,time=self.time)
+        def __neg__(self):
+            return sim_data.time_trace(-self.values,time=self.time)
 
     class diagnostic:
         def __init__(self, sim_data, diagnostic):
@@ -369,37 +536,28 @@ class sim_data:
 
             # Case corresponding to knowing the alfven times of the time slices
             if diagnostic == 'slice times':
-                times = []
-                for string in sim_data._all_attrs_list:
-                    if string.startswith('time_') == True:
-                        times.append(string)
-                        times.sort()
-                alfven_times = []
-                for time in times:
+                self.diagnostic = np.arange(sim_data.ntime)
+                self.x_axis = np.zeros(sim_data.ntime)
+                for t in self.diagnostic:
                     # Retrieve the time attribute
-                    alfven_times.append(sim_data._all_attrs[time].attrs['time'])
-
-                for (idx,time) in enumerate(times):
-                    times[idx] = int(time.replace('time_',''))
-
-                self.diagnostic = times
-                self.x_axis     = alfven_times
+                    self.x_axis[t] = sim_data._all_attrs['time_%03d'%t].attrs['time']
 
             # Case corresponding to the timings of each iteration
             # self.diagnostic holds several objects, so you can see a breakdown of the
             # timings as well.
-            # x_axis contains the iteration number
+            # x_axis contains the total time step length
             if diagnostic == 'timings':
-                self.diagnostic = sim_data._all_attrs['timings']
-                self.x_axis     = np.arange(self.diagnostic['t_onestep'].shape[0])+1
+                self.diagnostic = {}
+                for timing in sim_data._all_attrs['timings']:
+                    self.diagnostic[timing] = np.array(sim_data._all_attrs['timings'][timing])
+                self.x_axis = np.arange(self.diagnostic['t_onestep'].shape[0])+1
 
             # Case corresponding to the iterations of each step
             # self.diagnostic is a set of arrays for different iterations
             # x_axis contains iteration number
             if diagnostic =='iterations':
-                self.diagnostic = sim_data._all_attrs['kspits/kspits'][()]
+                self.diagnostic = np.asarray(sim_data._all_attrs['kspits/kspits'])
                 self.x_axis     = np.arange(np.shape(self.diagnostic[:,0])[0])+1
-
 
 
     class constants:
@@ -413,3 +571,42 @@ class sim_data:
             self.numvar    = sim_data._all_attrs.attrs['numvar']
             self.itor      = sim_data._all_attrs.attrs['itor']
             self.is3D      = sim_data._all_attrs.attrs['3d']
+
+
+class flux_coordinates:
+    """
+    Class that represents a flux surface coordinate system, e.g. PEST, Boozer or Hamada coordinates.
+    """
+    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin,points):
+        """
+        Initializes the flux_coordinates.
+        """
+        self.m = m
+        self.n = n
+        self.rpath = rpath
+        self.zpath = zpath
+        self.rma = axis[0]
+        self.zma = axis[1]
+        self.omega = omega
+        self.psi = psi
+        self.psi_norm = psin
+        self.flux_pol = -period*(psi-psi[0])
+        self.theta = theta
+        self.j = jac
+        self.q = q
+        self.area = area
+        self.dV_dchi = dV
+        self.fcoords = fcoords
+        #self.pest = 
+        #self.boozer = 
+        #self.hamada = 
+        self.V = V
+        self.flux_tor = phi
+        self.phi_norm = phi/phi[n-1]
+        self.rho = np.sqrt(phi/phi[n-1])
+        self.period = period
+        self.itor = itor
+        self.r0 = r0
+        self.current = current
+        self.dpsi_dchi = dpsi_dpsin
+        self.points = points
