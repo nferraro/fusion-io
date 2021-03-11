@@ -30,6 +30,8 @@ int m3dc1_fio_series::bounds(double* tmin, double* tmax) const
 
 int m3dc1_fio_series::eval(const double t, double* x)
 {
+  const double T = t / source->t0; // t is mks; T is in normalized units
+
   if(time->size()==0)
     return FIO_NO_DATA;
   
@@ -38,19 +40,19 @@ int m3dc1_fio_series::eval(const double t, double* x)
     return FIO_SUCCESS;
   }
 
-  if(t < time->at(0) || t > time->at(time->size()-1))
+  if(T < time->at(0) || T > time->at(time->size()-1))
     return FIO_OUT_OF_BOUNDS;
 
   // linearly interpolate data
   m3dc1_scalar_list::size_type i;
   for(i=0; i<time->size()-1; i++) {
-    if(time->at(i) * source->t0 <= t && time->at(i+1) * source->t0 >= t)
+    if(time->at(i) <= T && time->at(i+1) >= T)
       break;
   }
   *x = factor * (
 		 data->at(i) + 
     (data->at(i+1)-data->at(i))*
-		 (t / source->t0 - time->at(i))/(time->at(i+1)-time->at(i)));
+		 (T - time->at(i))/(time->at(i+1)-time->at(i)));
   
   return FIO_SUCCESS;
 }
