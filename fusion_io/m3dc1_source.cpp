@@ -33,6 +33,11 @@ int m3dc1_source::open(const char* filename)
   else
     kprad_z = 0;
 
+  if(version >= 35)
+    ifprime = 1;
+  else
+    ifprime = 0;
+
   const double c = 3.e10;
   const double m_p = 1.6726e-24;
 

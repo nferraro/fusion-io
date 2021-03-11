@@ -18,5 +18,5 @@ setup (name = 'fio_py',
        author = 'N.M. Ferraro', 
        version = '1.0',
        description = 'Fusion IO Package',
-       ext_modules = [fio_module])
-
+       ext_modules = [fio_module],
+       py_modules = ['fpy'])
