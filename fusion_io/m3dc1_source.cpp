@@ -23,6 +23,7 @@ int m3dc1_source::open(const char* filename)
   file.read_parameter("ntime", &ntime);
   file.read_parameter("ntor", &ntor);
   file.read_parameter("igeometry", &igeometry);
+  file.read_parameter("numvar", &numvar);
 
   if(version < 23) 
     file.read_parameter("zeff", &z_ion);
@@ -34,7 +35,7 @@ int m3dc1_source::open(const char* filename)
   else
     kprad_z = 0;
 
-  if(version >= 35)
+  if((version >= 38)||(version >= 35 && numvar > 1))
     ifprime = 1;
   else
     ifprime = 0;
