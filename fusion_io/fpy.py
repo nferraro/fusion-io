@@ -92,7 +92,7 @@ class sim_data:
     number of the M3DC1 simulation are stored.
     """
 
-    def __init__(self, filename='C1.h5', filetype='m3dc1', verbose=False, time = 0):
+    def __init__(self, filename='C1.h5', filetype='m3dc1', verbose=False, time=0, fast=False):
         """
         Initializes the fusion-io bindings to a file.
 
@@ -110,6 +110,11 @@ class sim_data:
         **time**
             sets the time variable during initialization. Not necessarily needed as is also set
             when reading a field
+
+        **fast**
+            Workaround to keep mesh connectivity in memory. If True, magnetic field will be loaded
+            upon initialization and the mesh connectivity will not be recalculated until the object
+            is destroyed.
         """
         if filetype == 'm3dc1':
             ifiletype = fio_py.FIO_M3DC1_SOURCE
@@ -148,6 +153,9 @@ class sim_data:
         fio_py.get_options(self._isrc)
         self.ntime = self._all_attrs.attrs["ntime"]
         self.set_timeslice(time)
+        if fast:
+            self._imag = fio_py.get_field(self._isrc, fio_py.FIO_MAGNETIC_FIELD)
+            self.fields.append(self._imag)
         self._cs = fio_py.get_int_parameter(self._isrc, fio_py.FIO_GEOMETRY)
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
         #available fields is a dictionary from names to assigned integers
@@ -578,7 +586,7 @@ class flux_coordinates:
     """
     Class that represents a flux surface coordinate system, e.g. PEST, Boozer or Hamada coordinates.
     """
-    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin,points):
+    def __init__(self, m,n,rpath,zpath,axis,omega,psi,psin,period,theta,jac,q,area,polarea,dV,fcoords,V,phi,itor,r0,current,dpsi_dpsin,points):
         """
         Initializes the flux_coordinates.
         """
@@ -596,6 +604,7 @@ class flux_coordinates:
         self.j = jac
         self.q = q
         self.area = area
+        self.polarea = polarea
         self.dV_dchi = dV
         self.fcoords = fcoords
         #self.pest = 
