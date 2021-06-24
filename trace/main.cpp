@@ -71,6 +71,32 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  int t;
+  if(tracer.sources[0].source->get_int_parameter(FIO_GEOMETRY,&t) == FIO_SUCCESS) {
+    tracer.toroidal = (t==FIO_CYLINDRICAL);
+  } else {
+    std::cerr << "Warning: can't determine geometry.  Assuming toroidal."
+	      << std::endl;
+    tracer.toroidal = true;
+  }
+  if(tracer.toroidal) {
+    std::cerr << "Geometry: toroidal" << std::endl;
+  } else {
+    std::cerr << "Geometry: straight cylinder" << std::endl;
+  }
+
+
+  double p;
+  if(tracer.sources[0].source->get_real_parameter(FIO_PERIOD,&p) == FIO_SUCCESS) {
+    tracer.period = p;
+  } else {
+    std::cerr << "Warning: can't determine period.  Assuming 2*pi"
+	      << std::endl;
+    tracer.period = 2.*M_PI;
+  }
+  std::cerr << "Period: " << tracer.period << std::endl;
+
+
   double R_axis, Z_axis;
   tracer.center(&R_axis, &Z_axis);
 
