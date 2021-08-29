@@ -264,7 +264,7 @@ program write_lp_input
         xm = xp
         call fio_eval_field_f(ipsi, xp, Psi, ierr, hint=hint)
         if(iprint.eq.1) then
-           write(stderr, '("  Point ", i)') i
+           write(stderr, '("  Point ", I8)') i
            write(stderr, '("    Starting R, phi, Z, Psi = ", 1p4E12.4)') xp, Psi
         end if
 

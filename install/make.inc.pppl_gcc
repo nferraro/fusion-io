@@ -1,9 +1,9 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC -std=c++11 #-qopenmp
+CFLAGS = -O3 -fPIC -std=c++11
 
 F90 = mpif90
-F90FLAGS = -O3 -r8 -qopt-report=0 -qopt-report-phase=vec -fPIC
+F90FLAGS = -O3 -fdefault-real-8 -fPIC
 
 LD = $(CXX) #-qopenmp
 LDFLAGS =
@@ -20,4 +20,4 @@ HDF5_INCLUDE = -I$(HDF5_HOME)/include
 NETCDF_INCLUDE = -I$(NETCDF_C_HOME)/include
 NETCDF_LIBS = -L$(NETCDF_C_HOME)/lib -lnetcdf
 
-LIBS = -lstdc++ -lifcore
+LIBS = -lstdc++
