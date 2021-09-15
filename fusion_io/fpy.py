@@ -333,7 +333,7 @@ class sim_data:
                 try:
                     return fio_py.eval_vector_field_deriv(self._ifield, x, self.sim_data.hint)
                 except:
-                    return (None,None,None)
+                    return (None,None,None,None,None,None,None,None,None)
             elif self.ftype == 'scalar':
                 try:
                     return (fio_py.eval_scalar_field_deriv(self._ifield, x, self.sim_data.hint),)
