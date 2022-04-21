@@ -390,7 +390,7 @@ class sim_data:
             self.sim_data = sim_data
             self._all_attrs  = self.sim_data._all_attrs
             self._all_attrs_list = self.sim_data._all_attrs_list
-            self.sigvalues = np.asarray(self.sim_data[signame+'/value'])
+            self.sigvalues = np.asarray(self.sim_data._all_attrs[signame+'/value'][:])
             
 
     class time_trace:
