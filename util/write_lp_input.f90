@@ -62,18 +62,18 @@ program write_lp_input
   real :: buf(1)
 
   ! Interpret arguments if provided
-  if(iargc() .ge. 1) then
+  if(command_argument_count() .ge. 1) then
      call getarg(1, filename)
   else
      filename = 'C1.h5'
   end if
-  if(iargc() .ge. 2) then
+  if(command_argument_count() .ge. 2) then
      call getarg(2, arg)
      read(arg,*,iostat=ierr) slice
   else
      slice = 0
   end if
-  if(iargc() .ge. 3) then
+  if(command_argument_count() .ge. 3) then
      call getarg(3, arg)
      read(arg,*,iostat=ierr) ipellet
   else

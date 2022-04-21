@@ -537,7 +537,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
   };
 
   // Read Psi_Norm field
-  fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
+  fopt.set_option(FIO_PART, FIO_EQUILIBRIUM_ONLY);
   result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Warning: couldn't open psi_norm field" << std::endl;

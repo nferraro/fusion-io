@@ -332,7 +332,7 @@ class sim_data:
                 try:
                     return fio_py.eval_vector_field_deriv(self._ifield, x, self.sim_data.hint)
                 except:
-                    return (None,None,None)
+                    return (None,None,None,None,None,None,None,None,None)
             elif self.ftype == 'scalar':
                 try:
                     return (fio_py.eval_scalar_field_deriv(self._ifield, x, self.sim_data.hint),)
@@ -389,7 +389,7 @@ class sim_data:
             self.sim_data = sim_data
             self._all_attrs  = self.sim_data._all_attrs
             self._all_attrs_list = self.sim_data._all_attrs_list
-            self.sigvalues = np.asarray(self.sim_data[signame+'/value'])
+            self.sigvalues = np.asarray(self.sim_data._all_attrs[signame+'/value'][:])
             
 
     class time_trace:

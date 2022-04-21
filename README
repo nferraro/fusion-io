@@ -45,6 +45,12 @@
      Before compiling do 'module unload darshan' and 'module load texlive'.
      Furthermore, load an anaconda module based on Python 3.
 
+   * If compiling on SDumont:
+     source /scratch/app/modulos/intel-psxe-2019.sh
+     module load openmpi/icc/4.0.4 cmake git intel_psxe/2019
+     module load hdf5/1.8_openmpi-2.0_intel
+     module load python/3.8.2
+
 
 3. From $FIO_ROOT
    make : builds static libraries and executables
