@@ -137,7 +137,9 @@ class sim_data:
                          'A' : ('vector potential', 'vector',  None , 'simple'),
                          'gradA' : ('grad vector potential', 'tensor',  None , 'simple'),
                          'E' : ('electric field',   'vector',  None , 'simple'),
-                         'psi' : ('psi',   'scalar',  None , 'composite')}
+                         'psi' : ('psi',   'scalar',  None , 'composite'),
+                         'rad' : ('total radiation',   'scalar',  None , 'simple')
+                         }
         self.available_fields = self.typedict
         self.filename = os.path.abspath(filename)
         self._all_attrs       = h5py.File(self.filename, 'r')
@@ -258,18 +260,19 @@ class sim_data:
         return to you what you want. ex:
         myfield =mysim.get_field('...')
         Allowed strings are:
-        'j'  - current density
-        'ni' - ion density
-        'ne' - electron density
-        'v'  - fluid velocity
-        'B'  - magnetic field
-        'p'  - total pressure
-        'pi' - ion pressure
-        'pe' - electron pressure
-        'ti' - ion temperature
-        'te' - electron temperature
-        'A'  - vector potential
-        'E'  - electric field
+        'j'   - current density
+        'ni'  - ion density
+        'ne'  - electron density
+        'v'   - fluid velocity
+        'B'   - magnetic field
+        'p'   - total pressure
+        'pi'  - ion pressure
+        'pe'  - electron pressure
+        'ti'  - ion temperature
+        'te'  - electron temperature
+        'A'   - vector potential
+        'E'   - electric field
+        'rad' - total radiation
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
