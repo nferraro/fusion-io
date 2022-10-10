@@ -1,5 +1,6 @@
 #include "fusion_io.h"
 #include <iostream>
+#include "string.h" 
 
 int m3dc1_fio_series::load()
 {
@@ -80,7 +81,7 @@ int m3dc1_fio_field::load(const fio_option_list* opt)
 
   if(time==-1) {
     eqsub = false;   // equilibrium fields need not be added in
-    use_f = false;   // equilibrium is assumed axisymmetric
+    //use_f = false;   // equilibrium is assumed axisymmetric
   }
 
   if(linfac != 1.) {
@@ -141,7 +142,7 @@ int m3dc1_scalar_field::eval(const double* x, double* v, fio_hint s)
   }
   *v = linfac*val[m3dc1_field::OP_1];
 
-  if(eqsub) {
+  if(eqsub && (!strcmp(name.c_str(),"rst")) && (!strcmp(name.c_str(),"zst"))) {
     if(!f0->eval(x[0], x[1]-phase, x[2], get, val, (int*)s)) {
       return FIO_OUT_OF_BOUNDS;
     }
@@ -169,7 +170,7 @@ int m3dc1_scalar_field::eval_deriv(const double* x, double* v, fio_hint s)
   v[FIO_DPHI] = linfac*val[m3dc1_field::OP_DP];
   v[FIO_DZ  ] = linfac*val[m3dc1_field::OP_DZ];
 
-  if(eqsub) {
+  if(eqsub && (!strcmp(name.c_str(),"rst")) && (!strcmp(name.c_str(),"zst"))) {
     if(!f0->eval(x[0], x[1]-phase, x[2], get, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
     
@@ -593,6 +594,14 @@ int m3dc1_magnetic_field::load(const fio_option_list* opt)
     if(!psi0) return 1;
     i0 = source->file.load_field("I", -1);
     if(!i0) return 1;
+    if(use_f) {
+      if(source->ifprime==0) {
+        f0 = source->file.load_field("f", -1);
+      } else {
+        f0 = source->file.load_field("fp", -1);
+      }
+      if(!f0) return 1;
+    }
   }
 
   if(extsub) {
@@ -742,20 +751,71 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
     if(!psi0->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
 
-    v[0] -= val[m3dc1_field::OP_DZ]/r;
-    v[2] += val[m3dc1_field::OP_DR]/r;
+    if((source->igeometry==1)) {
+      v[0] += -linfac*(rx*val[m3dc1_field::OP_DZ]-ry*val[m3dc1_field::OP_DR])/(dd*r);
+      v[2] +=  linfac*(zy*val[m3dc1_field::OP_DR]-zx*val[m3dc1_field::OP_DZ])/(dd*r);
+    } else {
+      v[0] += -linfac*val[m3dc1_field::OP_DZ]/r;
+      v[2] +=  linfac*val[m3dc1_field::OP_DR]/r;
+    }
 
     if(!i0->eval(x[0], x[1]-phase, x[2], gget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
     v[1] += val[m3dc1_field::OP_1]/r;
+
+    if(use_f) {
+      if(!f0->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
+        return FIO_OUT_OF_BOUNDS;
+  
+      if((source->igeometry==1)) {
+        fr = (zy*val[m3dc1_field::OP_DR]-zx*val[m3dc1_field::OP_DZ])/dd;
+        fz = (rx*val[m3dc1_field::OP_DZ]-ry*val[m3dc1_field::OP_DR])/dd;
+        if(source->ifprime==1) {
+          v[0] -= linfac*fr;
+          v[2] -= linfac*fz;
+        } else {
+          frr = (zy*zy*val[m3dc1_field::OP_DRR] + zx*zx*val[m3dc1_field::OP_DZZ]
+                - 2*zx*zy*val[m3dc1_field::OP_DRZ] - gg*fr
+                + (zy*zxy - zx*zyy)*val[m3dc1_field::OP_DR]
+                + (zx*zxy - zy*zxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          fzz = (ry*ry*val[m3dc1_field::OP_DRR] + rx*rx*val[m3dc1_field::OP_DZZ]
+                - 2*rx*ry*val[m3dc1_field::OP_DRZ] - ff*fz
+                + (ry*rxy - rx*ryy)*val[m3dc1_field::OP_DR]
+                + (rx*rxy - ry*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          frz = (-zy*ry*val[m3dc1_field::OP_DRR] - zx*rx*val[m3dc1_field::OP_DZZ]
+                + (rx*zy + ry*zx)*val[m3dc1_field::OP_DRZ] - gg*fz
+                - (zy*rxy - zx*ryy)*val[m3dc1_field::OP_DR]
+                - (zx*rxy - zy*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          v[0] -= ((zy*val[m3dc1_field::OP_DRP]-zx*val[m3dc1_field::OP_DZP])/dd 
+                 + (zyz*val[m3dc1_field::OP_DR]-zxz*val[m3dc1_field::OP_DZ])/dd
+                 - rz*frr - zz*frz - (ddz/dd)*fr)*linfac;
+          v[2] -= ((rx*val[m3dc1_field::OP_DZP]-ry*val[m3dc1_field::OP_DRP])/dd 
+                 + (rxz*val[m3dc1_field::OP_DZ]-ryz*val[m3dc1_field::OP_DR])/dd
+                 - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
+        }
+      } else {
+        if(source->ifprime==0) {
+          v[0] -= linfac*val[m3dc1_field::OP_DRP];
+          v[2] -= linfac*val[m3dc1_field::OP_DZP];
+        } else {
+          v[0] -= linfac*val[m3dc1_field::OP_DR];
+          v[2] -= linfac*val[m3dc1_field::OP_DZ];
+        }
+      }
+    }
   }
 
   if(extsub) {
     if(!psix->eval(x[0], x[1]-phase, x[2], psiget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
 
-    v[0] -= linfac*val[m3dc1_field::OP_DZ]/r;
-    v[2] += linfac*val[m3dc1_field::OP_DR]/r;
+    if((source->igeometry==1)) {
+      v[0] += -linfac*(rx*val[m3dc1_field::OP_DZ]-ry*val[m3dc1_field::OP_DR])/(dd*r);
+      v[2] +=  linfac*(zy*val[m3dc1_field::OP_DR]-zx*val[m3dc1_field::OP_DZ])/(dd*r);
+    } else {
+      v[0] += -linfac*val[m3dc1_field::OP_DZ]/r;
+      v[2] +=  linfac*val[m3dc1_field::OP_DR]/r;
+    }
 
     if(!ix->eval(x[0], x[1]-phase, x[2], gget, val, (int*)s))
       return FIO_OUT_OF_BOUNDS;
@@ -765,12 +825,40 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
       if(!fx->eval(x[0], x[1]-phase, x[2], fget, val, (int*)s))
         return FIO_OUT_OF_BOUNDS;
 
-      if(source->ifprime==0) {
-        v[0] -= linfac*val[m3dc1_field::OP_DRP];
-        v[2] -= linfac*val[m3dc1_field::OP_DZP];
+      if((source->igeometry==1)) {
+        fr = (zy*val[m3dc1_field::OP_DR]-zx*val[m3dc1_field::OP_DZ])/dd;
+        fz = (rx*val[m3dc1_field::OP_DZ]-ry*val[m3dc1_field::OP_DR])/dd;
+        if(source->ifprime==1) {
+          v[0] -= linfac*fr;
+          v[2] -= linfac*fz;
+        } else {
+          frr = (zy*zy*val[m3dc1_field::OP_DRR] + zx*zx*val[m3dc1_field::OP_DZZ]
+                - 2*zx*zy*val[m3dc1_field::OP_DRZ] - gg*fr
+                + (zy*zxy - zx*zyy)*val[m3dc1_field::OP_DR]
+                + (zx*zxy - zy*zxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          fzz = (ry*ry*val[m3dc1_field::OP_DRR] + rx*rx*val[m3dc1_field::OP_DZZ]
+                - 2*rx*ry*val[m3dc1_field::OP_DRZ] - ff*fz
+                + (ry*rxy - rx*ryy)*val[m3dc1_field::OP_DR]
+                + (rx*rxy - ry*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          frz = (-zy*ry*val[m3dc1_field::OP_DRR] - zx*rx*val[m3dc1_field::OP_DZZ]
+                + (rx*zy + ry*zx)*val[m3dc1_field::OP_DRZ] - gg*fz
+                - (zy*rxy - zx*ryy)*val[m3dc1_field::OP_DR]
+                - (zx*rxy - zy*rxx)*val[m3dc1_field::OP_DZ])/(dd*dd);
+          v[0] -= ((zy*val[m3dc1_field::OP_DRP]-zx*val[m3dc1_field::OP_DZP])/dd 
+                 + (zyz*val[m3dc1_field::OP_DR]-zxz*val[m3dc1_field::OP_DZ])/dd
+                 - rz*frr - zz*frz - (ddz/dd)*fr)*linfac;
+          v[2] -= ((rx*val[m3dc1_field::OP_DZP]-ry*val[m3dc1_field::OP_DRP])/dd 
+                 + (rxz*val[m3dc1_field::OP_DZ]-ryz*val[m3dc1_field::OP_DR])/dd
+                 - rz*frz - zz*fzz - (ddz/dd)*fz)*linfac;
+        }
       } else {
-        v[0] -= linfac*val[m3dc1_field::OP_DR];
-        v[2] -= linfac*val[m3dc1_field::OP_DZ];
+        if(source->ifprime==0) {
+          v[0] -= linfac*val[m3dc1_field::OP_DRP];
+          v[2] -= linfac*val[m3dc1_field::OP_DZP];
+        } else {
+          v[0] -= linfac*val[m3dc1_field::OP_DR];
+          v[2] -= linfac*val[m3dc1_field::OP_DZ];
+        }
       }
     }
   }

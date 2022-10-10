@@ -41,6 +41,27 @@ bool trace_integrator_s::rhs(const double r, const double phi, const double z,
   rr = 0.;
       
   trace_source_list::iterator i = sources.begin();
+  int result = i->field->eval(x, m, i->hint);
+  if(toroidal) {
+    result = i->rst->eval(x, &r0, i->hint);
+    if(result != FIO_SUCCESS)
+      return false;
+    rr += r0;
+  } else {
+    rr = 1.;
+  }
+  result = i->rst->eval_deriv(x, dr, i->hint);
+  if(result != FIO_SUCCESS)
+    return false;
+  rx += dr[0];
+  rz += dr[1];
+  ry += dr[2];
+  result = i->zst->eval_deriv(x, dz, i->hint);
+  if(result != FIO_SUCCESS)
+    return false;
+  zx += dz[0];
+  zz += dz[1];
+  zy += dz[2];
 
   while(i != sources.end()) {
     int result = i->field->eval(x, m, i->hint);
@@ -49,26 +70,6 @@ bool trace_integrator_s::rhs(const double r, const double phi, const double z,
     br   += m[0];
     bphi += m[1];
     bz   += m[2];
-    if(toroidal) {
-      result = i->rst->eval(x, &r0, i->hint);
-      if(result != FIO_SUCCESS)
-        return false;
-      rr += r0;
-    } else {
-      rr = 1.;
-    }
-    result = i->rst->eval_deriv(x, dr, i->hint);
-    if(result != FIO_SUCCESS)
-      return false;
-    rx += dr[0];
-    rz += dr[1];
-    ry += dr[2];
-    result = i->zst->eval_deriv(x, dz, i->hint);
-    if(result != FIO_SUCCESS)
-      return false;
-    zx += dz[0];
-    zz += dz[1];
-    zy += dz[2];
     i++;
   }
   d = rx*zy - ry*zx; 
@@ -182,13 +183,10 @@ bool trace_integrator_s::set_pos(const double r,const double phi,const double z)
   Zp = 0;
   trace_source_list::iterator i = sources.begin();
 
-  while(i != sources.end()) {
-    int result = i->zst->eval(x, &z0, i->hint);
-    if(result != FIO_SUCCESS)
-      return false;
-    Zp += z0;
-    i++;
-  }
+  int result = i->zst->eval(x, &z0, i->hint);
+  if(result != FIO_SUCCESS)
+    return false;
+  Zp += z0;
   return true;
 }
 
@@ -321,13 +319,10 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
       double zz0, xx[3] = {R, Phi, Z};
       Zp = 0;
       trace_source_list::iterator m = sources.begin();
-      while(m != sources.end()) {
-        iresult = m->zst->eval(xx, &zz0, m->hint);
-        if(iresult != FIO_SUCCESS)
-          return false;
-        Zp += zz0;
-        m++;
-      }
+      iresult = m->zst->eval(xx, &zz0, m->hint);
+      if(iresult != FIO_SUCCESS)
+        return false;
+      Zp += zz0;
 
       // count poloidal transits
       ptrans = false;
@@ -365,17 +360,14 @@ bool trace_integrator_s::integrate(int transits, int steps_per_transit,
       double z0;
       double x[3] = {R_plot, pl, Z_plot};
 
-      while(i != sources.end()) {
-        iresult = i->rst->eval(x, &r0, i->hint);
-        if(iresult != FIO_SUCCESS)
-          return false;
-        Rout += r0;
-        iresult = i->zst->eval(x, &z0, i->hint);
-        if(iresult != FIO_SUCCESS)
-          return false;
-        Zout += z0;
-        i++;
-      }
+      iresult = i->rst->eval(x, &r0, i->hint);
+      if(iresult != FIO_SUCCESS)
+        return false;
+      Rout += r0;
+      iresult = i->zst->eval(x, &z0, i->hint);
+      if(iresult != FIO_SUCCESS)
+        return false;
+      Zout += z0;
 
       file << std::setiosflags(std::ios::scientific)
 	   << std::setw(20) << std::setprecision(12) 

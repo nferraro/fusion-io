@@ -512,6 +512,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
   };
 
   // Read rst abd zst 
+  fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
   std::cerr << "Stellarator geometry" << std::endl;
   result = src.source->get_field(FIO_RSTELLA, &src.rst, &fopt);
   if(result != FIO_SUCCESS) {
@@ -527,7 +528,6 @@ bool create_source(const int type, const int argc, const std::string argv[])
   };
 
   // Read Psi_Norm field
-  fopt.set_option(FIO_EQUILIBRIUM_ONLY, 1);
   result = src.source->get_field(FIO_POLOIDAL_FLUX_NORM, &src.psi_norm, &fopt);
   if(result != FIO_SUCCESS) {
     std::cerr << "Warning: couldn't open psi_norm field" << std::endl;

@@ -7,7 +7,7 @@
 trace_integrator::trace_integrator()
 {
   reverse = false;
-  toroidal = false;
+  toroidal = true;
   period = 2.*M_PI;
   plane = 0.;
   nplanes = 1;
