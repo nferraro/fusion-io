@@ -663,7 +663,7 @@ int fio_geom_isosurface(fio_field* f, const double val, const double* guess,
 int fio_gridify_loop(const int m0, double** path0, const double* axis, 
 		     const int m, double** path, double* theta, 
 		     const int param=0)
-{
+{ 
   int dir = 0;
   double* l0 = new double[m0];
 
@@ -678,6 +678,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
     } else if(param==2) {
       // parameterize by toroidal angle
       l0[i] = path0[1][i];
+      if(l0[i] < 0.) l0[i] += 2.*M_PI;
     } else {
 
       // parameterize by arclength
@@ -740,6 +741,10 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 	std::cerr << " j not found! " << std::endl;
 	std::cerr << "l = " << l << std::endl;
 	std::cerr << "l0[m0-1] = " << l0[m0-1] << std::endl;
+	std::cerr << "gridify_loop called with\n";
+	std::cerr << "m0 = " << m0 << '\n';
+	std::cerr << "m = " << m << '\n';
+	std::cerr << "param = " << param << std::endl;
 	j = m0-1;
 	break;
       } 
