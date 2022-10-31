@@ -678,7 +678,13 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
     } else if(param==2) {
       // parameterize by toroidal angle
       l0[i] = path0[1][i];
-      if(l0[i] < 0.) l0[i] += 2.*M_PI;
+      /*
+      if(l0[i] < 0.) {
+	std::cerr << "error: toroidal angle < 0" << std::endl;
+	std::cerr << "i = " << i << std::endl;
+	std::cerr << "l0[i] = " << l0[i] << std::endl;
+      }
+      */
     } else {
 
       // parameterize by arclength
@@ -741,10 +747,12 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 	std::cerr << " j not found! " << std::endl;
 	std::cerr << "l = " << l << std::endl;
 	std::cerr << "l0[m0-1] = " << l0[m0-1] << std::endl;
+	/*
 	std::cerr << "gridify_loop called with\n";
 	std::cerr << "m0 = " << m0 << '\n';
 	std::cerr << "m = " << m << '\n';
 	std::cerr << "param = " << param << std::endl;
+	*/
 	j = m0-1;
 	break;
       } 
@@ -875,6 +883,28 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   std::ofstream file;
   std::string filename;
 
+  if(path_tor0[1][0] > path_tor0[1][1]) {
+    std::cerr << "reversing..." << std::endl;
+    double** rev = new double*[3];
+    rev[0] = new double[n];
+    rev[1] = new double[n];
+    rev[2] = new double[n];
+    for(int i=0; i<n; i++) {
+      rev[0][i] = path_tor0[0][n-i-1];
+      rev[1][i] = path_tor0[1][n-i-1];
+      if(rev[1][i] <= 0.) rev[1][i] += 2.*M_PI;
+      rev[2][i] = path_tor0[2][n-i-1];
+    }
+    for(int i=0; i<n; i++) {
+      path_tor0[0][i] = rev[0][i];
+      path_tor0[1][i] = rev[1][i];
+      path_tor0[2][i] = rev[2][i];
+    }
+    delete[] rev[0];
+    delete[] rev[1];
+    delete[] rev[2];
+  }
+  
   if(label) {
     filename = "tor_loop_raw_" + std::string(label) + ".dat";
     file.open(filename, std::ofstream::out|std::ofstream::trunc);
