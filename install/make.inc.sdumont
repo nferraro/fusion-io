@@ -3,21 +3,21 @@ CXX = mpicxx
 CFLAGS = -O3 -fPIC -std=c++11
 
 F90 = mpif90
-F90FLAGS = -O3 -r8 -fPIC
+F90FLAGS = -O3 -fdefault-real-8 -fPIC
 
-LD = $(CC)
-LDFLAGS = -lmpi_cxx
+LD = $(CXX) #-qopenmp
+LDFLAGS =
 
 ARCH = ar cr
-LDD = $(CC) --shared
+LDD = $(CXX) --shared
 
-LAPACK = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+PYTHON = python3
 
-HDF5_LIBS = -L$(HDF5DIR)/lib64 -lhdf5 -lz -Wl,-rpath,$(HDF5DIR)/lib64
-HDF5_INCLUDE = -I$(HDF5DIR)/include
+LAPACK = -llapack
 
-NETCDF_LIBS = -lnetcdf
+HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
+HDF5_INCLUDE = -I$(HDF5_HOME)/include
+NETCDF_INCLUDE = -I$(NETCDF_C_HOME)/include
+NETCDF_LIBS = -L$(NETCDF_C_HOME)/lib -lnetcdf
 
-PYTHON = python
-
-LIBS = -lstdc++ -lifcore -Wl,-rpath,$(FIO_INSTALL_DIR)/lib/_$(FIO_ARCH)
+LIBS = -lstdc++ -lgfortran
