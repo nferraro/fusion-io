@@ -424,7 +424,7 @@ class sim_data:
 
             if len(time) != len(values):
                 if abs(len(time) - len(values))==1:
-                    print('WARNING: time_trace time and values have different lengths')
+                    print('WARNING: len(time) and len(values) differ by 1. Simulation might currently be running.')
                     if len(time) > len(values):
                         self.time = time[:len(values)]
                         self.values = values
@@ -435,8 +435,13 @@ class sim_data:
                         self.time = time[:len(values)]
                         self.values = values
             else:
-                self.time = time[~np.isnan(time)]
-                self.values = values[~np.isnan(values)]
+                if values.ndim == 1:
+                    not_nan = ~np.isnan(values)
+                    self.time = time[not_nan]
+                    self.values = values[not_nan]
+                else:
+                    self.time = time
+                    self.values = values
 
         # Addition
         def __add__(self, other):
@@ -618,7 +623,7 @@ class flux_coordinates:
         self.zma = axis[1]
         self.omega = omega
         self.psi = psi
-        self.psi_norm = psin
+        self.psi_norm = np.asarray(psin)
         self.flux_pol = -period*(psi-psi[0])
         self.theta = theta
         self.j = jac
