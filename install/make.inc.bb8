@@ -1,0 +1,27 @@
+CC = mpicc
+CXX = mpic++
+#CFLAGS = -fast -Wall
+CFLAGS = -Wall -O3 -fPIC
+
+F90 = gfortran
+F90FLAGS = -Wall -fdefault-real-8 -fPIC -fimplicit-none
+
+ARCH = ar cr
+
+LDD = $(CXX) --shared
+LD = $(CXX)
+LDFLAGS =
+
+PYTHON = python
+PYFLAGS = 
+
+LIBS = -L/usr/lib64 -L/usr/lib64/openmpi/lib -lgfortran -lm
+
+LAPACK = 
+ 
+HDF5_LIBS = -lhdf5 -lhdf5_fortran -lsz -lz
+HDF5_INCLUDE = -I/usr/include
+
+NETCDF_LIBS = -lnetcdf
+
+INCLUDE = -I/usr/lib64/gfortran/modules/openmpi

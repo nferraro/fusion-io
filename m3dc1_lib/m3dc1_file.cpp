@@ -105,6 +105,7 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
 m3dc1_mesh* m3dc1_file::read_mesh(const int t)
 {
   int nelms;
+  int nplanes;
 
   hid_t time_group = open_timeslice(t);
   if(time_group < 0) {
@@ -123,6 +124,14 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   H5Aclose(nelms_attr);
   if(nelms < 1) {
     std::cerr << "Error: too few elements" << std::endl;
+    return 0;
+  }
+
+  hid_t nplanes_attr = H5Aopen(mesh_group, "nplanes", H5P_DEFAULT);
+  H5Aread(nplanes_attr, H5T_NATIVE_INT, &nplanes);
+  H5Aclose(nplanes_attr);
+  if(nplanes < 1) {
+    std::cerr << "Error reading nplanes" << std::endl;
     return 0;
   }
 
@@ -193,7 +202,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
     mesh->period = 2.*M_PI;
   }
 
-  read_parameter("nplanes", &(mesh->nplanes));
+  mesh->nplanes = nplanes;
 
   // Calculate connectivity tree
   mesh->find_neighbors();
@@ -479,5 +488,4 @@ bool m3dc1_file::extent(const int t, double* r0, double* r1,
   ts->mesh->extent(r0, r1, phi0, phi1, z0, z1); 
   return true;
 }
-
 

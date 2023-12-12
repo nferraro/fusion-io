@@ -40,16 +40,20 @@
        1) hdf5/intel-17.0/openmpi-1.10.2/1.10.0   4) openmpi/intel-17.0/3.0.0/64
        2) intel-mkl/2017.4/5/64                   5) anaconda/2019.10
        3) intel/17.0/64/17.0.5.239
+
+   * If compiling on perlmutter:
+     It is recommended to use the GNU compiler and Python >= 3.9.
    
    * If compiling on cori:
      Before compiling do 'module unload darshan' and 'module load texlive'.
      Furthermore, load an anaconda module based on Python 3.
 
    * If compiling on SDumont:
-     source /scratch/app/modulos/intel-psxe-2019.sh
-     module load openmpi/icc/4.0.4 cmake git intel_psxe/2019
-     module load hdf5/1.8_openmpi-2.0_intel
-     module load python/3.8.2
+     module load gcc/9.3
+     module load openmpi/gnu/4.1.1
+     module load mathlibs/openblas/0.3.19_gnu
+     module load hdf5/1.8_openmpi-2.0_gnu
+     module load anaconda3/2020.11
 
 
 3. From $FIO_ROOT
