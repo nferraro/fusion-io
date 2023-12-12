@@ -116,6 +116,7 @@ int main(int argc, char* argv[])
   double** path_plane = new double*[3];  // contains path of one toroidal plane
   double** path_surf = new double*[3];   // contains path of one surface
   double* bpol = new double[nphi*ntheta];
+  double* btor = new double[nr*nphi*ntheta];
 
   double* q = new double[nr];
   double* psi_surf = new double[nr];
@@ -239,8 +240,13 @@ int main(int argc, char* argv[])
         path_plane[0] = &(path_surf[0][i*ntheta]);
         path_plane[1] = &(path_surf[1][i*ntheta]);
         path_plane[2] = &(path_surf[2][i*ntheta]);
-        result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
-                                  &(bpol[i*ntheta]), h);
+	if(surfaces==1) {
+	  result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
+				    &(bpol[i*ntheta]), &(btor[s*nphi*ntheta+i*ntheta]), h);
+	} else {
+	  result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
+				    &(bpol[i*ntheta]), NULL, h);
+	}
         //      std::cerr << "q_plane = " << q_plane << std::endl;              
         if(surfaces==1) {
           q[s] += q_plane;
@@ -302,14 +308,76 @@ int main(int argc, char* argv[])
     }
   }
 
+  // Calculate Jacobian
+  double* Jac = new double[nr*nphi*ntheta];
+  double* dPsids = new double[nr*nphi];
+  
+  for(int i=0; i<nr; i++) {
+    for(int j=0; j<nphi; j++) {
+      dPsids[i+j*nr] = 0.;
+      for(int k=0; k<ntheta; k++) {
+	double dRdi, dZdj, dRdj, dZdi;
+	int ijk = i + j*nr + k*nr*nphi;
+
+	if(i==0) {
+	  dRdi = R[ijk + 1] - R[ijk];
+	  dZdi = Z[ijk + 1] - Z[ijk];
+	} else if(i==nr-1) {
+	  dRdi = R[ijk] - R[ijk-1];
+	  dZdi = Z[ijk] - Z[ijk-1];
+	} else {
+	  dRdi = (R[ijk+1] - R[ijk-1])/2.;
+	  dZdi = (Z[ijk+1] - Z[ijk-1])/2.;
+	};
+	int km = (k==0 ? ntheta-1 : k-1);
+	int kp = (k==ntheta-1 ? 0 : k+1);
+
+	dRdj = (R[i + j*nr + kp*nr*nphi] - R[i + j*nr + km*nr*nphi])/2.;
+	dZdj = (Z[i + j*nr + kp*nr*nphi] - Z[i + j*nr + km*nr*nphi])/2.;
+
+	Jac[ijk] = dRdi*dZdj - dRdj*dZdi;
+
+	// note that btor is stored in [i][j][k] whereas Jac is in [k][j][i]
+	dPsids[i+j*nr] = dPsids[i+j*nr] + Jac[ijk]*btor[k + j*ntheta + i*ntheta*nphi];
+      }
+    }
+  }
+ 
   double ion_mass = 2.;  // TODO: generalize this
-  int version = 2;
+  int version = 3;
+
+  // version 3
+  // * Includes calculation of B_tor and Jacobian
 
   // convert phi to degrees
   for(int i=0; i<nphi; i++)
     phi[i] = 180.*phi[i]/M_PI;
 
 
+  // sanity check of toroidal flux
+  double *psi_t = new double[nr];
+  double *dpsi_t = new double[nr];
+  for(int j=0; j<nphi; j++) {
+    double flux = 0.;
+    for(int i=0; i<nr; i++) {
+      flux = flux + dPsids[i + j*nr];
+      if(j==0) {
+	psi_t[i] = flux;
+	dpsi_t[i] = dPsids[i + j*nr];
+	std::cerr << "Flux inside surface " << i << " at phi=0: " << psi_t[i] << std::endl;
+      } else {
+	if(abs(flux - psi_t[i]) > 0.01*abs(psi_t[i])) {
+	  std::cerr << "Warning: toroidal flux at " << phi[j] << ": " << flux
+		    << "         toroidal flux at " << phi[0] << ": " << psi_t[0]
+		    << std::endl;
+	}
+      }
+    }
+    std::cerr << "Total toroidal flux at phi = " << phi[j]
+	      << ": " << flux << std::endl;
+  }
+
+  
   nc_put_att_int(ncid, NC_GLOBAL, "version", NC_SHORT, 1, &version);
   nc_put_att_double(ncid, NC_GLOBAL, "ion_mass", NC_FLOAT, 1, &ion_mass);
   nc_put_att_double(ncid, NC_GLOBAL, "psi_0", NC_FLOAT, 1, &psi0);
@@ -324,9 +392,11 @@ int main(int argc, char* argv[])
   int phi_id;
   nc_def_var(ncid, "Phi", NC_FLOAT, 1, &nt_dimid, &phi_id);
 
-  int q_id, psi_id;
+  int q_id, psi_id, psi_t_id, dpsi_t_id;
   nc_def_var(ncid, "q", NC_FLOAT, 1, &nr_dimid, &q_id);
   nc_def_var(ncid, "psi", NC_FLOAT, 1, &nr_dimid, &psi_id);
+  nc_def_var(ncid, "Psi_t", NC_FLOAT, 3, &nr_dimid, &psi_t_id);   // added in version 3
+  nc_def_var(ncid, "dPsi_t", NC_FLOAT, 3, &nr_dimid, &dpsi_t_id);   // added in version 3
 
   int ne_id, te_id, ni_id, ti_id, psi0_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
@@ -335,13 +405,14 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "ni0",  NC_FLOAT, 1, &npsi_dimid, &ni_id);
   nc_def_var(ncid, "Ti0",  NC_FLOAT, 1, &npsi_dimid, &ti_id);
 
-    int r_id, z_id;
+  int r_id, z_id, jac_id;
   int dims[3];
   dims[2] = nr_dimid;
   dims[1] = nt_dimid;
   dims[0] = np_dimid;
   nc_def_var(ncid, "R", NC_FLOAT, 3, dims, &r_id);
   nc_def_var(ncid, "Z", NC_FLOAT, 3, dims, &z_id);
+  nc_def_var(ncid, "Jac", NC_FLOAT, 3, dims, &jac_id); // added in version 3
 
   nc_enddef(ncid);
 
@@ -355,22 +426,30 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, ti_id, ti);
   nc_put_var_double(ncid, r_id, R);
   nc_put_var_double(ncid, z_id, Z);
+  nc_put_var_double(ncid, jac_id, Jac);
+  nc_put_var_double(ncid, psi_t_id, psi_t);
+  nc_put_var_double(ncid, dpsi_t_id, dpsi_t);
 
   nc_close(ncid);
 
   delete[] R;
   delete[] Z;
+  delete[] Jac;
+  delete[] dPsids;
 
   delete[] theta;
   delete[] phi;
   delete[] q;
   delete[] psi_surf;
+  delete[] psi_t;
+  delete[] dpsi_t;
   delete[] ne;
   delete[] te;
   delete[] ni;
   delete[] ti;
   delete[] psi_prof;
   delete[] bpol;
+  delete[] btor;
   delete[] path_plane;
   delete[] path_surf;
   delete[] path[0];

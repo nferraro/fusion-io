@@ -1034,7 +1034,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 
 
 int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
-		     double* bpol, fio_hint h=0)
+		     double* bpol, double* btor, fio_hint h=0)
 {
   int result;
 
@@ -1076,6 +1076,8 @@ int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
 
     if(bpol)
       bpol[i] = bp;
+    if(btor)
+      btor[i] = b[1];
   }
 
   *q /= (2.*M_PI);
@@ -1126,6 +1128,30 @@ int fio_surface_average(fio_field* f, const int n, double** x, double* a,
     denom += 1./bpol[i] * dl;
   }
   *a /= denom;
+
+  return FIO_SUCCESS;
+}
+
+int fio_eval_on_surface(fio_field* f, const int n, double** x, double** a,
+			fio_hint h=0)
+{
+  int result, dim;
+
+  dim = f->dimension();
+
+  for(int i=0; i<n; i++) {
+    double v[dim], p[3];
+
+    p[0] = x[0][i];
+    p[1] = x[1][i];
+    p[2] = x[2][i];
+    result = f->eval(p, v, h);
+    if(result !=FIO_SUCCESS)
+      return result;
+
+    for(int j=0; j<dim; j++)
+      a[i][j] = v[j];
+  }
 
   return FIO_SUCCESS;
 }
