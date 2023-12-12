@@ -1034,7 +1034,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 
 
 int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
-		     double* bpol, double* btor, fio_hint h=0)
+		     double* bpol, double** bout, fio_hint h=0)
 {
   int result;
 
@@ -1076,8 +1076,11 @@ int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
 
     if(bpol)
       bpol[i] = bp;
-    if(btor)
-      btor[i] = b[1];
+    if(bout) {
+      bout[0][i] = b[0];
+      bout[1][i] = b[1];
+      bout[2][i] = b[2];
+    }
   }
 
   *q /= (2.*M_PI);

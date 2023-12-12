@@ -116,7 +116,12 @@ int main(int argc, char* argv[])
   double** path_plane = new double*[3];  // contains path of one toroidal plane
   double** path_surf = new double*[3];   // contains path of one surface
   double* bpol = new double[nphi*ntheta];
-  double* btor = new double[nr*nphi*ntheta];
+  //  double* btor = new double[nr*nphi*ntheta];
+  double** b = new double*[3];
+  double** b_plane = new double*[3];
+  b[0] = new double[nr*nphi*ntheta];
+  b[1] = new double[nr*nphi*ntheta];
+  b[2] = new double[nr*nphi*ntheta];
 
   double* q = new double[nr];
   double* psi_surf = new double[nr];
@@ -241,8 +246,11 @@ int main(int argc, char* argv[])
         path_plane[1] = &(path_surf[1][i*ntheta]);
         path_plane[2] = &(path_surf[2][i*ntheta]);
 	if(surfaces==1) {
+	  b_plane[0] = &(b[0][s*nphi*ntheta+i*ntheta]);
+	  b_plane[1] = &(b[1][s*nphi*ntheta+i*ntheta]);
+	  b_plane[2] = &(b[2][s*nphi*ntheta+i*ntheta]);
 	  result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
-				    &(bpol[i*ntheta]), &(btor[s*nphi*ntheta+i*ntheta]), h);
+				    &(bpol[i*ntheta]), b_plane, h);
 	} else {
 	  result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
 				    &(bpol[i*ntheta]), NULL, h);
@@ -298,12 +306,18 @@ int main(int argc, char* argv[])
   // swap indices
   double* R = new double[nr*nphi*ntheta];
   double* Z = new double[nr*nphi*ntheta];
+  double* BR   = new double[nr*nphi*ntheta];
+  double* BPhi = new double[nr*nphi*ntheta];
+  double* BZ   = new double[nr*nphi*ntheta];
 
   for(int i=0; i<nr; i++) {
     for(int j=0; j<nphi; j++) {
       for(int k=0; k<ntheta; k++) {
 	R[i + j*nr + k*nr*nphi] = path[0][k + j*ntheta + i*ntheta*nphi];
 	Z[i + j*nr + k*nr*nphi] = path[2][k + j*ntheta + i*ntheta*nphi];
+	BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
+	BPhi[i + j*nr + k*nr*nphi] = b[1][k + j*ntheta + i*ntheta*nphi];
+	BZ  [i + j*nr + k*nr*nphi] = b[2][k + j*ntheta + i*ntheta*nphi];
       }
     }
   }
@@ -338,7 +352,7 @@ int main(int argc, char* argv[])
 	Jac[ijk] = dRdi*dZdj - dRdj*dZdi;
 
 	// note that btor is stored in [i][j][k] whereas Jac is in [k][j][i]
-	dPsids[i+j*nr] = dPsids[i+j*nr] + Jac[ijk]*btor[k + j*ntheta + i*ntheta*nphi];
+	dPsids[i+j*nr] = dPsids[i+j*nr] + Jac[ijk]*b[1][k + j*ntheta + i*ntheta*nphi];
       }
     }
   }
@@ -405,14 +419,17 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "ni0",  NC_FLOAT, 1, &npsi_dimid, &ni_id);
   nc_def_var(ncid, "Ti0",  NC_FLOAT, 1, &npsi_dimid, &ti_id);
 
-  int r_id, z_id, jac_id;
+  int r_id, z_id, jac_id, br_id, bphi_id, bz_id;
   int dims[3];
   dims[2] = nr_dimid;
   dims[1] = nt_dimid;
   dims[0] = np_dimid;
   nc_def_var(ncid, "R", NC_FLOAT, 3, dims, &r_id);
   nc_def_var(ncid, "Z", NC_FLOAT, 3, dims, &z_id);
-  nc_def_var(ncid, "Jac", NC_FLOAT, 3, dims, &jac_id); // added in version 3
+  nc_def_var(ncid, "Jac", NC_FLOAT, 3, dims, &jac_id);    // added in version 3
+  nc_def_var(ncid, "B_R",   NC_FLOAT, 3, dims, &br_id);   // added in version 3
+  nc_def_var(ncid, "B_Phi", NC_FLOAT, 3, dims, &bphi_id); // added in version 3
+  nc_def_var(ncid, "B_Z",   NC_FLOAT, 3, dims, &bz_id);   // added in version 3
 
   nc_enddef(ncid);
 
@@ -427,6 +444,9 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, r_id, R);
   nc_put_var_double(ncid, z_id, Z);
   nc_put_var_double(ncid, jac_id, Jac);
+  nc_put_var_double(ncid, br_id, BR);
+  nc_put_var_double(ncid, bphi_id, BPhi);
+  nc_put_var_double(ncid, bz_id, BZ);
   nc_put_var_double(ncid, psi_t_id, psi_t);
   nc_put_var_double(ncid, dpsi_t_id, dpsi_t);
 
@@ -434,6 +454,9 @@ int main(int argc, char* argv[])
 
   delete[] R;
   delete[] Z;
+  delete[] BR;
+  delete[] BPhi;
+  delete[] BZ;
   delete[] Jac;
   delete[] dPsids;
 
@@ -449,7 +472,12 @@ int main(int argc, char* argv[])
   delete[] ti;
   delete[] psi_prof;
   delete[] bpol;
-  delete[] btor;
+  //  delete[] btor;
+  delete[] b[0];
+  delete[] b[1];
+  delete[] b[2];
+  delete[] b;
+  delete[] b_plane;
   delete[] path_plane;
   delete[] path_surf;
   delete[] path[0];
