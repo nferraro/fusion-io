@@ -49,6 +49,7 @@ int m3dc1_source::open(const char* filename)
   t0 = L0/v0;
   Phi0 = L0*v0*B0/c;
   temp0 = p0/n0;
+  eta0 = 4.*M_PI*t0*v0*v0/(c*c);
 
   // convert normalization quantities to mks
   n0 /= 1.e-6;
@@ -59,6 +60,7 @@ int m3dc1_source::open(const char* filename)
   v0 /= 100.;
   Phi0 /= (1.e8/c);
   temp0 /= 1.6022e-12;    // Temperature is output in eV
+  eta0 /= 1e11/(c*c);
 
   if(itor==1) {
     period = 2.*M_PI;
@@ -121,6 +123,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_TOTAL_RADIATION);
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
+  fields->push_back(FIO_RESISTIVITY);
 
   return FIO_SUCCESS;
 }
@@ -271,6 +274,12 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     } else {
       result = FIO_BAD_SPECIES;
     }
+    break;
+
+  case(FIO_RESISTIVITY):
+    mf = new m3dc1_scalar_field(this, "eta", eta0);
+    mf->equilibrium_only = true;
+    if(s!=0) unneeded_species = true;
     break;
 
   case(FIO_SCALAR_POTENTIAL):
