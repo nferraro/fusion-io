@@ -1,6 +1,7 @@
 #ifndef M3DC1_MESH_H
 #define M3DC1_MESH_H
 
+#include <hdf5.h>
 #include <math.h>
 
 #define TOL 1e-4
@@ -86,6 +87,7 @@ public:
 
   bool set_memory_depth(int d);
   virtual void find_neighbors();
+  void clear_neighbors();
 
   bool is_in_element(const int i, 
 		     const double X, const double Phi, const double Z,
