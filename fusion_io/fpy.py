@@ -15,6 +15,7 @@ import fio_py
 import numpy as np
 import h5py
 import os
+from scipy.integrate import cumtrapz
 
 class sim_data:
     """
@@ -138,7 +139,7 @@ class sim_data:
                          'gradA' : ('grad vector potential', 'tensor',  None , 'simple'),
                          'E' : ('electric field',   'vector',  None , 'simple'),
                          'psi' : ('psi',   'scalar',  None , 'composite'),
-                         'rad' : ('total radiation',   'scalar',  None , 'simple')
+                         'kprad_rad' : ('total radiation',   'scalar',  None , 'simple')
                          }
         self.available_fields = self.typedict
         self.filename = os.path.abspath(filename)
@@ -185,9 +186,10 @@ class sim_data:
         fio_py.close_source(self._isrc)
 
     def set_timeslice(self,time):
-        if time == 'last':
-            time = self.ntime - 1
-            print('last time slice = '+str(time))
+        if isinstance(time,str):
+            if time == 'last':
+                time = self.ntime - 1
+                print('last time slice = '+str(time))
         time = int(time)
         self.timeslice = time
         fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
@@ -272,7 +274,7 @@ class sim_data:
         'te'  - electron temperature
         'A'   - vector potential
         'E'   - electric field
-        'rad' - total radiation
+        'kprad_rad' - total radiation
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
@@ -421,10 +423,25 @@ class sim_data:
                 values = np.asarray(scalar)
 
             if len(time) != len(values):
-                raise ValueError('time_trace time and values are different lengths')
+                if abs(len(time) - len(values))==1:
+                    print('WARNING: len(time) and len(values) differ by 1. Simulation might currently be running.')
+                    if len(time) > len(values):
+                        self.time = time[:len(values)]
+                        self.values = values
+                else:
+                    #raise ValueError('time_trace time and values have different lengths. len(time) = '+str(len(time)) + ', len(values) = ' + str(len(values)))
+                    print('WARNING: time_trace time and values have different lengths. len(time) = '+str(len(time)) + ', len(values) = ' + str(len(values)))
+                    if len(time) > len(values):
+                        self.time = time[:len(values)]
+                        self.values = values
             else:
-                self.time = time
-                self.values = values
+                if values.ndim == 1:
+                    not_nan = ~np.isnan(values)
+                    self.time = time[not_nan]
+                    self.values = values[not_nan]
+                else:
+                    self.time = time
+                    self.values = values
 
         # Addition
         def __add__(self, other):
@@ -540,6 +557,11 @@ class sim_data:
             return sim_data.time_trace(+self.values,time=self.time)
         def __neg__(self):
             return sim_data.time_trace(-self.values,time=self.time)
+        
+        
+        def cum_int(self,nts):
+            values = cumtrapz(self.values[:nts],self.time[:nts],initial=0.0)
+            return sim_data.time_trace(values,time=self.time)
 
     class diagnostic:
         def __init__(self, sim_data, diagnostic):
@@ -601,7 +623,7 @@ class flux_coordinates:
         self.zma = axis[1]
         self.omega = omega
         self.psi = psi
-        self.psi_norm = psin
+        self.psi_norm = np.asarray(psin)
         self.flux_pol = -period*(psi-psi[0])
         self.theta = theta
         self.j = jac

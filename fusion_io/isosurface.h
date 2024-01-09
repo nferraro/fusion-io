@@ -33,7 +33,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   double** path, const char* label, fio_hint h=0);
 
 int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
-		     double* bpol, fio_hint h=0);
+		     double* bpol, double** bout, fio_hint h=0);
 int fio_surface_average(fio_field* f, const int n, double** x, double* a,
 			double* bpol, fio_hint h=0);
 
