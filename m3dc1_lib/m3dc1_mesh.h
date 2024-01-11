@@ -36,13 +36,6 @@ class m3dc1_mesh {
     if(xi - t > a[i]*x) return false;
     return true;
   }
-  virtual void global_to_local(const int i, 
-			       const double X,const double Phi,const double Z,
-			       double* xi, double* zi, double* eta) const
-  {
-    *xi  =  (X - x[i])*co[i] + (Z - z[i])*sn[i] - b[i];
-    *eta = -(X - x[i])*sn[i] + (Z - z[i])*co[i];
-  }
   int shared_nodes(const int i, const int j);
   bool elements_are_neighbors(const int i, const int j);
 
@@ -53,6 +46,23 @@ class m3dc1_mesh {
 			double* xi=0, double* zi=0, double* eta=0, 
 			int guess=-1);
 
+public:
+  virtual void global_to_local(const int i, 
+			       const double X,const double Phi,const double Z,
+			       double* xi, double* zi, double* eta) const
+  {
+    *xi  =  (X - x[i])*co[i] + (Z - z[i])*sn[i] - b[i];
+    *eta = -(X - x[i])*sn[i] + (Z - z[i])*co[i];
+  }
+  virtual void local_to_global(const int i, 
+			       const double xi,const double zi,const double eta,
+			       double* X, double* Phi, double* Z) const
+  {
+    *X = (xi + b[i])*co[i] - eta*sn[i] + x[i];
+    *Z = (xi + b[i])*sn[i] + eta*co[i] + z[i];
+  }
+
+  
  public:
   int nelms;
   double* a;
@@ -112,6 +122,12 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
     if(zi - TOL*d[i] > d[i]) return false;
     return true;
   }
+
+  int shared_nodes(const int i, const int j);
+  bool elements_are_neighbors(const int i, const int j);
+  virtual int max_neighbors() const {return 5;}
+
+public:
   virtual void global_to_local(const int i, 
 			       const double X,const double Phi,const double Z,
 			       double* xi, double* zi, double* eta) const
@@ -119,11 +135,15 @@ class m3dc1_3d_mesh : public m3dc1_mesh {
     m3dc1_mesh::global_to_local(i, X, Phi, Z, xi, zi, eta);
     *zi = Phi - phi[i];
   }
+  virtual void local_to_global(const int i, 
+			       const double xi,const double zi,const double eta,
+			       double* X, double* Phi, double* Z) const
+  {
+    m3dc1_mesh::local_to_global(i, xi, zi, eta, X, Phi, Z);
+    *phi = zi + phi[i];
+  }
 
-  int shared_nodes(const int i, const int j);
-  bool elements_are_neighbors(const int i, const int j);
-  virtual int max_neighbors() const {return 5;}
-
+  
  public:
   double *phi;
   double *d;

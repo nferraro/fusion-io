@@ -85,6 +85,7 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
 
   read_parameter("icomplex", &ts->is_complex);
   read_parameter("3d", &ts->is_3d);
+  read_parameter("igeometry", &ts->is_stell);
   //  std::cerr << "3d = " << ts->is_3d << std::endl;
 
   hid_t attr_id = H5Aopen(time_group, "time", H5P_DEFAULT);
@@ -95,6 +96,16 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
   if(!ts->mesh) { 
     std::cerr << "Error reading mesh" << std::endl;
     return 0;
+  }
+
+  if(ts->is_stell) {
+    std::cerr << "Stellarator mesh" << std::endl;
+    m3dc1_field* Rst = load_field("rst",-1,M3DC1_LOGICAL_COORDS);
+    m3dc1_field* Zst = load_field("zst",-1,M3DC1_LOGICAL_COORDS);
+    ts->map = new m3dc1_coord_map((m3dc1_3d_mesh*)ts->mesh);
+    std::cerr << "Creating mapping..." << std::endl;
+    ts->map->load(Rst, Zst);
+    std::cerr << "Done loading stellarator mesh" << std::endl;
   }
 
   H5Gclose(time_group);
@@ -136,7 +147,9 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   }
 
   int is_3d = 0;
-  read_parameter("3d", &is_3d);  
+  int is_stell = 0;
+  read_parameter("3d", &is_3d);
+  read_parameter("igeometry", &is_stell);
   //  std::cerr << "is_3d = " << is_3d << std::endl;
 
   int version = 0;
@@ -154,7 +167,7 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
 	  (void*)data);
   H5Dclose(mesh_dataset);
 
-  m3dc1_mesh* mesh;
+  m3dc1_mesh *mesh;
   if(is_3d) mesh = new m3dc1_3d_mesh(nelms);
   else mesh = new m3dc1_mesh(nelms);
 
@@ -206,10 +219,10 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
 
   // Calculate connectivity tree
   mesh->find_neighbors();
-
+  
   H5Gclose(mesh_group);
   H5Gclose(time_group);
-
+  
   return mesh;
 }
 
@@ -378,6 +391,7 @@ m3dc1_field* m3dc1_file::load_field(const char* n, const int t,
  
   bool is_3d = (ts->is_3d==1);
   bool is_complex = (ts->is_complex==1);
+  bool is_stell = (ts->is_stell==1);
 
   // open time group
   hid_t time_group = open_timeslice(t);
@@ -412,7 +426,9 @@ m3dc1_field* m3dc1_file::load_field(const char* n, const int t,
 
   // Create new field
   m3dc1_field* field;
-  if(is_3d)
+  if(is_stell && (options & M3DC1_LOGICAL_COORDS)==0)
+    field = new m3dc1_stell_field(ts->mesh,ts->map);
+  else if(is_3d)
     field = new m3dc1_3d_field(ts->mesh);
   else if(is_complex)
     field = new m3dc1_complex_field(ts->mesh,ts->ntor);

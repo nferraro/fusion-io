@@ -1,5 +1,5 @@
-#ifndef M3DC1_FIELD_H
-#define M3DC1_FIELD_H
+#ifndef M3DC1_FIO_FIELD_H
+#define M3DC1_FIO_FIELD_H
 
 #include <m3dc1_field.h>
 #include <m3dc1_file.h>

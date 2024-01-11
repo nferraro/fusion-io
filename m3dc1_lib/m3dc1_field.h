@@ -1,5 +1,5 @@
-#ifndef M3DC1_H
-#define M3DC1_H
+#ifndef M3DC1_FIELD_H
+#define M3DC1_FIELD_H
 
 #include <hdf5.h>
 #include <map>
@@ -95,24 +95,6 @@ class m3dc1_compound_field : public m3dc1_field {
   virtual bool eval(const double r, const double phi, const double z,
 		    const m3dc1_field::m3dc1_get_op op, double* val,
 		    int* element=0);
-};
-
-class m3dc1_timeslice {
- public:
-  typedef std::map<std::string, m3dc1_field*> m3dc1_field_map;
-  m3dc1_field_map field_map;
-
-  int ntor;
-  int is_3d;
-  int is_complex;
-
-  double time;
-  m3dc1_mesh* mesh;
-
-  m3dc1_timeslice();
-  ~m3dc1_timeslice();
-
-  bool get_field(const char*, m3dc1_field**) const;
 };
 
 #endif

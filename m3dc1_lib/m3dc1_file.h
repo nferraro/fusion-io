@@ -2,6 +2,8 @@
 #define M3DC1_FILE_H
 
 #include "m3dc1_field.h"
+#include "m3dc1_stell_field.h"
+#include "m3dc1_timeslice.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -26,6 +28,7 @@ class m3dc1_file {
   const static int M3DC1_ADD_EQUILIBRIUM = 1;
   const static int M3DC1_ADD_EXTERNAL    = 2;
   const static int M3DC1_TOTAL           = 3;
+  const static int M3DC1_LOGICAL_COORDS  = 8;
 
  public:
   m3dc1_file();

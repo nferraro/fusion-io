@@ -1,4 +1,5 @@
 #include "m3dc1_field.h"
+#include "m3dc1_coord_map.h"
 #include <math.h>
 #include <iostream>
 
@@ -292,23 +293,4 @@ bool m3dc1_compound_field::eval(const double r,const double phi,const double z,
   }
 
   return true;
-}
-
-
-
-m3dc1_timeslice::m3dc1_timeslice()
-  : mesh(0)
-{
-  is_3d = 0;
-}
-
-m3dc1_timeslice::~m3dc1_timeslice()
-{
-  std::map<std::string, m3dc1_field*>::iterator i = field_map.begin();
-  while(i != field_map.end()) {
-    delete(i->second);
-    i++;
-  }
-
-  if(mesh) delete(mesh);
 }

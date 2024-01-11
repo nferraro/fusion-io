@@ -19,7 +19,7 @@ include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 LIBS := $(HDF5_LIBS) $(LIBS)
 INCLUDE := $(HDF5_INCLUDE) $(INCLUDE)
 
-OBJS = m3dc1_mesh.o m3dc1_field.o m3dc1_file.o
+OBJS = m3dc1_mesh.o m3dc1_field.o m3dc1_coord_map.o m3dc1_stell_field.o m3dc1_timeslice.o m3dc1_file.o
 
 all : libm3dc1.a libm3dc1_fortran.a
 
