@@ -140,7 +140,7 @@ public:
 			       double* X, double* Phi, double* Z) const
   {
     m3dc1_mesh::local_to_global(i, xi, zi, eta, X, Phi, Z);
-    *phi = zi + phi[i];
+    *Phi = zi + phi[i];
   }
 
   
