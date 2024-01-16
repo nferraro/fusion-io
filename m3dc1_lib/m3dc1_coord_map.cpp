@@ -2,6 +2,69 @@
 
 #include <iostream>
 
+bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const double z,
+		     double *xi_frac, double *zi_frac, double *eta_frac) const
+{
+  // determine whether phi falls inside element
+  const double tol = 1e-6;
+
+  if(phi < Phi[0]-tol) return false;
+  if(phi > Phi[1]+tol) return false;
+  double d = (phi - Phi[0]) / (Phi[1] - Phi[0]);
+
+  // define the triangle in the plane of phi
+  double R0 = R[3]*d + R[0]*(1.-d);
+  double R1 = R[4]*d + R[1]*(1.-d);
+  double R2 = R[5]*d + R[2]*(1.-d);
+  double Z0 = Z[3]*d + Z[0]*(1.-d);
+  double Z1 = Z[4]*d + Z[1]*(1.-d);
+  double Z2 = Z[5]*d + Z[2]*(1.-d);
+
+  if((r - R0)*(Z1 - Z0) - (z - Z0)*(R1 - R0) > tol) return false;
+  if((r - R1)*(Z2 - Z1) - (z - Z1)*(R2 - R1) > tol) return false;
+  if((r - R2)*(Z0 - Z2) - (z - Z2)*(R0 - R2) > tol) return false;
+
+  double l2 = (R1 - R0)*(R1 - R0) + (Z1 - Z0)*(Z1 - Z0);
+  double dot_l = ((R2 - R0)*(R1 - R0) + (Z2 - Z0)*(Z1 - Z0))/l2;
+  double R3 = dot_l*(R1 - R0) + R0;
+  double Z3 = dot_l*(Z1 - Z0) + Z0;
+
+  // return "fractional" local coordinates
+  *xi_frac = ((r - R3)*(R1 - R0) + (z - Z3)*(Z1 - Z0)) / l2;
+  *zi_frac = d;
+  *eta_frac = ((r - R0)*(Z1 - Z0) - (z - Z0)*(R1 - R0)) /
+    ((R2 - R0)*(Z1 - Z0) - (Z2 - Z0)*(R1 - R0));
+
+    /*  
+  std::cerr << "found at " << *xi_frac << " " << *zi_frac << " " << *eta_frac << std::endl;
+
+  if(*xi_frac > 1.+tol || *xi_frac < -1.-tol) {
+    std::cerr << "xi_frac out of bounds" << std::endl;
+    std::cerr << *xi_frac << std::endl;
+    std::cerr << "(" << r << ", " << z << ")" << std::endl;
+    std::cerr << "(" << R0 << ", " << Z0 << ") "
+	      << "(" << R1 << ", " << Z1 << ") "
+	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
+    std::cerr << dot << " " << l2 << std::endl;
+    std::cerr << "(" << R3 << ", " << Z3 << ") " << std::endl;
+  }
+  */
+  if(*eta_frac < -tol || *eta_frac > 1.+tol) {
+    std::cerr << "eta_frac out of bounds" << std::endl;
+    std::cerr << *eta_frac << std::endl;
+    std::cerr << "(" << r << ", " << z << ")" << std::endl;
+    std::cerr << "(" << R0 << ", " << Z0 << ") "
+	      << "(" << R1 << ", " << Z1 << ") "
+	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
+  }
+  if(*zi_frac < 0. || *zi_frac > 1.) {
+    std::cerr << "zi_frac out of bounds" << std::endl;
+  }
+
+  return true;
+}
+
+
 m3dc1_coord_map::m3dc1_coord_map(m3dc1_3d_mesh* m)
 {
   mesh = m;
@@ -14,14 +77,13 @@ m3dc1_coord_map::~m3dc1_coord_map()
 }
 
 bool m3dc1_coord_map::load(m3dc1_field* Rf, m3dc1_field* Zf)
-{
+{  
   R_field = Rf;
   Z_field = Zf;
-  
+
   // Populate elm array
   for(int i=0; i<mesh->nelms; i++) {
     double xi[6], zi[6], eta[6];
-    //    std::cerr << "i = " << i << std::endl;
 
     xi[0] = -mesh->b[i];
     xi[1] =  mesh->a[i];
@@ -41,41 +103,39 @@ bool m3dc1_coord_map::load(m3dc1_field* Rf, m3dc1_field* Zf)
     eta[3] = 0.;
     eta[4] = 0.;
     eta[5] = mesh->c[i];
-    
+
     for(int j=0; j<6; j++) {
       int e;
-      double x, phi, y, r, z;
+      double x, phi, y, r[m3dc1_field::OP_NUM], z[m3dc1_field::OP_NUM];
 
       mesh->local_to_global(i,xi[j],zi[j],eta[j],&x,&phi,&y);
-      
+
       e = i;
 
-      std::cerr << "Before eval " << std::endl;
-      if(!R_field->eval(x,phi,y,m3dc1_field::qGET_VAL,&r,&e)) {
-	std::cerr << "failed;  returning" << std::endl;
+      if(!R_field->eval(x,phi,y,m3dc1_field::GET_VAL,r,&e)) {
+	std::cerr << "Error reading R" << std::endl;
 	return false;
       }
-      if(!Z_field->eval(x,phi,y,m3dc1_field::GET_VAL,&z,&e))
+      if(!Z_field->eval(x,phi,y,m3dc1_field::GET_VAL,z,&e)) {
+	std::cerr << "Error reading Z" << std::endl;
 	return false;
+      }
 
       if(e != i) {
 	std::cerr << "Warning: node found in different element" << std::endl;
 	std::cerr << e << " " << i << std::endl;
       }
-      /*
-      r = x;
-      z = y;
-      */
-      elm[i].R[j] = r;
-      elm[i].Z[j] = z;
+
+      elm[i].R[j] = r[m3dc1_field::OP_1];
+      elm[i].Z[j] = z[m3dc1_field::OP_1];
       if(j==0) {
 	elm[i].Phi[0] = phi;
       } else if(j==3) {
 	elm[i].Phi[1] = phi;
       }
     }
-
   }
+  std::cerr << "Successfully loaded map!" << std::endl;
 
   return true;
 }
@@ -84,7 +144,7 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
 			      double *xi_frac, double *zi_frac, double *eta_frac, int* e) const
 {
   bool found;
-  
+
   if(*e >= 0) {
     found = elm[*e].is_in_element(R, Phi, Z, xi_frac, zi_frac, eta_frac);
     if(found) return true;
@@ -109,6 +169,8 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // find element containing the R, Phi, Z point
   if(!find_element(R, Phi, Z, &xi_frac, &zi_frac, &eta_frac, e)) {
+    std::cerr << "failed find_element containing ("
+	      << R << ", " << Phi << ", " << Z << ")" << std::endl;
     return false;
   }
 
@@ -121,21 +183,21 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // calculate global logical coordinates
   mesh->local_to_global(*e, xi, zi, eta, x, phi, y);
-  
+
   // refine the coordinates through Newton iterations
   int e0 = *e;
-  double R0, Z0;
+  double R0[m3dc1_field::OP_NUM], Z0[m3dc1_field::OP_NUM];
   for(int i=0; i<refine; i++) {
-    
-    if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,&R0,&e0))
+
+    if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,R0,&e0))
       return false;
-    if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,&Z0,&e0))
+    if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,&e0))
       return false;
   }
-
+  /*
   std::cerr << "( " << R  << ", " << Z  << ") /"
-	    << "( " << R0 << ", " << Z0 << ")"
+	    << "( " << R0[m3dc1_field::OP_1] << ", " << Z0[m3dc1_field::OP_1] << ")"
 	    << std::endl;
-    
+  */
   return true;
 }

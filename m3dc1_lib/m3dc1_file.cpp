@@ -91,6 +91,7 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
   hid_t attr_id = H5Aopen(time_group, "time", H5P_DEFAULT);
   H5Aread(attr_id, H5T_NATIVE_DOUBLE, (void*)(&ts->time));
   H5Aclose(attr_id);
+  H5Gclose(time_group);
   
   ts->mesh = read_mesh(t);
   if(!ts->mesh) { 
@@ -102,13 +103,18 @@ m3dc1_timeslice* m3dc1_file::load_timeslice(const int t)
     std::cerr << "Stellarator mesh" << std::endl;
     m3dc1_field* Rst = load_field("rst",-1,M3DC1_LOGICAL_COORDS);
     m3dc1_field* Zst = load_field("zst",-1,M3DC1_LOGICAL_COORDS);
+    if(Rst==0 || Zst==0) {
+      std::cerr << "Error loading mapping fields" << std::endl;
+      return 0;
+    }
     ts->map = new m3dc1_coord_map((m3dc1_3d_mesh*)ts->mesh);
     std::cerr << "Creating mapping..." << std::endl;
-    ts->map->load(Rst, Zst);
+    if(!ts->map->load(Rst, Zst)) {
+      std::cerr << "Error creating mapping." << std::endl;
+      return 0;
+    }
     std::cerr << "Done loading stellarator mesh" << std::endl;
   }
-
-  H5Gclose(time_group);
 
   return ts;
 }
@@ -426,11 +432,11 @@ m3dc1_field* m3dc1_file::load_field(const char* n, const int t,
 
   // Create new field
   m3dc1_field* field;
-  if(is_stell && (options & M3DC1_LOGICAL_COORDS)==0)
+  if(is_stell && (options & M3DC1_LOGICAL_COORDS)==0) {
     field = new m3dc1_stell_field(ts->mesh,ts->map);
-  else if(is_3d)
+  } else if(is_3d) {
     field = new m3dc1_3d_field(ts->mesh);
-  else if(is_complex)
+  } else if(is_complex)
     field = new m3dc1_complex_field(ts->mesh,ts->ntor);
   else
     field = new m3dc1_field(ts->mesh);

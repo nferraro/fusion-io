@@ -13,9 +13,7 @@ bool m3dc1_stell_field::eval(const double R, const double Phi, const double Z,
 			     int* element)
 {
   double x, phi, y;
-  int refine=0;
-
-  //  std::cerr << "evaluating stellarator field " << std::endl;
+  int refine=1;
   
   // find logical coordinates associated with R, Phi, Z
   if(!map->find_coordinates(R,Phi,Z,&x,&phi,&y,element,refine))
