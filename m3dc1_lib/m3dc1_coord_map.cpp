@@ -49,6 +49,7 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
     std::cerr << "(" << R3 << ", " << Z3 << ") " << std::endl;
   }
   */
+  /*
   if(*eta_frac < -tol || *eta_frac > 1.+tol) {
     std::cerr << "eta_frac out of bounds" << std::endl;
     std::cerr << *eta_frac << std::endl;
@@ -57,6 +58,7 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
 	      << "(" << R1 << ", " << Z1 << ") "
 	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
   }
+  */
   if(*zi_frac < 0. || *zi_frac > 1.) {
     std::cerr << "zi_frac out of bounds" << std::endl;
   }
@@ -169,8 +171,10 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // find element containing the R, Phi, Z point
   if(!find_element(R, Phi, Z, &xi_frac, &zi_frac, &eta_frac, e)) {
+    /*
     std::cerr << "failed find_element containing ("
 	      << R << ", " << Phi << ", " << Z << ")" << std::endl;
+    */
     return false;
   }
 
@@ -187,17 +191,69 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
   // refine the coordinates through Newton iterations
   int e0 = *e;
   double R0[m3dc1_field::OP_NUM], Z0[m3dc1_field::OP_NUM];
+  const double min_det = 1.e-10;
+  const double tol = 1e-5;
+  int op = m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL;
   for(int i=0; i<refine; i++) {
 
-    if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,R0,&e0))
+    if(!R_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,R0,&e0))
       return false;
-    if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,&e0))
+    if(!Z_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,Z0,&e0))
       return false;
+
+    double dR = R - R0[m3dc1_field::OP_1];
+    double dZ = Z - Z0[m3dc1_field::OP_1];
+    if(abs(dR) < tol && abs(dZ) < tol)
+      return true;
+
+    /*
+    R(x,y) = R(x0+dx,y0+dy) = R0 + (dR/dx)dx + (dR/dy)dy
+    Z(x,y) = ...            = Z0 + (dZ/dx)dx + (dZ/dy)dy
+    ( R - R0 ) = ( dR/dx  dR/dy ) ( dx )
+    ( Z - Z0 ) = ( dZ/dx  dZ/dy ) ( dy )
+
+    ( dx ) = _______________1________________ (  dZ/dy  -dR/dy ) ( R - R0 )
+    ( dy ) = (dR/dx)(dZ/dy) - (dR/dy)(dZ/dx)) ( -dZ/dx   dR/dx ) ( Z - Z0 )
+    */
+    double det = R0[m3dc1_field::OP_DR]*Z0[m3dc1_field::OP_DZ]
+      -          R0[m3dc1_field::OP_DZ]*Z0[m3dc1_field::OP_DR];
+    if(abs(det) < min_det) {
+      std::cerr << "determinant is too small.  aborting Newton iterations"
+		<< std::endl;
+      break;
+    }
+    double dx = ( Z0[m3dc1_field::OP_DZ]*dR - R0[m3dc1_field::OP_DZ]*dZ)/det;
+    double dy = (-Z0[m3dc1_field::OP_DR]*dZ + R0[m3dc1_field::OP_DR]*dZ)/det;
+
+    double max_step = (mesh->a[e0] + mesh->b[e0] + mesh->c[e0])/6.;
+
+    if(dx > max_step) {
+      dy *= max_step/dx;
+      dx  = max_step;
+    } else if(dx < -max_step) {
+      dy *= -max_step/dx;
+      dx  = -max_step;
+    }
+    if(dy > max_step) {
+      dx *= max_step/dy;
+      dy  = max_step;
+    } else if(dy < -max_step) {
+      dx *= -max_step/dy;
+      dy  = -max_step;
+    }
+
+    *x += dx;
+    *y += dy;
   }
-  /*
+
+  if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,R0,&e0))
+    return false;
+  if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,&e0))
+    return false;
+
   std::cerr << "( " << R  << ", " << Z  << ") /"
 	    << "( " << R0[m3dc1_field::OP_1] << ", " << Z0[m3dc1_field::OP_1] << ")"
 	    << std::endl;
-  */
+
   return true;
 }
