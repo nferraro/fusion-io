@@ -27,10 +27,12 @@ class m3dc1_coord_map {
   bool load(m3dc1_field* R, m3dc1_field* Z);
 
   bool find_coordinates(const double R, const double Phi, const double Z,
-			double *x, double* phi, double* y, int* e, int refine) const;
+			double *x, double* phi, double* y,
+			int* e, int refine) const;
   bool find_element(const double R, const double Phi, const double Z,
 		    double *xi_frac, double *zi_frac, double *eta_frac, int* e) const;
-    
+  bool eval_map_deriv(const double x, const double phi, const double z,
+		      double* R, double* Z, int* e) const;
 };
 
 #endif

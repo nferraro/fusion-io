@@ -164,7 +164,8 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
 }
 
 bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const double Z,
-				       double *x, double* phi, double* y, int* e, int refine) const
+				       double *x, double* phi, double* y,
+				       int* e, int refine) const
 {
   double xi_frac, zi_frac, eta_frac;
   double xi, zi, eta;
@@ -254,6 +255,16 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
   std::cerr << "( " << R  << ", " << Z  << ") /"
 	    << "( " << R0[m3dc1_field::OP_1] << ", " << Z0[m3dc1_field::OP_1] << ")"
 	    << std::endl;
+
+  return true;
+}
+
+bool m3dc1_coord_map::eval_map_deriv(const double x, const double phi, const double y, double* R, double* Z, int* e) const
+{
+  if(!R_field->eval(x,phi,y,m3dc1_field::GET_ALL,R,e))
+    return false;
+  if(!Z_field->eval(x,phi,y,m3dc1_field::GET_ALL,Z,e))
+    return false;
 
   return true;
 }

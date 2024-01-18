@@ -21,7 +21,8 @@ class m3dc1_field {
     GET_DVAL   = 2,
     GET_DDVAL  = 4,
     GET_PVAL   = 8,
-    GET_PPVAL  = 16
+    GET_PPVAL  = 16,
+    GET_ALL    = 31
   };
 
   enum m3dc1_op {
