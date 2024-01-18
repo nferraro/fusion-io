@@ -214,21 +214,37 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   int itor = 0;
   read_parameter("itor", &itor);
   mesh->toroidal = (itor==1);
-  if(itor==0) {
-    read_parameter("rzero", &rzero);
-    mesh->period = 2.*M_PI*rzero;
-  } else {
-    mesh->period = 2.*M_PI;
+
+  hid_t period_attr = H5Aopen(mesh_group, "nplanes", H5P_DEFAULT);
+  H5Aread(period_attr, H5T_NATIVE_FLOAT, &mesh->period);
+  H5Aclose(period_attr);
+  if(mesh->period <= 0.) {
+    std::cerr << "Error reading period; using defaults" << std::endl;
+    if(itor==0) {
+      read_parameter("rzero", &rzero);
+      mesh->period = 2.*M_PI*rzero;
+    } else {
+      mesh->period = 2.*M_PI;
+    }
   }
+  if(is_stell) {
+    hid_t nperiods_attr = H5Aopen(mesh_group, "nperiods", H5P_DEFAULT);
+    H5Aread(nperiods_attr, H5T_NATIVE_INT, &mesh->nperiods);
+    H5Aclose(nperiods_attr);
+  } else {
+    mesh->nperiods = 1.;
+  }
+  std::cerr << "period = " << mesh->period << std::endl;
+  std::cerr << "nperiods = " << mesh->nperiods << std::endl;
 
   mesh->nplanes = nplanes;
 
   // Calculate connectivity tree
   mesh->find_neighbors();
-  
+
   H5Gclose(mesh_group);
   H5Gclose(time_group);
-  
+
   return mesh;
 }
 

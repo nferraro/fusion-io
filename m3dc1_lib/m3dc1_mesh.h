@@ -77,6 +77,7 @@ public:
   double period;
   bool toroidal;
   int nplanes;
+  int nperiods;
 
  public:
   m3dc1_mesh(int n);
@@ -154,8 +155,9 @@ public:
 			 double* xi=0, double* zi=0, double* eta=0, 
 			 int guess=-1)
   {
-    while(Phi < 0      ) Phi += period;
-    while(Phi >= period) Phi -= period;
+    double p = period / nperiods;
+    while(Phi <  0.) Phi += p;
+    while(Phi >= p ) Phi -= p;
 
     return m3dc1_mesh::in_element(X, Phi, Z, xi, zi, eta, guess);
   }

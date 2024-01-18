@@ -59,8 +59,11 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
 	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
   }
   */
-  if(*zi_frac < 0. || *zi_frac > 1.) {
-    std::cerr << "zi_frac out of bounds" << std::endl;
+  if(*zi_frac < 0. || *zi_frac > 1.+tol) {
+    std::cerr << "zi_frac out of bounds "
+	      << phi << " "
+	      << Phi[0] << " "
+	      << Phi[1] << std::endl;
   }
 
   return true;
@@ -122,12 +125,12 @@ bool m3dc1_coord_map::load(m3dc1_field* Rf, m3dc1_field* Zf)
 	std::cerr << "Error reading Z" << std::endl;
 	return false;
       }
-
+      /*
       if(e != i) {
 	std::cerr << "Warning: node found in different element" << std::endl;
 	std::cerr << e << " " << i << std::endl;
       }
-
+      */
       elm[i].R[j] = r[m3dc1_field::OP_1];
       elm[i].Z[j] = z[m3dc1_field::OP_1];
       if(j==0) {
@@ -135,6 +138,8 @@ bool m3dc1_coord_map::load(m3dc1_field* Rf, m3dc1_field* Zf)
       } else if(j==3) {
 	elm[i].Phi[1] = phi;
       }
+      if(elm[i].Phi[0] > elm[i].Phi[1])
+	elm[i].Phi[1] += mesh->period / mesh->nperiods;
     }
   }
   std::cerr << "Successfully loaded map!" << std::endl;
@@ -147,13 +152,18 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
 {
   bool found;
 
+  double p = mesh->period / mesh->nperiods;
+  double phi = Phi;
+  while(phi <  0.) phi += p;
+  while(phi >= p ) phi -= p;
+
   if(*e >= 0) {
-    found = elm[*e].is_in_element(R, Phi, Z, xi_frac, zi_frac, eta_frac);
+    found = elm[*e].is_in_element(R, phi, Z, xi_frac, zi_frac, eta_frac);
     if(found) return true;
   }
 
   for(int i=0; i<mesh->nelms; i++) {
-    found = elm[i].is_in_element(R, Phi, Z, xi_frac, zi_frac, eta_frac);
+    found = elm[i].is_in_element(R, phi, Z, xi_frac, zi_frac, eta_frac);
     if(found) {
       *e = i;
       return true;
@@ -251,11 +261,11 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
     return false;
   if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,&e0))
     return false;
-
+  /*
   std::cerr << "( " << R  << ", " << Z  << ") /"
 	    << "( " << R0[m3dc1_field::OP_1] << ", " << Z0[m3dc1_field::OP_1] << ")"
 	    << std::endl;
-
+  */
   return true;
 }
 
