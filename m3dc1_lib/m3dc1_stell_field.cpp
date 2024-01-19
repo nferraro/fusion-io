@@ -61,15 +61,16 @@ bool m3dc1_stell_field::eval(const double R, const double Phi, const double Z,
     -        Z0[OP_DR]*(R0[OP_DRZ]*Z0[OP_DZ ] - R0[OP_DZZ]*Z0[OP_DR ] +
 			R0[OP_DR ]*Z0[OP_DZZ] - R0[OP_DZ ]*Z0[OP_DRZ]);
 
+  // note that the following reference some real-space derivatives (val).
   val[OP_DRR] = (Z0[OP_DZ]*Z0[OP_DZ]*v[OP_DRR] + Z0[OP_DR]*Z0[OP_DR]*v[OP_DZZ]
-		 - 2.*Z0[OP_DR]*Z0[OP_DZ]*v[OP_DRZ] - G*v[OP_DR]
+		 - 2.*Z0[OP_DR]*Z0[OP_DZ]*v[OP_DRZ] - G*val[OP_DR]
 		 + (Z0[OP_DZ]*Z0[OP_DRZ] - Z0[OP_DR]*Z0[OP_DZZ])*v[OP_DR])/(D*D);
   val[OP_DZZ] = (R0[OP_DZ]*R0[OP_DZ]*v[OP_DRR] + R0[OP_DR]*R0[OP_DR]*v[OP_DZZ]
-		 - 2.*R0[OP_DR]*R0[OP_DZ]*v[OP_DRZ] - F*v[OP_DZ]
+		 - 2.*R0[OP_DR]*R0[OP_DZ]*v[OP_DRZ] - F*val[OP_DZ]
 		 + (R0[OP_DZ]*R0[OP_DRZ] - R0[OP_DR]*R0[OP_DZZ])*v[OP_DR])/(D*D);
   val[OP_DRZ] = ((R0[OP_DR]*Z0[OP_DZ] + R0[OP_DZ]*Z0[OP_DR])*v[OP_DRZ]
 		 - R0[OP_DZ]*Z0[OP_DZ]*v[OP_DRR] - R0[OP_DR]*Z0[OP_DR]*v[OP_DZZ]
-		 - G*v[OP_DZ]
+		 - G*val[OP_DZ]
 		 -(Z0[OP_DZ]*R0[OP_DRZ] - Z0[OP_DR]*R0[OP_DZZ])*v[OP_DR]
 		 -(Z0[OP_DR]*R0[OP_DRZ] - Z0[OP_DZ]*R0[OP_DRR])*v[OP_DZ])/(D*D);
 
