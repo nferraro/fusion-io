@@ -32,8 +32,9 @@ class m3dc1_fio_field : public fio_field {
   bool eqsub, extsub, use_f;
   m3dc1_source* source;
  public:
+  bool equilibrium_only;
   m3dc1_fio_field(m3dc1_source* s) 
-    { source = s; }
+    { source = s; equilibrium_only=false; }
   virtual int load(const fio_option_list*) = 0;
   int get_real_parameter(const field_parameter, double*);
 };

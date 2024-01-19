@@ -91,12 +91,15 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_POLOIDAL_FLUX):     *s = "poloidal flux";    break;
   case(FIO_POLOIDAL_FLUX_NORM):*s = "normalized poloidal flux"; break;
   case(FIO_PRESSURE):          *s = "pressure";         break;
+  case(FIO_RESISTIVITY):       *s = "resistivity";      break;
   case(FIO_SCALAR_POTENTIAL):  *s = "scalar potential"; break;
   case(FIO_TEMPERATURE):       *s = "temperature";      break;
+  case(FIO_THERMAL_DIFFUSIVITY): *s = "thermal diffusivity"; break;
   case(FIO_TOTAL_PRESSURE):    *s = "total pressure";   break;
   case(FIO_TOTAL_RADIATION):   *s = "total radiation";  break;
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
+  case(FIO_VISCOSITY):         *s = "viscosity";        break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;

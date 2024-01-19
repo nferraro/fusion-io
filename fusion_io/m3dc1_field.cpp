@@ -66,6 +66,9 @@ int m3dc1_fio_field::load(const fio_option_list* opt)
   opt->get_option(FIO_PART, &ilin);
   opt->get_option(FIO_PHASE, &phase);
 
+  if(equilibrium_only)
+    ilin = FIO_EQUILIBRIUM_ONLY;
+
   if(ilin==FIO_EQUILIBRIUM_ONLY) {
     if(source->eqsubtract==1) 
       time = -1;
