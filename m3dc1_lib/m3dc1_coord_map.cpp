@@ -59,13 +59,14 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
 	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
   }
   */
+  /*
   if(*zi_frac < 0. || *zi_frac > 1.+tol) {
     std::cerr << "zi_frac out of bounds "
 	      << phi << " "
 	      << Phi[0] << " "
 	      << Phi[1] << std::endl;
   }
-
+  */
   return true;
 }
 
@@ -162,6 +163,28 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     if(found) return true;
   }
 
+  // Test neighbors
+  for(int n=0; n<mesh->nneighbors[*e]; n++) {
+    int m = mesh->neighbor[*e][n];
+    if(elm[m].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+      *e = m;
+      return true;
+    }
+  }
+
+  // Test neighbors' neighbors
+  for(int n=0; n<mesh->nneighbors[*e]; n++) {
+    int m = mesh->neighbor[*e][n];
+    for(int nn=0; nn<mesh->nneighbors[m]; nn++) {
+      int l = mesh->neighbor[m][nn];
+      if(elm[l].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+	*e = l;
+	return true;
+      }
+    }
+  }
+
+  // Test all
   for(int i=0; i<mesh->nelms; i++) {
     found = elm[i].is_in_element(R, phi, Z, xi_frac, zi_frac, eta_frac);
     if(found) {
@@ -199,23 +222,42 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
   // calculate global logical coordinates
   mesh->local_to_global(*e, xi, zi, eta, x, phi, y);
 
+
   // refine the coordinates through Newton iterations
-  int e0 = *e;
+  //  int e0 =  *e;
   double R0[m3dc1_field::OP_NUM], Z0[m3dc1_field::OP_NUM];
   const double min_det = 1.e-10;
   const double tol = 1e-5;
   int op = m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL;
+  double x_last = *x;
+  double y_last = *y;
+  int e_last = *e;
   for(int i=0; i<refine; i++) {
 
-    if(!R_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,R0,&e0))
-      return false;
-    if(!Z_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,Z0,&e0))
+    if(!R_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,R0,e)) {
+      if(i==0) return false;
+
+      // If we were inside the domain on the last step but not in this step,
+      // then backtrack halfway and try again.
+      //      std::cerr << "backtracking..." << std::endl;
+      *x = (*x + x_last) / 2.;
+      *y = (*y + y_last) / 2.;
+      *e = e_last;
+      continue;
+    }
+
+    if(!Z_field->eval(*x,*phi,*y,(m3dc1_field::m3dc1_get_op)op,Z0,e))
       return false;
 
     double dR = R - R0[m3dc1_field::OP_1];
     double dZ = Z - Z0[m3dc1_field::OP_1];
     if(abs(dR) < tol && abs(dZ) < tol)
       return true;
+
+    // store last successful evaluation
+    e_last = *e;
+    x_last = *x;
+    y_last = *y;
 
     /*
     R(x,y) = R(x0+dx,y0+dy) = R0 + (dR/dx)dx + (dR/dy)dy
@@ -233,10 +275,11 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 		<< std::endl;
       break;
     }
-    double dx = ( Z0[m3dc1_field::OP_DZ]*dR - R0[m3dc1_field::OP_DZ]*dZ)/det;
-    double dy = (-Z0[m3dc1_field::OP_DR]*dZ + R0[m3dc1_field::OP_DR]*dZ)/det;
 
-    double max_step = (mesh->a[e0] + mesh->b[e0] + mesh->c[e0])/6.;
+    double dx = ( Z0[m3dc1_field::OP_DZ]*dR - R0[m3dc1_field::OP_DZ]*dZ)/det;
+    double dy = (-Z0[m3dc1_field::OP_DR]*dR + R0[m3dc1_field::OP_DR]*dZ)/det;
+
+    double max_step = (mesh->a[*e] + mesh->b[*e] + mesh->c[*e])/12.;
 
     if(dx > max_step) {
       dy *= max_step/dx;
@@ -257,13 +300,20 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
     *y += dy;
   }
 
-  if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,R0,&e0))
+  // Make sure the last step was a successful one
+  *x = x_last;
+  *y = y_last;
+  *e = e_last;
+
+  if(!R_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,R0,e))
     return false;
-  if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,&e0))
+  if(!Z_field->eval(*x,*phi,*y,m3dc1_field::GET_VAL,Z0,e))
     return false;
+
   /*
   std::cerr << "( " << R  << ", " << Z  << ") /"
-	    << "( " << R0[m3dc1_field::OP_1] << ", " << Z0[m3dc1_field::OP_1] << ")"
+	    << "( " << R0[m3dc1_field::OP_1] << ", "
+	    << Z0[m3dc1_field::OP_1] << ")"
 	    << std::endl;
   */
   return true;

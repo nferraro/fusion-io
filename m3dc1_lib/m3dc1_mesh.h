@@ -17,10 +17,11 @@ class m3dc1_mesh {
 
   void clear_memory();
 
- protected:
+ public:
   int* nneighbors;
   int** neighbor;
 
+ protected:
   virtual int max_neighbors() const {return 3;}
 
   //  static const double tol = 1e-1;
