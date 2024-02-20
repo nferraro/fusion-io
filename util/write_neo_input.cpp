@@ -13,9 +13,10 @@ int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 double dl_tor = 0.01;     // step size when finding surfaces
-double dl_pol = 0.002;    // step size when finding surfaces
+double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
 double tol = 0.1;         // Tolerance for Te when finding isosurface
+double dR0 = 0.0;         // Guess for offset from magnetic axis
 double psi_start = -1;
 double psi_end = -1;
 std::deque<fio_source*> sources;
@@ -163,7 +164,7 @@ int main(int argc, char* argv[])
       te_prof = &electron_temperature;
     }
 
-    x[0] = axis[0] - 0.01;
+    x[0] = axis[0] + dR0 - 0.01;
 
     for(int s=0; s<s_max; s++) {
       
@@ -172,7 +173,9 @@ int main(int argc, char* argv[])
       } else {
 	psi_norm = (s_end-s_start)*s/(s_max-1.) + s_start;
       }
-      
+
+      std::cerr << "Surface " << s << " of " << s_max << std::endl;
+
       x[1] = axis[1];
       x[2] = axis[2];
 
@@ -747,9 +750,9 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 11;
+  const int num_opts = 12;
   std::string arg_list[num_opts] = 
-    { "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
+    { "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
       "-ntheta", "-pert_prof", "-psi_end", "-psi_start", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
@@ -797,7 +800,10 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 {
   bool argc_err = false;
 
-  if(opt=="-m3dc1") {
+  if(opt=="-dR0") {
+    if(argc==1) dR0 = atof(argv[0].c_str());
+    else argc_err = true;    
+  } else if(opt=="-m3dc1") {
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-max_step") {
     if(argc==1) max_step = atof(argv[0].c_str());
@@ -844,6 +850,7 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 void print_usage()
 {
   std::cerr << "write_neo_input"
+	    << " -dR0 <dR0>"
 	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"
 	    << " -nphi <nphi>"
 	    << " -npsi <npsi>"
@@ -853,7 +860,8 @@ void print_usage()
 	    << " -psi_start <psi_start>"
 	    << std::endl;
 
-  std::cerr 
+  std::cerr
+    << "<dR0>:          offset to major radius\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
     << "<nphi>:         number of toroidal points per surface\n"
     << "<npsi>:         number of radial points for T, n profiles\n"
