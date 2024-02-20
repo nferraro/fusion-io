@@ -8,72 +8,16 @@
 #include "fusion_io_field.h"
 #include "interpolate.h"
 
-int fio_find_val_1d_brute(fio_field* f, const double val, double* x,
-		    const double tol, const double max_step, 
-		    const double* axis, fio_hint h=0)
-{
-  const int max_its = 100;
-  double d0 = x[0] - axis[0];
-  double d2 = x[2] - axis[2];
-  double d = sqrt(d0*d0 + d2*d2);
-  double co = d0/d;
-  double sn = d2/d;
-  double v;
-  double error, last_error;
-  double last_d;
-  double step = max_step;
-
-  double x0[3];
-  x0[0] = x[0];
-  x0[1] = x[1];
-  x0[2] = x[2];
-  
-  d = step;
-
-  for(int i=0; i<max_its; i++) {
-    x[0] = d*co + axis[0];
-    x[2] = d*sn + axis[2];
-    
-    int result = f->eval(x, &v, h);
-
-    if(result == FIO_OUT_OF_BOUNDS)
-      std::cerr << "No sign flip found." << std::endl;
-
-    if(result != FIO_SUCCESS)
-      break;
-
-    error = v - val;
-    if(fabs(error) < tol)
-      return FIO_SUCCESS;
-
-    if(i > 0) {
-      if(error*last_error < 0) {
-	d = last_d;
-	error = last_error;
-	step /= 2;
-	continue;
-      }
-    }
-
-    last_d = d;
-    last_error = error;
-    d += step;
-  }
-
-  x[0] = x0[0];
-  x[1] = x0[1];
-  x[2] = x0[2];
-
-  std::cerr << "Brute force failed" << std::endl;
-  return FIO_DIVERGED;
-}
-
-
-// If dim=1, then search only along the line defined by x and axis
-// If dim=2, then search only in plane that passes through x with normal=axis
+// find x such that f(x) = val
+// dim = 1:
+// such that x on the line passing through the initial guess for x
+// in direction norm
+// dim = 2:
+// such that x is in the plane passing through the initial guess for x
+// with normal norm
 int fio_find_val(fio_field* f, const double val, double* x,
 		 const double tol, const double max_step, 
-		 const int dim, const double* axis, fio_hint h=0)
+		 const int dim, const double* norm, fio_hint h=0)
 {
   const double toroidal_extent = 2.*M_PI; // TODO: generalize this
 
@@ -90,48 +34,49 @@ int fio_find_val(fio_field* f, const double val, double* x,
   x0[0] = x[0];
   x0[1] = x[1];
   x0[2] = x[2];
+  /*
+  double val_hist[max_its];
+  double x_hist[3][max_its];
+  int h_hist[max_its];
+  */
+  // calculate unit vector from norm
+  double d = sqrt(norm[0]*norm[0]+norm[1]*norm[1]+norm[2]*norm[2]);
+  n[0] = norm[0] / d;
+  n[1] = norm[1] / d;
+  n[2] = norm[2] / d;
 
-  if(axis) {
-    if(dim==1) {
-      n[0] = x[0] - axis[0];
-      n[1] = x[1] - axis[1];
-      n[2] = x[2] - axis[2];
-    } else {
-      n[0] = axis[0];
-      n[1] = axis[1];
-      n[2] = axis[2];
-    }
-    double d = sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
-    n[0] /= d;
-    n[1] /= d;
-    n[2] /= d;
-  } else if(dim==1 || dim==2) {
-    std::cerr << "Error in fio_find_val: 'axis' argument must be passed if dim==1 or dim==2" << std::endl;
-    return FIO_UNSUPPORTED;
-  }
-  /*  
+    /*  
   std::cerr << " dim = " << dim << std::endl;
   std::cerr << " n[0] = " << n[0] << std::endl;
   std::cerr << " n[1] = " << n[1] << std::endl;
   std::cerr << " n[2] = " << n[2] << std::endl;
   */
-  double x2[3], v2;
-  const double del = 1e-5;
-  double error;
-  
+  double s[3];
+  double error, last_error, df;
+
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
     result = f->eval(x, &v, h);
+    /*
+    x_hist[0][i] = x[0];
+    x_hist[1][i] = x[1];
+    x_hist[2][i] = x[2];
+    val_hist[i] = v;
+    h_hist[i] = *((int*)h);
+    */
 
     if(result == FIO_OUT_OF_BOUNDS) {
-      if(i==0) { 
+      if(i==0) {
 	std::cerr << "Error in fio_find_val: initial guess is out of bounds"
 		  << std::endl;
+	std::cerr << "( " << x[0] << ", " << x[1] << ", " << x[2]
+		  <<  " )" << std::endl;
 	return FIO_OUT_OF_BOUNDS;
       } else {
 	// If we've moved out of bounds, cut step size in half and try again
-	/*
+
 	std::cerr << "Out of bounds.  re-stepping." << std::endl;
+	/*
 	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
 	std::cerr << x[0] << ", " << x[2] << std::endl;
 	*/
@@ -154,68 +99,80 @@ int fio_find_val(fio_field* f, const double val, double* x,
     // Check if we are within tolerance
     error = v - val;
     if(fabs(error) < tol) {
+      //      std::cerr << "Found." << std::endl;
       return FIO_SUCCESS;
     }
 
-    // Evaluate the derivative of the field and take a step
-    if(dim==1) {
-      x2[0] = x[0] + del*n[0];
-      x2[1] = x[1] + del*n[1];
-      x2[2] = x[2] + del*n[2];
-      result = f->eval(x2, &v2, h);
+    if(i>10 && last_error < error) {
+      if(error*last_error < 0) {
+	// spiralling; split the difference
+	/*
+	std::cerr << "Spiralling.  re-stepping. " << i << std::endl;
+	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
+	std::cerr << x[0] << ", " << x[2] << std::endl;
+	*/
+	dx[0] /= 2.;
+	dx[1] /= 2.;
+	dx[2] /= 2.;
+	x[0] = last_x[0] + dx[0];
+	x[1] = last_x[1] + dx[1];
+	x[2] = last_x[2] + dx[2];
+	continue;
+      } else {
+	// moving in wrong direction; back up
+	//	std::cerr << "Moving in wrong direction.  re-stepping. " << i << std::endl;
+	dx[0] /= 2.;
+	dx[1] /= 2.;
+	dx[2] /= 2.;
+	x[0] = last_x[0] + dx[0];
+	x[1] = last_x[1] + dx[1];
+	x[2] = last_x[2] + dx[2];
+	continue;
+      }
     } else {
-
-      result = f->eval_deriv(x, dv, h);
-      /*
-      for(int j=0; j<3; j++) {
-	x2[0] = x[0];
-	x2[1] = x[1];
-	x2[2] = x[2];
-	x2[j] += del;
-	result = f->eval(x2, &v2, h);
-	dv[j] = (v2 - v)/del;
-      }
-      */
-
-      // if dim==2, restrict to plane
-      if(dim==2) {
-	dv[0] -= dv[0]*n[0];
-	dv[1] -= dv[1]*n[1];
-	dv[2] -= dv[2]*n[2];
-      }
+      last_error = error;
     }
-    
+
+    // Evaluate the derivative of the field and take a step
+    result = f->eval_deriv(x, dv, h);
     if(result != FIO_SUCCESS) return result;
 
+    // define the direction to move
     if(dim==1) {
-      // if angle is provided, then maintain angle
-      //      dl = -error / (dv . n);
-      dl = -error / (v2 - v) * del;
+      // move in direction supplied by user
+      s[0] = n[0];
+      s[1] = n[1];
+      s[2] = n[2];
     } else {
-      // if no angle is provided, then follow path of fastest descent
-      mod_dv = sqrt(dv[0]*dv[0] + dv[1]*dv[1] + dv[2]*dv[2]);
-      dl = -error / mod_dv;
+      // move in direction of steepest gradient but normal to n
+      s[0] = dv[0]*(1.-n[0]);
+      s[1] = dv[1]*(1.-n[1]);
+      s[2] = dv[2]*(1.-n[2]);
+
+      double sn = sqrt(s[0]*s[0] + s[1]*s[1] + s[2]*s[2]);
+      s[0] /= sn;
+      s[1] /= sn;
+      s[2] /= sn;
     }
 
-    if(dl==0.) {
+    // derivative in the direction to move
+    df = dv[0]*s[0] + dv[1]*s[1] + dv[2]*s[2];
+
+    if(fabs(df) < tol) {
       std::cerr << "Error in fio_find_val: zero gradient" << std::endl;
       return FIO_DIVERGED;
     }
+
+    double dl = -error / df;
     if(dl > max_step) {
       dl = max_step;
     } else if(dl < -max_step) {
       dl = -max_step;
     }
 
-    if(dim==1) {
-      dx[0] = dl*n[0];
-      dx[1] = dl*n[1];
-      dx[2] = dl*n[2];
-    } else {
-      dx[0] = dl*dv[0]/mod_dv;
-      dx[1] = dl*dv[1]/mod_dv;
-      dx[2] = dl*dv[2]/mod_dv;
-    }
+    dx[0] = dl*s[0];
+    dx[1] = dl*s[1];
+    dx[2] = dl*s[2];
     /*
     std::cerr << "dv: " << dv[0] << ", " << dv[1] << ", " << dv[2] << std::endl;
     std::cerr << "dx: " << dx[0] << ", " << dx[1] << ", " << dx[2] << std::endl;
@@ -231,9 +188,6 @@ int fio_find_val(fio_field* f, const double val, double* x,
     if(x[1] >= toroidal_extent) x[1] -= toroidal_extent;
   }
 
-  x[0] = x0[0];
-  x[1] = x0[1];
-  x[2] = x0[2];
   /*
   if(axis) {
     // If Newton iterations don't converge, try brute force search
@@ -242,20 +196,40 @@ int fio_find_val(fio_field* f, const double val, double* x,
       return FIO_SUCCESS;
   }
   */
-
+  /*
   std::cerr << "Error: fio_find_val did not converge after " << max_its
 	    << " iterations" << std::endl;
+  */
+  /*
+  std::cerr << " df = " << df << std::endl;
+  std::cerr << " dv = " << dv[0] << " " << dv[1] << " " << dv[2] << std::endl;
+  std::cerr << " s = " << s[0] << " " << s[1] << " " << s[2] << std::endl;
+  */
+  /*
+  for(int i=0; i<max_its; i++) {
+    std::cerr << "f(" << x_hist[0][i] << "," << x_hist[1][i] << "," << x_hist[2][i]
+	      << ")_ " << h_hist[i] << " = " << val_hist[i] << std::endl;
+  }
+  std::cerr << "looking for " << val << std::endl;
+
+  x[0] = x0[0];
+  x[1] = x0[1];
+  x[2] = x0[2];
 
   return FIO_DIVERGED;
+
+  */
+  return FIO_SUCCESS;
 }
 
 
+
 int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
-		      const double* axis, const double* norm, 
+		      const double* axis, const double* norm, const double* dd, 
 		      const double dl, const double tol, const double max_step,
 		      int* n, double*** path, fio_hint h=0)
 {
-  const int max_pts = 10000;
+  const int max_pts = 1000;
 
   int nn;
   double x[3];
@@ -276,13 +250,19 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
     double dv[3], dx[3];
     double t[3], dt, de2;
 
-    if(nn==0) {
-      // For first point, keep angle fixed
-      result = fio_find_val(f, val, x, tol, max_step, 1, axis, h);
-    } else {
-      result = fio_find_val(f, val, x, tol, max_step, 2, norm, h);
+    result = fio_find_val(f, val, x, tol, max_step, 2, norm, h);
+
+    if(result != FIO_SUCCESS) {
+      std::cerr << "fio_find_val failed at nn = " << nn << "\n"
+		<< " x = " << x[0] << " " << x[1] << " " << x[2] << "\n"
+		<< " norm = " << norm[0] << " " << norm[1] << " " << norm[2] << "\n"
+		<< std::endl;
+      std::cout << "\n";
+      for(int j=0; j<nn; j++) {
+	std::cout << p[0][j] << " " << p[1][j] << " " << p[2][j] << std::endl;
+      }
+      return result;
     }
-    if(result != FIO_SUCCESS) return result;
     
     p[0].push_back(x[0]);
     p[1].push_back(x[1]);
@@ -290,15 +270,21 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
     nn++;
 
     //    std::cout << x[0] << ", " << x[1] << ", " << x[2] << ", " << std::endl;
-    
-    result = f->eval_deriv(x, dv, h);
-    dv[1] /= x[0];  // Convert from partial derivs to gradient
-    if(result != FIO_SUCCESS) return result;
-    
+
     // t = norm x grad(f)
-    t[0] = (norm[1]*dv[2]-norm[2]*dv[1]);
-    t[1] = (norm[2]*dv[0]-norm[0]*dv[2]);
-    t[2] = (norm[0]*dv[1]-norm[1]*dv[0]);
+    if(dd) {
+      t[0] = dd[0];
+      t[1] = dd[1];
+      t[2] = dd[2];
+    } else {
+      result = f->eval_deriv(x, dv, h);
+      //      dv[1] /= x[0];  // Convert from partial derivs to gradient
+      if(result != FIO_SUCCESS) return result;
+
+      t[0] = (norm[1]*dv[2]-norm[2]*dv[1]);
+      t[1] = (norm[2]*dv[0]-norm[0]*dv[2]);
+      t[2] = (norm[0]*dv[1]-norm[1]*dv[0]);
+    }
     dt = sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
 
     if(dt==0.) {
@@ -350,7 +336,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
     std::cerr << "dphi = " << dl * t[1] / dt / x[0] << std::endl;
     */
     x[0] += dl * t[0] / dt;
-    x[1] += dl * t[1] / dt / x[0];
+    x[1] += dl * t[1] / dt;
     x[2] += dl * t[2] / dt;
   }
 
@@ -864,97 +850,12 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   double** path, const char* label, fio_hint h=0)
 {
   int result;
-
-  // Calculate toroidal loop
-
   int n;
-  double norm[3];
-  norm[0] = 0.;
-  norm[1] = 0.;
-  norm[2] = 1.;
-  double** path_tor0;
-  result = fio_isosurface_2d(f, val, guess, axis, norm, dl_tor, tol, max_step,
-			     &n, &path_tor0, h);
 
-  if(result!=FIO_SUCCESS) {
-    std::cerr << "Error finding toroidal loop." << std::endl;
-    return result;
-  }
   std::ofstream file;
   std::string filename;
 
-  if(path_tor0[1][0] > path_tor0[1][1]) {
-    std::cerr << "reversing..." << std::endl;
-    double** rev = new double*[3];
-    rev[0] = new double[n];
-    rev[1] = new double[n];
-    rev[2] = new double[n];
-    for(int i=0; i<n; i++) {
-      rev[0][i] = path_tor0[0][n-i-1];
-      rev[1][i] = path_tor0[1][n-i-1];
-      if(rev[1][i] <= 0.) rev[1][i] += 2.*M_PI;
-      rev[2][i] = path_tor0[2][n-i-1];
-    }
-    for(int i=0; i<n; i++) {
-      path_tor0[0][i] = rev[0][i];
-      path_tor0[1][i] = rev[1][i];
-      path_tor0[2][i] = rev[2][i];
-    }
-    delete[] rev[0];
-    delete[] rev[1];
-    delete[] rev[2];
-  }
-  
-  if(label) {
-    filename = "tor_loop_raw_" + std::string(label) + ".dat";
-    file.open(filename, std::ofstream::out|std::ofstream::trunc);
-    for(int i=0; i<n; i++) {
-      file << std::setprecision(10) << std::setw(16) << path_tor0[1][i] 
-	   << std::setprecision(10) << std::setw(16) << path_tor0[0][i] 
-	   << std::setprecision(10) << std::setw(16) << path_tor0[2][i] 
-	   << std::endl;
-    }
-    file.close();
-  }
-
-  //  std::cerr << "Found toroidal loop with " << n << " points." << std::endl;
-
-
-  // gridify toroidal loop
-  double** path_tor = new double*[3];
-  path_tor[0] = new double[nphi];
-  path_tor[1] = new double[nphi];
-  path_tor[2] = new double[nphi];
-  result = fio_gridify_loop(n, path_tor0, 0, nphi, path_tor, phi, 2);
-  delete[] path_tor0[0];
-  delete[] path_tor0[1];
-  delete[] path_tor0[2];
-  delete[] path_tor0;
-  if(result!=FIO_SUCCESS) {
-    std::cerr << "Error gridifying toroidal loop" << std::endl;
-    delete[] path_tor[0];
-    delete[] path_tor[1];
-    delete[] path_tor[2];
-    delete[] path_tor;
-    return result;
-  }
-
-  if(label) {
-    filename = "tor_loop_gridded_" + std::string(label) + ".dat";
-    file.open(filename, std::ofstream::out|std::ofstream::trunc);
-    for(int i=0; i<nphi; i++) {
-      file << std::setprecision(10) << std::setw(16) << path_tor[1][i]
-	   << std::setprecision(10) << std::setw(16) << path_tor[0][i]
-	   << std::setprecision(10) << std::setw(16) << path_tor[2][i] 
-	   << std::endl;
-    }
-    file.close();
-  }
-
-
-  // calculate poloidal loops
-  //  std::cerr << "Calculating poloidal loops.." << std::endl;
-
+  double norm[3];
   norm[0] = 0.;
   norm[1] = 1.;
   norm[2] = 0.;
@@ -964,22 +865,66 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     file.open(filename, std::ofstream::out|std::ofstream::trunc);
   }
 
+  double t[3];
+  t[0] = 1.;
+  t[1] = 0.;
+  t[2] = 0.;
+
+  double x[3];
+  x[0] = guess[0];
+
   // Loop over each toroidal point and calculate poloidal path
   for(int i=0; i<nphi; i++) {
     double** path_pol0;
-    double x[3];
-    x[0] = path_tor[0][i];
-    x[1] = path_tor[1][i];
-    x[2] = path_tor[2][i];
-    result = fio_isosurface_2d(f, val, x, axis, norm, dl_pol, tol, max_step,
-			       &n, &path_pol0, h);
+
+
+    // find axis
+    // ! need to do this
+
     
+    x[1] = 2.*M_PI*i/nphi;
+    x[2] = axis[2];
+
+    if(i==0) {
+      // find initial point along horizontal path from axis
+      // For first point, keep angle fixed
+
+      t[0] = 1.;
+      t[1] = 0.;
+      t[2] = 0.;
+      result = fio_find_val(f, val, x, tol, 0.1, 1, t, h);
+    } else {
+      t[0] = 0.;
+      t[1] = 1.;
+      t[2] = 0.;
+      result = fio_find_val(f, val, x, tol, 0.1, 2, t, h);
+      if(result != FIO_SUCCESS) {
+	std::cerr << " trying again with new initial guess.." << std::endl;
+	x[0] = (x[0] + guess[0])/2.;
+	x[2] = (x[2] + axis[2])/2.;
+	result = fio_find_val(f, val, x, tol, 0.1, 2, t, h);
+      }
+    }
     if(result != FIO_SUCCESS) {
-      std::cerr << "Error finding poloidal loop at phi = " << path_tor[1][i]
+      std::cerr << "Error finding initial point" << std::endl;
+      break;
+    }
+    /*
+    std::cerr << "Poloidal loop " << i << " at Te = " << val
+	      << " phi = " << x[1] << std::endl;
+    */
+    result = fio_isosurface_2d(f, val, x, axis, norm, 0, dl_pol, tol, max_step,
+			       &n, &path_pol0, h);
+
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding poloidal loop at phi = " << 2.*M_PI*i/nphi
 		<< std::endl;
       break;
     }
-    
+    x[0] = path_pol0[0][n-1];
+    x[1] = path_pol0[1][n-1];
+    x[2] = path_pol0[2][n-1];
+
     if(label) {
       for(int j=0; j<n; j++) {
 	file << std::setprecision(10) << std::setw(16) << path_pol0[1][j] 
@@ -1001,12 +946,6 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
       break;
     }
   }
-
-  delete[] path_tor[0];
-  delete[] path_tor[1];
-  delete[] path_tor[2];
-  delete[] path_tor;
-
 
   //  std::cerr << "Writing final path data" << std::endl;
   if(label) {

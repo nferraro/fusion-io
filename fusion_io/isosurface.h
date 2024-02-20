@@ -9,7 +9,7 @@ int fio_isosurface(fio_field* f, const double val, const double* guess,
 		   const double max_step, const double dphi, 
 		   int* n, double*** path, fio_hint h=0);
 int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
-		      const double* axis, const double* norm, 
+		      const double* axis, const double* norm, const double* dd,
 		      const double dl, const double tol,
 		      const double max_step,
 		      int* n, double*** path, fio_hint h=0);
