@@ -19,6 +19,8 @@ double tol = 0.1;         // Tolerance for Te when finding isosurface
 double dR0 = 0.0;         // Guess for offset from magnetic axis
 double psi_start = -1;
 double psi_end = -1;
+double te_start = -1;
+double te_end = -1;
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
 fio_compound_field ion_density, ion_temperature, psin, mag;
@@ -76,7 +78,6 @@ int main(int argc, char* argv[])
   std::cerr << "Tolerance for finding isosurface (tol) = " << tol << " eV\n";
   std::cerr << "=======================" << std::endl;
 
-
   // Find magnetic axis
   axis[1] = 0.;
 
@@ -131,6 +132,9 @@ int main(int argc, char* argv[])
   double* te = new double[npsi];
   double* ni = new double[npsi];
   double* ti = new double[npsi];
+  double** axis_3d = new double*[nphi];
+  for(int i=0; i<nphi; i++)
+    axis_3d[i] = new double[3];
 
   // Surfaces
   std::ofstream gplot, splot;
@@ -139,6 +143,32 @@ int main(int argc, char* argv[])
   
   gplot << "plot ";
   splot << "set hidden3d\nsplot ";
+
+  // Find magnetic axis
+  double n[3];
+  double te_max;
+  n[0] = 0.;
+  n[1] = 1.;
+  n[2] = 0.;
+
+  x[0] = axis[0] + dR0 - 0.01;
+  x[1] = 0.;
+  x[2] = 0.;
+
+  result = fio_find_max(&electron_temperature, &te_max, x,
+			1., 0.1, 2, n, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding magnetic axis " << std::endl;
+  } else {
+    std::cerr << "Found magnetic axis" << std::endl;
+    std::cerr << "TE MAX = " << te_max << " AT ("
+	    << x[0] << ", " << x[1] << ", " << x[2] << std::endl;
+
+    axis[0] = x[0];
+    axis[1] = 0;
+    axis[2] = x[2];
+  }
+
 
   for(int surfaces=0; surfaces<2; surfaces++) {
   
@@ -164,48 +194,57 @@ int main(int argc, char* argv[])
       te_prof = &electron_temperature;
     }
 
-    x[0] = axis[0] + dR0 - 0.01;
-
     for(int s=0; s<s_max; s++) {
       
-      if(s_max==1) {
-	psi_norm = s_start;
-      } else {
-	psi_norm = (s_end-s_start)*s/(s_max-1.) + s_start;
-      }
+      std::cerr << "Surface " << s+1 << " of " << s_max << std::endl;
 
-      std::cerr << "Surface " << s << " of " << s_max << std::endl;
-
-      x[1] = axis[1];
+      x[0] = axis[0] - 0.01;
+      x[1] = 0.;
       x[2] = axis[2];
 
-      if(surfaces==0 && !pert_prof) {
-	result = fio_find_val(psin0, psi_norm, x, 1e-4, 0.1, 1, axis, h);
-      } else {
-	result = fio_find_val(&psin, psi_norm, x, 1e-4, 0.1, 1, axis, h);
-      }
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error finding psi_norm = " << psi_norm
+      if((te_end>0.) && (te_start>0.)) {
+	// use Te as radial coordinate
+	double te0 = (te_end - te_start)*s/(s_max - 1.) + te_start;
+	std::cerr << "Searching for Te = " << te0 << " at "
+		  << "( " << x[0] << ", " << x[1] << ", " << x[2] << " )"
 		  << std::endl;
-	break;
+	result = fio_find_val(&electron_temperature, te0, x, 1., 0.1, 1, axis, h);
+	if(result != FIO_SUCCESS) {
+	  std::cerr << "Error finding Te = " << te0  << std::endl;
+	  break;
+	} else {
+	  std::cerr << "Found Te = " << te0 << std::endl;
+	}
+	psi_norm = (te_max-te0)/te_max;
+
+      } else {
+	// use psi_norm as radial coordinate
+	if(s_max==1) {
+	  psi_norm = s_start;
+	} else {
+	  psi_norm = (s_end-s_start)*s/(s_max-1.) + s_start;
+	}
+
+	if(surfaces==0 && !pert_prof) {
+	  result = fio_find_val(psin0, psi_norm, x, 1e-4, 0.1, 1, axis, h);
+	} else {
+	  result = fio_find_val(&psin, psi_norm, x, 1e-4, 0.1, 1, axis, h);
+	}
+	if(result != FIO_SUCCESS) {
+	  std::cerr << "Error finding psi_norm = " << psi_norm
+		    << std::endl;
+	  break;
+	}
+
       }
 
       // Find electron temperature on surface
       double temp;
       result = te_prof->eval(x, &temp, h);
-
       if(result != FIO_SUCCESS) {
-	std::cerr << "Error evaluating electron temperature at psi_norm = "
-		  << psi_norm << std::endl;
+	std::cerr << "Error evaluating electron temperature" << std::endl;
 	break;
       }
-
-      if(surfaces==1) {
-	std::cerr << s << ": Found psi_norm = " << psi_norm << " at ("
-		  << x[0] << ", " << x[1] << ", " << x[2] 
-		  << ") with Te = " << temp << std::endl;
-      }
-
       
       char* label;
       char surf_label[256];
@@ -225,14 +264,13 @@ int main(int argc, char* argv[])
 	path_surf[2] = path[2];
       }
       result = fio_gridded_isosurface(te_prof, temp, x,
-				      axis, dl_tor, dl_pol, tol, max_step,
+				      axis_3d, dl_tor, dl_pol, tol, max_step,
 				      nphi, ntheta, 
 				      phi, theta,
 				      path_surf, label, h);
 
       if(result!=FIO_SUCCESS) {
-	std::cerr << "Error finding surface at psi_norm = " 
-		  << psi_norm << " and Te = " << temp << std::endl;
+	std::cerr << "Error finding surface at Te = " << temp << std::endl;
 	continue;
       }
 
@@ -367,9 +405,10 @@ int main(int argc, char* argv[])
   // * Includes calculation of B_tor and Jacobian
 
   // convert phi to degrees
-  for(int i=0; i<nphi; i++)
+  for(int i=0; i<nphi; i++) { 
     phi[i] = 180.*phi[i]/M_PI;
-
+    //    std::cerr << "phi[" << i << "] = " << phi[i] << std::endl;
+  }
 
   // sanity check of toroidal flux
   double *psi_t = new double[nr];
@@ -385,7 +424,7 @@ int main(int argc, char* argv[])
       } else {
 	if(abs(flux - psi_t[i]) > 0.01*abs(psi_t[i])) {
 	  std::cerr << "Warning: toroidal flux at " << phi[j] << ": " << flux
-		    << "         toroidal flux at " << phi[0] << ": " << psi_t[0]
+		    << "         toroidal flux at " << phi[0] << ": " << psi_t[i]
 		    << std::endl;
 	}
       }
@@ -487,7 +526,9 @@ int main(int argc, char* argv[])
   delete[] path[1];
   delete[] path[2];
   delete[] path;
-
+  for(int i=0; i<nphi; i++)
+    delete[] axis_3d[i];
+  delete[] axis_3d;
 
   // Deallocate fields
   src0->deallocate_search_hint(&h);
@@ -750,10 +791,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 12;
+  const int num_opts = 14;
   std::string arg_list[num_opts] = 
     { "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-pert_prof", "-psi_end", "-psi_start", "-tol" };
+      "-ntheta", "-pert_prof", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -828,6 +869,12 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
     else argc_err = true;
   } else if(opt=="-psi_start") {
     if(argc==1) psi_start = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-te_end") {
+    if(argc==1) te_end = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-te_start") {
+    if(argc==1) te_start = atof(argv[0].c_str());
     else argc_err = true;
   } else if(opt=="-tol") {
     if(argc==1) tol = atof(argv[0].c_str());

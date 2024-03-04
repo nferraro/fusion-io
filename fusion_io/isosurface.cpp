@@ -34,36 +34,19 @@ int fio_find_val(fio_field* f, const double val, double* x,
   x0[0] = x[0];
   x0[1] = x[1];
   x0[2] = x[2];
-  /*
-  double val_hist[max_its];
-  double x_hist[3][max_its];
-  int h_hist[max_its];
-  */
+
   // calculate unit vector from norm
   double d = sqrt(norm[0]*norm[0]+norm[1]*norm[1]+norm[2]*norm[2]);
   n[0] = norm[0] / d;
   n[1] = norm[1] / d;
   n[2] = norm[2] / d;
 
-    /*  
-  std::cerr << " dim = " << dim << std::endl;
-  std::cerr << " n[0] = " << n[0] << std::endl;
-  std::cerr << " n[1] = " << n[1] << std::endl;
-  std::cerr << " n[2] = " << n[2] << std::endl;
-  */
   double s[3];
   double error, last_error, df;
 
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
     result = f->eval(x, &v, h);
-    /*
-    x_hist[0][i] = x[0];
-    x_hist[1][i] = x[1];
-    x_hist[2][i] = x[2];
-    val_hist[i] = v;
-    h_hist[i] = *((int*)h);
-    */
 
     if(result == FIO_OUT_OF_BOUNDS) {
       if(i==0) {
@@ -76,10 +59,7 @@ int fio_find_val(fio_field* f, const double val, double* x,
 	// If we've moved out of bounds, cut step size in half and try again
 
 	std::cerr << "Out of bounds.  re-stepping." << std::endl;
-	/*
-	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
-	std::cerr << x[0] << ", " << x[2] << std::endl;
-	*/
+
 	dx[0] /= 2.;
 	dx[1] /= 2.;
 	dx[2] /= 2.;
@@ -91,10 +71,6 @@ int fio_find_val(fio_field* f, const double val, double* x,
     } else if(result != FIO_SUCCESS) {
       return result;
     }
-    /*
-    std::cerr << "x: " << x[0] << ", " << x[1] << ", " << x[2] << std::endl;
-    std::cerr << error << std::endl;
-    */
 
     // Check if we are within tolerance
     error = v - val;
@@ -304,8 +280,10 @@ int fio_find_max(fio_field* f, double* val, double* x,
     /*
     std::cerr << "Te( " << x[0] << ", " << x[1] << ", " << x[2] << " ) = "
 	      << *val << std::endl;
+    std::cerr << " grad(Te) = ( "
+	      << dv[0] << ", " << dv[1] << ", " << dv[2] << " )"
+	      << std::endl;
     */
-    
     if(fabs(df) < tol) {
       /*
       std::cerr << "Found maximum at ("
@@ -317,12 +295,21 @@ int fio_find_max(fio_field* f, double* val, double* x,
 
     // find the derivative of |grad(f)| in the direction of steepest descent
     double x1[3], dv1[3], df1;
-    const double del = 1e-6;
+    const double del = 1e-5;
     x1[0] = x[0] + dv[0]*del/df;
     x1[1] = x[1] + dv[1]*del/df;
     x1[2] = x[2] + dv[2]*del/df;
 
     result = f->eval_deriv(x1, dv1, h);
+    if(dim==1) {
+      dv1[0] = dv1[0]*n[0];
+      dv1[1] = dv1[1]*n[1];
+      dv1[2] = dv1[2]*n[2];
+    } else if(dim==2) {
+      dv1[0] = dv1[0]*(1. - n[0]);
+      dv1[1] = dv1[1]*(1. - n[1]);
+      dv1[2] = dv1[2]*(1. - n[2]);
+    }
     df1 = sqrt(dv1[0]*dv1[0] + dv1[1]*dv1[1] + dv1[2]*dv1[2]);
 
     double ddf = (df1 - df) / del;
@@ -339,7 +326,13 @@ int fio_find_max(fio_field* f, double* val, double* x,
       dx[1] *= max_step/dl;
       dx[2] *= max_step/dl;
     }
-
+    /*
+    std::cerr << " x1 = ( " << x1[0] << ", " << x1[1] << ", " << x1[2] << " )"
+	      << std::endl;
+    std::cerr << " df = " << df << "; ddf = " << ddf << "; dl = " << dl << std::endl;
+    std::cerr << " dx = ( " << dx[0] << ", " << dx[1] << ", " << dx[2] << " )"
+	      << std::endl;
+    */
     last_x[0] = x[0];
     last_x[1] = x[1];
     last_x[2] = x[2];
@@ -982,8 +975,7 @@ int fio_gridify_surface(const int m0, double** path0, const double* axis,
 //    h: hint for last point on path
 //
 int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
-			   const double* axis, 
-			   const double dl_tor, const double dl_pol,
+			   double** axis, const double dl_tor, const double dl_pol,
 			   const double tol, const double max_step,
 			   const int nphi, const int ntheta, 
 			   double* phi, double* theta,
@@ -1006,10 +998,6 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   }
 
   double t[3];
-  t[0] = 1.;
-  t[1] = 0.;
-  t[2] = 0.;
-
   double x[3];
   x[0] = guess[0];
 
@@ -1019,31 +1007,36 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 
     phi[i] = 2.*M_PI*i/nphi;
 
-    // find axis
-    // ! need to do this
+    // find axis in phi = phi[i] plane
+    double te_max;
+    t[0] = 0.;
+    t[1] = 1.;
+    t[2] = 0.;
     x[1] = phi[i];
-    x[2] = axis[2];
-
     if(i==0) {
-      // find initial point along horizontal path from axis
-      // For first point, keep angle fixed
-
-      t[0] = 1.;
-      t[1] = 0.;
-      t[2] = 0.;
-      result = fio_find_val(f, val, x, tol, 0.1, 1, t, h);
+      x[0] = guess[0];
+      x[2] = guess[2];
     } else {
-      t[0] = 0.;
-      t[1] = 1.;
-      t[2] = 0.;
-      result = fio_find_val(f, val, x, tol, 0.1, 2, t, h);
-      if(result != FIO_SUCCESS) {
-	std::cerr << " trying again with new initial guess.." << std::endl;
-	x[0] = (x[0] + guess[0])/2.;
-	x[2] = (x[2] + axis[2])/2.;
-	result = fio_find_val(f, val, x, tol, 0.1, 2, t, h);
-      }
+      x[0] = axis[i-1][0];
+      x[2] = axis[i-1][2];
     }
+    result = fio_find_max(f, &te_max, x, 1., 0.1, 2, t, h);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding magnetic axis at phi = "
+		<< phi[i] << std::endl;
+      break;
+    }
+    axis[i][0] = x[0];
+    axis[i][1] = x[1];
+    axis[i][2] = x[2];
+
+    // find initial point in horizontal line from axis
+    t[0] = 1.;
+    t[1] = 0.;
+    t[2] = 0.;
+    x[0] = x[0] + 0.02;  // move off axis to avoid zero gradient
+    result = fio_find_val(f, val, x, tol, 0.1, 1, t, h);
+
     if(result != FIO_SUCCESS) {
       std::cerr << "Error finding initial point" << std::endl;
       break;
@@ -1052,11 +1045,12 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     std::cerr << "Poloidal loop " << i << " at Te = " << val
 	      << " phi = " << x[1] << std::endl;
     */
-    result = fio_isosurface_2d(f, val, x, axis, norm, 0, dl_pol, tol, max_step,
+
+    result = fio_isosurface_2d(f, val, x, axis[i], norm, 0, dl_pol, tol, max_step,
 			       &n, &path_pol0, h);
 
     if(result != FIO_SUCCESS) {
-      std::cerr << "Error finding poloidal loop at phi = " << 2.*M_PI*i/nphi
+      std::cerr << "Error finding poloidal loop at phi = " << phi[i]
 		<< std::endl;
       break;
     }
@@ -1126,7 +1120,7 @@ int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
 
   for(int i=0; i<n; i++) {
     double b[3], p[3];
-  
+
     p[0] = x[0][i];
     p[1] = x[1][i];
     p[2] = x[2][i];
@@ -1184,7 +1178,7 @@ int fio_surface_average(fio_field* f, const int n, double** x, double* a,
 
   for(int i=0; i<n; i++) {
     double v, p[3];
-  
+
     p[0] = x[0][i];
     p[1] = x[1][i];
     p[2] = x[2][i];
