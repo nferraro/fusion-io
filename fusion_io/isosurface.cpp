@@ -215,11 +215,151 @@ int fio_find_val(fio_field* f, const double val, double* x,
   x[0] = x0[0];
   x[1] = x0[1];
   x[2] = x0[2];
-
+  */
   return FIO_DIVERGED;
 
+
+  //  return FIO_SUCCESS;
+}
+
+
+// find local maximum of f
+// dim = 1: only search on line passing through x in direction norm
+// dim = 2: only search in plane passing through x with normal norm
+// dim = 3: fully 3D search
+int fio_find_max(fio_field* f, double* val, double* x,
+		 const double tol, const double max_step, 
+		 const int dim, const double* norm, fio_hint h=0)
+{
+  const double toroidal_extent = 2.*M_PI; // TODO: generalize this
+
+  if(f->dimension() != 1) {
+    std::cerr << "Error in fio_find_val: field is not a scalar field"
+	      << std::endl;
+    return FIO_UNSUPPORTED;
+  }
+
+  const int max_its = 100;
+  int result;
+  double last_x[3], dx[3], dv[3], v, dl, mod_dv, n[3];
+  double x0[3];
+  x0[0] = x[0];
+  x0[1] = x[1];
+  x0[2] = x[2];
+
+  // calculate unit vector from norm
+  double d = sqrt(norm[0]*norm[0]+norm[1]*norm[1]+norm[2]*norm[2]);
+  n[0] = norm[0] / d;
+  n[1] = norm[1] / d;
+  n[2] = norm[2] / d;
+
+
+  double s[3];
+  double error, last_error;
+
+  for(int i=0; i<max_its; i++) {
+    // Evaluate the field
+    result = f->eval_deriv(x, dv, h);
+
+    if(result == FIO_OUT_OF_BOUNDS) {
+      if(i==0) {
+	std::cerr << "Error in fio_find_max: initial guess is out of bounds"
+		  << std::endl;
+	std::cerr << "( " << x[0] << ", " << x[1] << ", " << x[2]
+		  <<  " )" << std::endl;
+	return FIO_OUT_OF_BOUNDS;
+      } else {
+	// If we've moved out of bounds, cut step size in half and try again
+
+	std::cerr << "Out of bounds.  re-stepping." << std::endl;
+	/*
+	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
+	std::cerr << x[0] << ", " << x[2] << std::endl;
+	*/
+	dx[0] /= 2.;
+	dx[1] /= 2.;
+	dx[2] /= 2.;
+	x[0] = last_x[0] + dx[0];
+	x[1] = last_x[1] + dx[1];
+	x[2] = last_x[2] + dx[2];
+	continue;
+      }
+    } else if(result != FIO_SUCCESS) {
+      return result;
+    }
+
+    // restrict gradient to search direction / plane
+    if(dim==1) {
+      dv[0] = dv[0]*n[0];
+      dv[1] = dv[1]*n[1];
+      dv[2] = dv[2]*n[2];
+    } else if(dim==2) {
+      dv[0] = dv[0]*(1. - n[0]);
+      dv[1] = dv[1]*(1. - n[1]);
+      dv[2] = dv[2]*(1. - n[2]);
+    }
+    double df = sqrt(dv[0]*dv[0] + dv[1]*dv[1] + dv[2]*dv[2]);
+
+    result = f->eval(x, val, h);
+    /*
+    std::cerr << "Te( " << x[0] << ", " << x[1] << ", " << x[2] << " ) = "
+	      << *val << std::endl;
+    */
+    
+    if(fabs(df) < tol) {
+      /*
+      std::cerr << "Found maximum at ("
+		<< x[0] << ", " << x[1] << ", " << x[2]
+		<< " with value " << *val << std::endl;
+      */
+      return FIO_SUCCESS;
+    }
+
+    // find the derivative of |grad(f)| in the direction of steepest descent
+    double x1[3], dv1[3], df1;
+    const double del = 1e-6;
+    x1[0] = x[0] + dv[0]*del/df;
+    x1[1] = x[1] + dv[1]*del/df;
+    x1[2] = x[2] + dv[2]*del/df;
+
+    result = f->eval_deriv(x1, dv1, h);
+    df1 = sqrt(dv1[0]*dv1[0] + dv1[1]*dv1[1] + dv1[2]*dv1[2]);
+
+    double ddf = (df1 - df) / del;
+
+    double dl = -df / ddf;
+
+    // take a newton step in the direction of steepest descent
+    dx[0] = dv[0]*dl/df;
+    dx[1] = dv[1]*dl/df;
+    dx[2] = dv[2]*dl/df;
+
+    if(dl > max_step) {
+      dx[0] *= max_step/dl;
+      dx[1] *= max_step/dl;
+      dx[2] *= max_step/dl;
+    }
+
+    last_x[0] = x[0];
+    last_x[1] = x[1];
+    last_x[2] = x[2];
+    x[0] += dx[0];
+    x[1] += dx[1];
+    x[2] += dx[2];
+
+    if(x[1] < 0.) x[1] += toroidal_extent;
+    if(x[1] >= toroidal_extent) x[1] -= toroidal_extent;
+  }
+
+  std::cerr << "Error: fio_find_max did not converge after " << max_its
+	    << " iterations" << std::endl;
+
+  /*
+  x[0] = x0[0];
+  x[1] = x0[1];
+  x[2] = x0[2];
   */
-  return FIO_SUCCESS;
+  return FIO_DIVERGED;
 }
 
 
@@ -252,7 +392,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 
     result = fio_find_val(f, val, x, tol, max_step, 2, norm, h);
 
-    if(result != FIO_SUCCESS) {
+    if(result == FIO_OUT_OF_BOUNDS) {
       std::cerr << "fio_find_val failed at nn = " << nn << "\n"
 		<< " x = " << x[0] << " " << x[1] << " " << x[2] << "\n"
 		<< " norm = " << norm[0] << " " << norm[1] << " " << norm[2] << "\n"

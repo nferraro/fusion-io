@@ -1,6 +1,9 @@
 #ifndef FIO_ISOSURFACE_H
 #define FIO_ISOSURFACE_H
 
+int fio_find_max(fio_field* f, double* val, double* x,
+		 const double tol, const double max_step, 
+		 const int dim, const double* norm, fio_hint h=0);
 int fio_find_val(fio_field* f, const double val, double* x,
 		 const double tol, const double max_step, 
 		 const int dim, const double* axis, fio_hint h=0);
