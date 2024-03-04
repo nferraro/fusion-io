@@ -1017,12 +1017,11 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   for(int i=0; i<nphi; i++) {
     double** path_pol0;
 
+    phi[i] = 2.*M_PI*i/nphi;
 
     // find axis
     // ! need to do this
-
-    
-    x[1] = 2.*M_PI*i/nphi;
+    x[1] = phi[i];
     x[2] = axis[2];
 
     if(i==0) {
