@@ -182,77 +182,75 @@ int main(int argc, char* argv[])
 		  << std::endl;
 	break;
       }
-
-      // Find electron temperature on surface
-      double temp;
-      result = electron_temperature.eval(x, &temp, h);
-      if(result != FIO_SUCCESS) {
-	std::cerr << "Error evaluating electron temperature" << std::endl;
-	break;
-      }
-      std::cerr << "Found Te = " << temp
-		<< ", psi_norm = " << psi_norm << std::endl;
-      
-      char* label;
-      char surf_label[256];
-
-      sprintf(surf_label, "%d", s);
-      label = surf_label;
-
-      path_surf[0] = &(path[0][s*nphi*ntheta]);
-      path_surf[1] = &(path[1][s*nphi*ntheta]);
-      path_surf[2] = &(path[2][s*nphi*ntheta]);
-
-      result = fio_gridded_isosurface(&electron_temperature, temp, x,
-				      axis_3d, dl_tor, dl_pol, tol, max_step,
-				      nphi, ntheta, 
-				      phi, theta,
-				      path_surf, label, h);
-
-      if(result!=FIO_SUCCESS) {
-	std::cerr << "Error finding surface at Te = " << temp << std::endl;
-	continue;
-      }
-
-
-      // Estimate q by averaging q over each toroidal plane
-      double q_plane;
-      q[s] = 0.;
-
-      for(int i=0; i<nphi; i++) {
-        path_plane[0] = &(path_surf[0][i*ntheta]);
-        path_plane[1] = &(path_surf[1][i*ntheta]);
-        path_plane[2] = &(path_surf[2][i*ntheta]);
-
-	b_plane[0] = &(b[0][s*nphi*ntheta+i*ntheta]);
-	b_plane[1] = &(b[1][s*nphi*ntheta+i*ntheta]);
-	b_plane[2] = &(b[2][s*nphi*ntheta+i*ntheta]);
-	result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
-				  &(bpol[i*ntheta]), b_plane, h);
-
-        //      std::cerr << "q_plane = " << q_plane << std::endl;              
-	q[s] += q_plane;
-      }
-
-      // Calculate q
-      psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
-      q[s] /= nphi;
-      std::cerr <<  " q = " <<  q[s] << std::endl;                    
-
-      // Calculate flux surface averages for profiles
-      te[s] = temp;
-      result = fio_surface_average(&electron_density, nphi*ntheta, path_surf,
-				   &(ne[s]), bpol, h);
-      result = fio_surface_average(&ion_temperature, nphi*ntheta, path_surf,
-				   &(ti[s]), bpol, h);
-      result = fio_surface_average(&ion_density, nphi*ntheta, path_surf,
-				   &(ni[s]), bpol, h);
-
-      gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
-      if(s < nr-1)
-	gplot << ", \\\n";
     }
 
+    // Find electron temperature on surface
+    double temp;
+    result = electron_temperature.eval(x, &temp, h);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error evaluating electron temperature" << std::endl;
+      break;
+    }
+    std::cerr << "Found Te = " << temp
+	      << ", psi_norm = " << psi_norm << std::endl;
+
+    char* label;
+    char surf_label[256];
+
+    sprintf(surf_label, "%d", s);
+    label = surf_label;
+
+    path_surf[0] = &(path[0][s*nphi*ntheta]);
+    path_surf[1] = &(path[1][s*nphi*ntheta]);
+    path_surf[2] = &(path[2][s*nphi*ntheta]);
+
+    result = fio_gridded_isosurface(&electron_temperature, temp, x,
+				    axis_3d, dl_tor, dl_pol, tol, max_step,
+				    nphi, ntheta, 
+				    phi, theta,
+				    path_surf, label, h);
+
+    if(result!=FIO_SUCCESS) {
+      std::cerr << "Error finding surface at Te = " << temp << std::endl;
+      continue;
+    }
+
+    // Estimate q by averaging q over each toroidal plane
+    double q_plane;
+    q[s] = 0.;
+
+    for(int i=0; i<nphi; i++) {
+      path_plane[0] = &(path_surf[0][i*ntheta]);
+      path_plane[1] = &(path_surf[1][i*ntheta]);
+      path_plane[2] = &(path_surf[2][i*ntheta]);
+
+      b_plane[0] = &(b[0][s*nphi*ntheta+i*ntheta]);
+      b_plane[1] = &(b[1][s*nphi*ntheta+i*ntheta]);
+      b_plane[2] = &(b[2][s*nphi*ntheta+i*ntheta]);
+      result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
+				&(bpol[i*ntheta]), b_plane, h);
+
+        //      std::cerr << "q_plane = " << q_plane << std::endl;              
+      q[s] += q_plane;
+    }
+
+    // Calculate q
+    psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
+    q[s] /= nphi;
+    std::cerr <<  " q = " <<  q[s] << std::endl;                    
+
+    // Calculate flux surface averages for profiles
+    te[s] = temp;
+    result = fio_surface_average(&electron_density, nphi*ntheta, path_surf,
+				 &(ne[s]), bpol, h);
+    result = fio_surface_average(&ion_temperature, nphi*ntheta, path_surf,
+				 &(ti[s]), bpol, h);
+    result = fio_surface_average(&ion_density, nphi*ntheta, path_surf,
+				 &(ni[s]), bpol, h);
+
+    gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
+    if(s < nr-1)
+      gplot << ", \\\n";
   }
 
   gplot << std::endl;  
