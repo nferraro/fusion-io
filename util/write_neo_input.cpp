@@ -106,6 +106,8 @@ int main(int argc, char* argv[])
   double* te = new double[nr];
   double* ni = new double[nr];
   double* ti = new double[nr];
+  double* psi_t = new double[nr];
+  double* dpsi_t = new double[nr];
   double** axis_3d = new double*[nphi];
   for(int i=0; i<nphi; i++)
     axis_3d[i] = new double[3];
@@ -258,15 +260,6 @@ int main(int argc, char* argv[])
   splot.close();
 
 
-  // Create netcdf file
-  std::cerr << "Writing netcdf file" << std::endl;
-
-  int ncid;
-  result = nc_create("neo_input.nc", NC_CLOBBER, &ncid);
-  if(result != 0) {
-    std::cerr << "Error opening netcdf file\n" << nc_strerror(result)
-	      << std::endl;
-  }
 
   // swap indices
   double* R = new double[nr*nphi*ntheta];
@@ -288,6 +281,7 @@ int main(int argc, char* argv[])
   }
 
   // Calculate Jacobian
+  std::cerr << "Calculating Jacobian" << std::endl;
   double* Jac = new double[nr*nphi*ntheta];
   double* dPsids = new double[nr*nphi];
   
@@ -335,8 +329,6 @@ int main(int argc, char* argv[])
   }
 
   // sanity check of toroidal flux
-  double *psi_t = new double[nr];
-  double *dpsi_t = new double[nr];
   for(int j=0; j<nphi; j++) {
     double flux = 0.;
     for(int i=0; i<nr; i++) {
@@ -353,16 +345,29 @@ int main(int argc, char* argv[])
 	}
       }
     }
+    /*
     std::cerr << "Total toroidal flux at phi = " << phi[j]
 	      << ": " << flux << std::endl;
+    */
   }
 
-  
+  // Create netcdf file
+  std::cerr << "Writing netcdf file" << std::endl;
+
+  int ncid;
+  result = nc_create("neo_input.nc", NC_CLOBBER, &ncid);
+  if(result != 0) {
+    std::cerr << "Error opening netcdf file\n" << nc_strerror(result)
+	      << std::endl;
+  }
+
+  //  std::cerr << " attributes..." << std::endl;  
   nc_put_att_int(ncid, NC_GLOBAL, "version", NC_SHORT, 1, &version);
   nc_put_att_double(ncid, NC_GLOBAL, "ion_mass", NC_FLOAT, 1, &ion_mass);
   nc_put_att_double(ncid, NC_GLOBAL, "psi_0", NC_FLOAT, 1, &psi0);
   nc_put_att_double(ncid, NC_GLOBAL, "psi_1", NC_FLOAT, 1, &psi1);
 
+  //  std::cerr << " defining variables..." << std::endl;  
   int nr_dimid, np_dimid, nt_dimid, npsi_dimid;
   nc_def_dim(ncid, "npsi", nr,   &npsi_dimid);
   nc_def_dim(ncid, "nr", nr,     &nr_dimid);
@@ -399,6 +404,7 @@ int main(int argc, char* argv[])
 
   nc_enddef(ncid);
 
+  //  std::cerr << " writing variables..." << std::endl;  
   nc_put_var_double(ncid, phi_id, phi);
   nc_put_var_double(ncid, q_id, q);
   nc_put_var_double(ncid, psi_id, psi_surf);
@@ -417,6 +423,9 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, dpsi_t_id, dpsi_t);
 
   nc_close(ncid);
+
+  std::cerr << "Done writing netcdf file." << std::endl;
+  std::cerr << "Freeing memory." << std::endl;
 
   delete[] R;
   delete[] Z;
@@ -466,6 +475,7 @@ int main(int argc, char* argv[])
   */
   delete_sources();
 
+  std::cerr << "Done." << std::endl;
   return 0;
 }
 
