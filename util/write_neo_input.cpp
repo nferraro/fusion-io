@@ -92,10 +92,10 @@ int main(int argc, char* argv[])
   double* phi = new double[nphi];
   double** path_plane = new double*[3];  // contains path of one toroidal plane
   double** path_surf = new double*[3];   // contains path of one surface
-  double* bpol = new double[nphi*ntheta];
+  //  double* bpol = new double[nphi*ntheta];
   //  double* btor = new double[nr*nphi*ntheta];
   double** b = new double*[3];
-  double** b_plane = new double*[3];
+  double** b_surf = new double*[3];
   b[0] = new double[nr*nphi*ntheta];
   b[1] = new double[nr*nphi*ntheta];
   b[2] = new double[nr*nphi*ntheta];
@@ -108,6 +108,8 @@ int main(int argc, char* argv[])
   double* ti = new double[nr];
   double* psi_t = new double[nr];
   double* dpsi_t = new double[nr];
+  double* psi_p = new double[nr];
+  double* dpsi_p = new double[nr];
   double** axis_3d = new double*[nphi];
   for(int i=0; i<nphi; i++)
     axis_3d[i] = new double[3];
@@ -217,39 +219,8 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    // Estimate q by averaging q over each toroidal plane
-    double q_plane;
-    q[s] = 0.;
-
-    for(int i=0; i<nphi; i++) {
-      path_plane[0] = &(path_surf[0][i*ntheta]);
-      path_plane[1] = &(path_surf[1][i*ntheta]);
-      path_plane[2] = &(path_surf[2][i*ntheta]);
-
-      b_plane[0] = &(b[0][s*nphi*ntheta+i*ntheta]);
-      b_plane[1] = &(b[1][s*nphi*ntheta+i*ntheta]);
-      b_plane[2] = &(b[2][s*nphi*ntheta+i*ntheta]);
-      result = fio_q_at_surface(&mag, ntheta, path_plane, &q_plane,
-				&(bpol[i*ntheta]), b_plane, h);
-
-        //      std::cerr << "q_plane = " << q_plane << std::endl;              
-      q[s] += q_plane;
-    }
-
-    // Calculate q
-    psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
-    q[s] /= nphi;
-    std::cerr <<  " q = " <<  q[s] << std::endl;                    
-
-    // Calculate flux surface averages for profiles
     te[s] = temp;
-    result = fio_surface_average(&electron_density, nphi*ntheta, path_surf,
-				 &(ne[s]), bpol, h);
-    result = fio_surface_average(&ion_temperature, nphi*ntheta, path_surf,
-				 &(ti[s]), bpol, h);
-    result = fio_surface_average(&ion_density, nphi*ntheta, path_surf,
-				 &(ni[s]), bpol, h);
-
+    
     gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
     if(s < nr-1)
       gplot << ", \\\n";
@@ -259,7 +230,28 @@ int main(int argc, char* argv[])
   gplot.close();
   splot.close();
 
+  // Calculate Jacobian
+  std::cerr << "Calculating the Jacobian..." << std::endl;
+  double* jac = new double[nr*nphi*ntheta];
+  result = fio_isosurface_jacobian(nr, nphi, ntheta, path, jac);
+  if(result != FIO_SUCCESS)
+    std::cerr << "Error evaluating jacobian" << std::endl;
 
+  // calculate B at each point
+  std::cerr << "Calculating B on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&mag, nr*nphi*ntheta, path, b, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding B" << std::endl;
+  }
+
+  // Calculate flux surface averages for profiles
+  std::cerr << "Calculating flux surface averages..." << std::endl;  
+  result = fio_surface_average(&electron_density, nr, nphi, ntheta, path,
+			       jac, ne, h);
+  result = fio_surface_average(&ion_temperature, nr, nphi, ntheta, path,
+			       jac, ti, h);
+  result = fio_surface_average(&ion_density, nr, nphi, ntheta, path,
+			       jac, ni, h);
 
   // swap indices
   double* R = new double[nr*nphi*ntheta];
@@ -267,10 +259,12 @@ int main(int argc, char* argv[])
   double* BR   = new double[nr*nphi*ntheta];
   double* BPhi = new double[nr*nphi*ntheta];
   double* BZ   = new double[nr*nphi*ntheta];
+  double* Jac = new double[nr*nphi*ntheta];
 
   for(int i=0; i<nr; i++) {
     for(int j=0; j<nphi; j++) {
       for(int k=0; k<ntheta; k++) {
+	Jac[i + j*nr + k*nr*nphi] = jac[k + j*ntheta + i*ntheta*nphi];
 	R[i + j*nr + k*nr*nphi] = path[0][k + j*ntheta + i*ntheta*nphi];
 	Z[i + j*nr + k*nr*nphi] = path[2][k + j*ntheta + i*ntheta*nphi];
 	BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
@@ -280,16 +274,16 @@ int main(int argc, char* argv[])
     }
   }
 
-  // Calculate Jacobian
-  std::cerr << "Calculating Jacobian" << std::endl;
-  double* Jac = new double[nr*nphi*ntheta];
+
+  // Toroidal Flux
+  std::cerr << "Calculating toroidal flux" << std::endl;
   double* dPsids = new double[nr*nphi];
   
   for(int i=0; i<nr; i++) {
     for(int j=0; j<nphi; j++) {
       dPsids[i+j*nr] = 0.;
       for(int k=0; k<ntheta; k++) {
-	double dRdi, dZdj, dRdj, dZdi;
+	double dRdi, dZdi, dRdk, dZdk;
 	int ijk = i + j*nr + k*nr*nphi;
 
 	if(i==0) {
@@ -304,18 +298,156 @@ int main(int argc, char* argv[])
 	};
 	int km = (k==0 ? ntheta-1 : k-1);
 	int kp = (k==ntheta-1 ? 0 : k+1);
+	dRdk = (R[i + j*nr + kp*nr*nphi] - R[i + j*nr + km*nr*nphi])/2.;
+	dZdk = (Z[i + j*nr + kp*nr*nphi] - Z[i + j*nr + km*nr*nphi])/2.;
 
-	dRdj = (R[i + j*nr + kp*nr*nphi] - R[i + j*nr + km*nr*nphi])/2.;
-	dZdj = (Z[i + j*nr + kp*nr*nphi] - Z[i + j*nr + km*nr*nphi])/2.;
-
-	Jac[ijk] = dRdi*dZdj - dRdj*dZdi;
-
-	// note that btor is stored in [i][j][k] whereas Jac is in [k][j][i]
-	dPsids[i+j*nr] = dPsids[i+j*nr] + Jac[ijk]*b[1][k + j*ntheta + i*ntheta*nphi];
+	// flux through dtheta x dr
+	dPsids[i+j*nr] += BPhi[ijk]*(dRdi*dZdk - dRdk*dZdi);
       }
     }
   }
+
+  // calculate toroidal flux
+  double fluxt = 0.;
+  for(int i=0; i<nr; i++) {
+    dpsi_t[i] = 0.;
+
+    // calculate mean toroidal flux
+    for(int j=0; j<nphi; j++)
+      dpsi_t[i] += dPsids[i+j*nr];
+    dpsi_t[i] /= nphi;
+    fluxt += dpsi_t[i];
+    psi_t[i] = fluxt;
+
+    // calculate variance in toroidal flux
+    double fluxt_var = 0.;
+    for(int j=0; j<nphi; j++) {
+      double fluxt_j = 0.;
+      for(int ii=0; ii<=i; ii++)
+	fluxt_j += dPsids[ii+j*nr];
+
+      fluxt_var += (fluxt_j - psi_t[i])*(fluxt_j - psi_t[i]);
+    }
+    fluxt_var /= nphi;
+
+    std::cerr << "Toroidal flux at surface " << i << " = "
+	      << psi_t[i] << " +/- " << sqrt(fluxt_var) << std::endl;
+  }
+
+
+  // Poloidal flux
+  std::cerr << "Calculating poloidal flux" << std::endl;
+  double* dpsids = new double[nr*ntheta];
+  double* dpsix  = new double[nr*ntheta];
+  double* dAds = new double[nr*ntheta];
+  double* dVds = new double[nr*ntheta];
+
+  for(int i=0; i<nr; i++) {
+    for(int k=0; k<ntheta; k++) {
+      dpsids[i+k*nr] = 0.;
+      dpsix[i+k*nr] = 0.;
+      dAds[i+k*nr] = 0.;
+
+      // Do integral over phi
+      for(int j=0; j<nphi; j++) {
+	double dRdi, dZdi, dRdj, dZdj, dRdk, dZdk, dphidj;
+	int ijk = i + j*nr + k*nr*nphi;
+
+	if(i==0) {
+	  dRdi = R[ijk + 1] - R[ijk];
+	  dZdi = Z[ijk + 1] - Z[ijk];
+	} else if(i==nr-1) {
+	  dRdi = R[ijk] - R[ijk - 1];
+	  dZdi = Z[ijk] - Z[ijk - 1];
+	} else {
+	  dRdi = (R[ijk+1] - R[ijk-1])/2.;
+	  dZdi = (Z[ijk+1] - Z[ijk-1])/2.;
+	};
+	int jm = (j==0 ? nphi-1 : j-1);
+	int jp = (j==nphi-1 ? 0 : j+1);
+	dRdj = (R[i + jp*nr + k*nr*nphi] - R[i + jm*nr + k*nr*nphi])/2.;
+	dZdj = (Z[i + jp*nr + k*nr*nphi] - Z[i + jm*nr + k*nr*nphi])/2.;
+	dphidj = 2.*M_PI / nphi;
+
+	int km = (k==0 ? ntheta-1 : k-1);
+	int kp = (k==ntheta-1 ? 0 : k+1);
+	dRdk = (R[i + j*nr + kp*nr*nphi] - R[i + j*nr + km*nr*nphi])/2.;
+	dZdk = (Z[i + j*nr + kp*nr*nphi] - Z[i + j*nr + km*nr*nphi])/2.;
+
+	// B . dphi x dr (poloidal flux)
+	dpsids[i + k*nr] -= R[ijk]*dphidj*
+	  ( BZ[ijk] * dRdi - BR[ijk] * dZdi) - 
+	    BPhi[ijk] * (dRdi*dZdj - dRdj*dZdi);
+	
+	// B . dtheta x dphi (normal flux)
+	dpsix[i + k*nr] -= R[ijk]*dphidj*
+	  ( BR[ijk] * dZdk - BZ[ijk] * dRdk) -
+	  BPhi[ijk] * (dRdj*dZdk - dRdk*dZdj);
+
+	dAds[i + k*nr] += Jac[ijk] / sqrt(dRdk*dRdk + dZdk*dZdk);
+	dVds[i + k*nr] += Jac[ijk];
+      }
+    }
+  }
+
+  // calculate poloidal flux
+  double fluxp = 0.;
+  for(int i=0; i<nr; i++) {
+    dpsi_p[i] = 0.;
+
+    // calculate mean poloidal flux
+    for(int k=0; k<ntheta; k++)
+      dpsi_p[i] += dpsids[i+k*nr];
+    dpsi_p[i] /= ntheta;
+    fluxp += dpsi_p[i];   
+    psi_p[i] = fluxp;
+
+    // calculate variance in poloidal flux
+    double fluxp_var = 0.;
+    for(int k=0; k<ntheta; k++) {
+      double fluxp_k = 0.;
+      for(int ii=0; ii<=i; ii++)
+	fluxp_k += dpsids[ii+k*nr];
+      
+      fluxp_var += (fluxp_k - psi_p[i])*(fluxp_k - psi_p[i]);
+    }
+    fluxp_var /= ntheta;
+
+    std::cerr << "Poloidal flux at surface " << i << " = "
+	      << psi_p[i] << " +/- " << sqrt(fluxp_var) << std::endl;
+  }
+
+  // Sanity check: calculate normal flux through surfaces
+  // (should be zero)
+  for(int i=0; i<nr; i++) {
+    double flux_norm = 0;
+    for(int k=0; k<ntheta; k++) {
+      flux_norm += dpsix[i + k*nr];
+    }
+    std::cerr << "Net flux through surface " << i << ": "
+	      << flux_norm << std::endl;
+  }
+
+  // Calculate q
+  for(int i=0; i<nr; i++) {
+    q[i] = dpsi_t[i] / dpsi_p[i];
+    std::cerr << "q at surface " << i << ": "
+	      << q[i] << std::endl;
+  }
+
+
+  // Calculate volume inside each surface
+  double volume = 0;
+  for(int i=0; i<nr; i++) {
+    for(int k=0; k<ntheta; k++) {
+      volume += dVds[i + k*nr];
+    }
  
+    std::cerr << "Net volume inside surface " << i << ": "
+	      << volume << std::endl;
+  }
+
+
   double ion_mass = 2.;  // TODO: generalize this
   int version = 3;
 
@@ -326,29 +458,6 @@ int main(int argc, char* argv[])
   for(int i=0; i<nphi; i++) { 
     phi[i] = 180.*phi[i]/M_PI;
     //    std::cerr << "phi[" << i << "] = " << phi[i] << std::endl;
-  }
-
-  // sanity check of toroidal flux
-  for(int j=0; j<nphi; j++) {
-    double flux = 0.;
-    for(int i=0; i<nr; i++) {
-      flux = flux + dPsids[i + j*nr];
-      if(j==0) {
-	psi_t[i] = flux;
-	dpsi_t[i] = dPsids[i + j*nr];
-	std::cerr << "Flux inside surface " << i << " at phi=0: " << psi_t[i] << std::endl;
-      } else {
-	if(abs(flux - psi_t[i]) > 0.01*abs(psi_t[i])) {
-	  std::cerr << "Warning: toroidal flux at " << phi[j] << ": " << flux
-		    << "         toroidal flux at " << phi[0] << ": " << psi_t[i]
-		    << std::endl;
-	}
-      }
-    }
-    /*
-    std::cerr << "Total toroidal flux at phi = " << phi[j]
-	      << ": " << flux << std::endl;
-    */
   }
 
   // Create netcdf file
@@ -435,23 +544,24 @@ int main(int argc, char* argv[])
   delete[] Jac;
   delete[] dPsids;
 
+  delete[] jac;
   delete[] theta;
   delete[] phi;
   delete[] q;
   delete[] psi_surf;
   delete[] psi_t;
   delete[] dpsi_t;
+  delete[] psi_p;
+  delete[] dpsi_p;
   delete[] ne;
   delete[] te;
   delete[] ni;
   delete[] ti;
-  delete[] bpol;
-  //  delete[] btor;
   delete[] b[0];
   delete[] b[1];
   delete[] b[2];
   delete[] b;
-  delete[] b_plane;
+  delete[] b_surf;
   delete[] path_plane;
   delete[] path_surf;
   delete[] path[0];

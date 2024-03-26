@@ -1105,15 +1105,15 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 }
 
 
-int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
-		     double* bpol, double** bout, fio_hint h=0)
+int fio_q_at_plane(fio_field* f, const int n, double** x, double* q,
+		   double* bpol, double** bout, fio_hint h=0)
 {
   int result;
 
   *q = 0.;
 
   if(f->dimension() != 3) {
-    std::cerr << "Error in fio_q_at_surface: field is not a vector field"
+    std::cerr << "Error in fio_q_at_plane: field is not a vector field"
 	      << std::endl;
     return FIO_UNSUPPORTED;
   }
@@ -1156,6 +1156,145 @@ int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
   }
 
   *q /= (2.*M_PI);
+
+  return FIO_SUCCESS;
+}
+
+int fio_eval_on_path(fio_field* f, const int n, double** x,
+		     double** fout, fio_hint h=0)
+{
+  int result;
+  int dim = f->dimension();
+
+  double* b = new double[dim];
+  
+  for(int i=0; i<n; i++) {
+    double p[3];
+    
+    p[0] = x[0][i];
+    p[1] = x[1][i];
+    p[2] = x[2][i];
+
+    result = f->eval(p, b, h);
+    if(result != FIO_SUCCESS) 
+      return result;
+
+    for(int j=0; j<dim; j++)
+      fout[j][i] = b[j];
+  }
+
+  delete[] b;
+
+  return FIO_SUCCESS;
+}
+
+
+int fio_surface_average(fio_field* f, int ns, int nphi, int ntheta,
+			double** x, double* jac,
+			double* fout, fio_hint h=0)
+{
+  if(f->dimension() > 1) {
+    std::cerr << "Error: can only surface-average scalar fields"
+	      << std::endl;
+    return FIO_UNSUPPORTED;
+  }
+
+  int di = ntheta*nphi;
+  int dj = ntheta;
+  int dk = 1;
+
+  for(int i=0; i<ns; i++) {
+    fout[i] = 0.;
+    double dV = 0.;
+    for(int j=0; j<nphi; j++) {
+      for(int k=0; k<ntheta; k++) {
+	int ijk = k*dk + j*dj + i*di;
+	
+	double p[3];
+	p[0] = x[0][ijk];
+	p[1] = x[1][ijk];
+	p[2] = x[2][ijk];
+
+	double b;
+	int result = f->eval(p, &b, h);
+	if(result != FIO_SUCCESS) 
+	  return result;
+
+	fout[i] += b*jac[ijk];
+	dV += jac[ijk];
+      }
+    }
+    fout[i] /= dV;
+  }
+
+  return FIO_SUCCESS;
+}
+
+int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
+			    double** x, double* jac)
+{
+  int result;
+
+  if(ns==1) {
+    std::cerr << "Error: cannot calculate jacobian with one surface"
+	      << std::endl;
+    return FIO_UNSUPPORTED;
+  }
+
+  int di = ntheta*nphi;
+  int dj = ntheta;
+  int dk = 1;
+
+  double* R = x[0];
+  double* Z = x[2];
+  double dphidj = 2.*M_PI / nphi;
+
+  int jac_sign = 0;
+
+  for(int i=0; i<ns; i++ ) {
+    for(int j=0; j<nphi; j++) {
+      for(int k=0; k<ntheta; k++) {
+	double dRdi, dRdj, dRdk, dZdi, dZdj, dZdk;
+	int ijk = k*dk + j*dj + i*di;
+
+	if(i==0) {
+	  dRdi = R[ijk + di] - R[ijk];
+	  dZdi = Z[ijk + di] - Z[ijk];
+	} else if(i==ns-1) {
+	  dRdi = R[ijk] - R[ijk - di];
+	  dZdi = Z[ijk] - Z[ijk - di];
+	} else {
+	  dRdi = (R[ijk+di] - R[ijk-di])/2.;
+	  dZdi = (Z[ijk+di] - Z[ijk-di])/2.;
+	}
+	
+	int jm = (j==0 ? nphi-1 : j-1);
+	int jp = (j==nphi-1 ? 0 : j+1);
+	dRdj = (R[k*dk + jp*dj + i*di] - R[k*dk + jm*dj + i*di])/2.;
+	dZdj = (Z[k*dk + jp*dj + i*di] - Z[k*dk + jm*dj + i*di])/2.;
+
+	int km = (k==0 ? ntheta-1 : k-1);
+	int kp = (k==ntheta-1 ? 0 : k+1);
+	dRdk = (R[kp*dk + j*dj + i*di] - R[km*dk + j*dj + i*di])/2.;
+	dZdk = (Z[kp*dk + j*dj + i*di] - Z[km*dk + j*dj + i*di])/2.;
+	
+	// di . (dk x dj)
+	// where i is the radial index
+	//       k is the poloidal index
+	//       j is the toroidal index
+	jac[ijk] = (dRdi*dZdk - dRdk*dZdi)*R[ijk]*dphidj;
+
+	if(jac_sign==0) {
+	  jac_sign = (jac[ijk] > 0 ? 1 : -1);
+	} else {
+	  if(jac[ijk]*jac_sign < 0) {
+	    std::cerr << "Error: Jacobian flips sign." << std::endl;
+	    return FIO_UNSUPPORTED;
+	  }
+	}
+      }
+    }
+  }
 
   return FIO_SUCCESS;
 }

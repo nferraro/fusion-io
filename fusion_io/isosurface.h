@@ -1,6 +1,8 @@
 #ifndef FIO_ISOSURFACE_H
 #define FIO_ISOSURFACE_H
 
+int fio_eval_on_path(fio_field* f, const int n, double** x,
+		     double** fout, fio_hint h=0);
 int fio_find_max(fio_field* f, double* val, double* x,
 		 const double tol, const double max_step, 
 		 const int dim, const double* norm, fio_hint h=0);
@@ -34,10 +36,17 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 			   double* phi, double* theta,
 			   double** path, const char* label, fio_hint h=0);
 
-int fio_q_at_surface(fio_field* f, const int n, double** x, double* q,
-		     double* bpol, double** bout, fio_hint h=0);
+int fio_q_at_plane(fio_field* f, const int n, double** x, double* q,
+		   double* bpol, double** bout, fio_hint h=0);
+/*
 int fio_surface_average(fio_field* f, const int n, double** x, double* a,
 			double* bpol, fio_hint h=0);
+*/
+int fio_surface_average(fio_field* f, int ns, int nphi, int ntheta,
+			double** x, double* jac,
+			double* fout, fio_hint h=0);
 
+int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
+			    double** x, double* jac);
 
 #endif
