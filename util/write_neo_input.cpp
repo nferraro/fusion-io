@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
       // use Te as radial coordinate
       double te0 = (te_end - te_start)*s/(nr - 1.) + te_start;
       std::cerr << " ( Te = " << te0 << " )" << std::endl;
-      result = fio_find_val(&electron_temperature, te0, x, 1., 0.1, 1, axis, h);
+      result = fio_find_val(&electron_temperature, te0, x, tol, max_step, 1, axis, h);
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding Te = " << te0  << std::endl;
 	break;
