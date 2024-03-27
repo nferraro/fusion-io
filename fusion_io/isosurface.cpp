@@ -852,7 +852,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
       theta[i] = (double)i/(double)(m) * 2.*M_PI;
       l = theta[i];
     } else {
-      theta[i] = (double)i/(double)(m-1);
+      theta[i] = (double)i/(double)(m);
       l = theta[i]*l0[m0];
     }
     /*
