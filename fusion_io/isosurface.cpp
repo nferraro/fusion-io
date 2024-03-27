@@ -1250,6 +1250,7 @@ int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
   double dphidj = 2.*M_PI / nphi;
 
   int jac_sign = 0;
+  int ierr = FIO_SUCCESS;
 
   for(int i=0; i<ns; i++ ) {
     for(int j=0; j<nphi; j++) {
@@ -1285,18 +1286,20 @@ int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
 	jac[ijk] = (dRdi*dZdk - dRdk*dZdi)*R[ijk]*dphidj;
 
 	if(jac_sign==0) {
-	  jac_sign = (jac[ijk] > 0 ? 1 : -1);
+	  jac_sign = (jac[ijk] > 0) ? 1 : -1;
 	} else {
-	  if(jac[ijk]*jac_sign < 0) {
-	    std::cerr << "Error: Jacobian flips sign." << std::endl;
-	    return FIO_UNSUPPORTED;
+	  if(jac[ijk]*jac_sign <= 0.) {
+	    std::cerr << "Error: Jacobian flips sign. "
+		      << i << ", " << j << ", " << k << std::endl;
+	    ierr = 1.;
 	  }
 	}
+
       }
     }
   }
 
-  return FIO_SUCCESS;
+  return ierr;
 }
 
 
