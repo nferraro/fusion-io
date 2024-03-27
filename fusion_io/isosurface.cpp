@@ -1017,8 +1017,8 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
       x[0] = guess[0];
       x[2] = guess[2];
     } else {
-      x[0] = axis[i-1][0];
-      x[2] = axis[i-1][2];
+      x[0] = axis[0][i-1];
+      x[2] = axis[2][i-1];
     }
     result = fio_find_max(f, &te_max, x, 1., 0.1, 2, t, h);
     if(result != FIO_SUCCESS) {
@@ -1026,9 +1026,9 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 		<< phi[i] << std::endl;
       break;
     }
-    axis[i][0] = x[0];
-    axis[i][1] = x[1];
-    axis[i][2] = x[2];
+    axis[0][i] = x[0];
+    axis[1][i] = x[1];
+    axis[2][i] = x[2];
 
     // find initial point in horizontal line from axis
     t[0] = 1.;
@@ -1046,7 +1046,11 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
 	      << " phi = " << x[1] << std::endl;
     */
 
-    result = fio_isosurface_2d(f, val, x, axis[i], norm, 0, dl_pol, tol, max_step,
+    double ax[3];
+    ax[0] = axis[0][i];
+    ax[1] = axis[1][i];
+    ax[2] = axis[2][i];
+    result = fio_isosurface_2d(f, val, x, ax, norm, 0, dl_pol, tol, max_step,
 			       &n, &path_pol0, h);
 
     if(result != FIO_SUCCESS) {

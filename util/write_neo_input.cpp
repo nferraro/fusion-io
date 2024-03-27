@@ -110,10 +110,11 @@ int main(int argc, char* argv[])
   double* dpsi_t = new double[nr];
   double* psi_p = new double[nr];
   double* dpsi_p = new double[nr];
-  double** axis_3d = new double*[nphi];
-  for(int i=0; i<nphi; i++)
-    axis_3d[i] = new double[3];
-
+  double* axis_3d[3];
+  axis_3d[0] = new double[nphi];
+  axis_3d[1] = new double[nphi];
+  axis_3d[2] = new double[nphi];
+  
   // Surfaces
   std::ofstream gplot, splot;
   gplot.open("plot_surfaces", std::ofstream::out|std::ofstream::trunc);
@@ -449,10 +450,13 @@ int main(int argc, char* argv[])
 
 
   double ion_mass = 2.;  // TODO: generalize this
-  int version = 3;
+  int version = 4;
 
   // version 3
   // * Includes calculation of B_tor and Jacobian
+
+  // version 4
+  // * Includes 3D axis info
 
   // convert phi to degrees
   for(int i=0; i<nphi; i++) { 
@@ -486,6 +490,11 @@ int main(int argc, char* argv[])
   int phi_id;
   nc_def_var(ncid, "Phi", NC_FLOAT, 1, &nt_dimid, &phi_id);
 
+  int axis_r_id;
+  int axis_z_id;
+  nc_def_var(ncid, "axis_R", NC_FLOAT, 1, &nt_dimid, &axis_r_id); // ver 4
+  nc_def_var(ncid, "axis_Z", NC_FLOAT, 1, &nt_dimid, &axis_z_id); // ver 4
+  
   int q_id, psi_id, psi_t_id, dpsi_t_id;
   nc_def_var(ncid, "q", NC_FLOAT, 1, &nr_dimid, &q_id);
   nc_def_var(ncid, "psi", NC_FLOAT, 1, &nr_dimid, &psi_id);
@@ -515,6 +524,8 @@ int main(int argc, char* argv[])
 
   //  std::cerr << " writing variables..." << std::endl;  
   nc_put_var_double(ncid, phi_id, phi);
+  nc_put_var_double(ncid, axis_r_id, axis_3d[0]);
+  nc_put_var_double(ncid, axis_z_id, axis_3d[2]);
   nc_put_var_double(ncid, q_id, q);
   nc_put_var_double(ncid, psi_id, psi_surf);
   nc_put_var_double(ncid, psi0_id, psi_surf);
@@ -568,9 +579,9 @@ int main(int argc, char* argv[])
   delete[] path[1];
   delete[] path[2];
   delete[] path;
-  for(int i=0; i<nphi; i++)
-    delete[] axis_3d[i];
-  delete[] axis_3d;
+  delete[] axis_3d[0];
+  delete[] axis_3d[1];
+  delete[] axis_3d[2];
 
   // Deallocate fields
   src0->deallocate_search_hint(&h);
