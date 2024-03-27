@@ -495,12 +495,13 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "axis_R", NC_FLOAT, 1, &nt_dimid, &axis_r_id); // ver 4
   nc_def_var(ncid, "axis_Z", NC_FLOAT, 1, &nt_dimid, &axis_z_id); // ver 4
   
-  int q_id, psi_id, psi_t_id, dpsi_t_id;
+  int q_id, psi_id, psi_t_id, dpsi_t_id, psi_p_id, dpsi_p_id;
   nc_def_var(ncid, "q", NC_FLOAT, 1, &nr_dimid, &q_id);
   nc_def_var(ncid, "psi", NC_FLOAT, 1, &nr_dimid, &psi_id);
-  nc_def_var(ncid, "Psi_t", NC_FLOAT, 3, &nr_dimid, &psi_t_id);   // added in version 3
-  nc_def_var(ncid, "dPsi_t", NC_FLOAT, 3, &nr_dimid, &dpsi_t_id);   // added in version 3
-
+  nc_def_var(ncid, "Psi_t", NC_FLOAT, 1, &nr_dimid, &psi_t_id);    // ver 3
+  nc_def_var(ncid, "dPsi_t", NC_FLOAT, 1, &nr_dimid, &dpsi_t_id);  // ver 3
+  nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
+  nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
   int ne_id, te_id, ni_id, ti_id, psi0_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
@@ -541,6 +542,8 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, bz_id, BZ);
   nc_put_var_double(ncid, psi_t_id, psi_t);
   nc_put_var_double(ncid, dpsi_t_id, dpsi_t);
+  nc_put_var_double(ncid, psi_p_id, psi_p);
+  nc_put_var_double(ncid, dpsi_p_id, dpsi_p);
 
   nc_close(ncid);
 
