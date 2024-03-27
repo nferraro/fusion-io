@@ -784,19 +784,20 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 		     const int param=0)
 { 
   int dir = 0;
-  double* l0 = new double[m0];
+  double* l0 = new double[m0+1];
 
-  for(int i=0; i<m0; i++) {
+  for(int i=0; i<=m0; i++) {
+    int ii = (i < m0) ? i : 0;
     if(param==1) {
       // parameterize by poloidal angle
       double dx[3];
-      dx[0] = path0[0][i] - axis[0];
-      dx[2] = path0[2][i] - axis[2];
+      dx[0] = path0[0][ii] - axis[0];
+      dx[2] = path0[2][ii] - axis[2];
       l0[i] = atan2(dx[2],dx[0]);
       if(l0[i] < 0.) l0[i] += 2.*M_PI;
     } else if(param==2) {
       // parameterize by toroidal angle
-      l0[i] = path0[1][i];
+      l0[i] = path0[1][ii];
       /*
       if(l0[i] < 0.) {
 	std::cerr << "error: toroidal angle < 0" << std::endl;
@@ -811,11 +812,11 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
 	l0[i] = 0.;
       else {
 	double dx[3];
-	dx[0] = path0[0][i]*cos(path0[1][i]) 
+	dx[0] = path0[0][ii]*cos(path0[1][ii]) 
 	  - path0[0][i-1]*cos(path0[1][i-1]);
-	dx[1] = path0[0][i]*sin(path0[1][i])
+	dx[1] = path0[0][ii]*sin(path0[1][ii])
 	  - path0[0][i-1]*sin(path0[1][i-1]);
-	dx[2] = path0[2][i]-path0[2][i-1];
+	dx[2] = path0[2][ii]-path0[2][i-1];
 	
 	double dl = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
 	l0[i] = l0[i-1] + dl;
@@ -830,7 +831,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
       else if (d*dir < 0) {
 	std::cerr << "Error in fio_gridify_surface_2d: d < 0\n"
 		  << i << " " << l0[i] << " " << l0[i-1] << " " 
-		  << path0[1][i] << std::endl;
+		  << path0[1][ii] << std::endl;
 	return FIO_DIVERGED;
       }
     }
@@ -852,7 +853,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
       l = theta[i];
     } else {
       theta[i] = (double)i/(double)(m-1);
-      l = theta[i]*l0[m0-1];
+      l = theta[i]*l0[m0];
     }
     /*
     path[0][i] = path0[0][i];
@@ -865,7 +866,7 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
       if(j==m0) {
 	std::cerr << " j not found! " << std::endl;
 	std::cerr << "l = " << l << std::endl;
-	std::cerr << "l0[m0-1] = " << l0[m0-1] << std::endl;
+	std::cerr << "l0[m0] = " << l0[m0] << std::endl;
 	/*
 	std::cerr << "gridify_loop called with\n";
 	std::cerr << "m0 = " << m0 << '\n';
@@ -878,9 +879,10 @@ int fio_gridify_loop(const int m0, double** path0, const double* axis,
     }
     double delta_l = l0[j+1] - l0[j];
     double dl = l - l0[j];
-    path[0][i] = path0[0][j]*(1.-dl/delta_l) + path0[0][j+1]*(dl/delta_l);
-    path[1][i] = path0[1][j]*(1.-dl/delta_l) + path0[1][j+1]*(dl/delta_l);
-    path[2][i] = path0[2][j]*(1.-dl/delta_l) + path0[2][j+1]*(dl/delta_l);
+    int jp = (j+1<m0) ? j+1 : 0;
+    path[0][i] = path0[0][j]*(1.-dl/delta_l) + path0[0][jp]*(dl/delta_l);
+    path[1][i] = path0[1][j]*(1.-dl/delta_l) + path0[1][jp]*(dl/delta_l);
+    path[2][i] = path0[2][j]*(1.-dl/delta_l) + path0[2][jp]*(dl/delta_l);
 
     /*
     bool r = true;
