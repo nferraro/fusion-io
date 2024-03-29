@@ -135,9 +135,10 @@ int main(int argc, char* argv[])
   x[2] = 0.;
 
   result = fio_find_max(&electron_temperature, &te_max, x,
-			1., 0.1, 2, n, h);
+			tol, max_step, 2, n, h);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error finding magnetic axis " << std::endl;
+    return result;
   } else {
     std::cerr << "Found magnetic axis" << std::endl;
     std::cerr << "TE MAX = " << te_max << " AT ("
@@ -167,7 +168,7 @@ int main(int argc, char* argv[])
       result = fio_find_val(&electron_temperature, te0, x, tol, max_step, 1, axis, h);
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding Te = " << te0  << std::endl;
-	break;
+	return result;
       }
       psi_norm = (te_max-te0)/te_max;
 
@@ -185,7 +186,7 @@ int main(int argc, char* argv[])
       if(result != FIO_SUCCESS) {
 	std::cerr << "Error finding psi_norm = " << psi_norm
 		  << std::endl;
-	break;
+	return result;
       }
     }
 
@@ -209,6 +210,9 @@ int main(int argc, char* argv[])
     path_surf[1] = &(path[1][s*nphi*ntheta]);
     path_surf[2] = &(path[2][s*nphi*ntheta]);
 
+    x[0] = axis[0];
+    x[1] = 0;
+    x[2] = axis[2];
     result = fio_gridded_isosurface(&electron_temperature, temp, x,
 				    axis_3d, dl_tor, dl_pol, tol, max_step,
 				    nphi, ntheta, 
@@ -217,7 +221,7 @@ int main(int argc, char* argv[])
 
     if(result!=FIO_SUCCESS) {
       std::cerr << "Error finding surface at Te = " << temp << std::endl;
-      continue;
+      return result;
     }
 
     te[s] = temp;
