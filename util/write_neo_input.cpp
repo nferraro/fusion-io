@@ -210,9 +210,9 @@ int main(int argc, char* argv[])
     path_surf[1] = &(path[1][s*nphi*ntheta]);
     path_surf[2] = &(path[2][s*nphi*ntheta]);
 
-    x[0] = axis[0];
-    x[1] = 0;
-    x[2] = axis[2];
+    axis_3d[0][0] = axis[0];
+    axis_3d[1][0] = 0;
+    axis_3d[2][0] = axis[2];
     result = fio_gridded_isosurface(&electron_temperature, temp, x,
 				    axis_3d, dl_tor, dl_pol, tol, max_step,
 				    nphi, ntheta, 
