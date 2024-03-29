@@ -225,6 +225,7 @@ int main(int argc, char* argv[])
     }
 
     te[s] = temp;
+    psi_surf[s] = psi_norm*(psi1 - psi0) + psi0;
     
     gplot << "'surface_" << std::to_string(s) << ".dat' u 2:3 w l";
     if(s < nr-1)
