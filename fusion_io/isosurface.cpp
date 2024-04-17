@@ -247,7 +247,7 @@ int fio_find_max(fio_field* f, double* val, double* x,
       } else {
 	// If we've moved out of bounds, cut step size in half and try again
 
-	std::cerr << "Out of bounds.  re-stepping." << std::endl;
+	std::cerr << "fio_find_max: Out of bounds; re-stepping." << std::endl;
 	/*
 	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
 	std::cerr << x[0] << ", " << x[2] << std::endl;
@@ -1003,6 +1003,11 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
   double x[3];
   x[0] = guess[0];
 
+  double a[3];
+  a[0] = axis[0][0];
+  a[1] = axis[1][0];
+  a[2] = axis[2][0];
+
   // Loop over each toroidal point and calculate poloidal path
   for(int i=0; i<nphi; i++) {
     double** path_pol0;
@@ -1014,29 +1019,24 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     t[0] = 0.;
     t[1] = 1.;
     t[2] = 0.;
-    x[1] = phi[i];
-    if(i==0) {
-      x[0] = guess[0];
-      x[2] = guess[2];
-    } else {
-      x[0] = axis[0][i-1];
-      x[2] = axis[2][i-1];
-    }
-    result = fio_find_max(f, &te_max, x, 1., 0.1, 2, t, h);
+    a[1] = phi[i];
+    
+    result = fio_find_max(f, &te_max, a, tol, max_step, 2, t, h);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error finding magnetic axis at phi = "
 		<< phi[i] << std::endl;
-      break;
+      return result;
     }
-    axis[0][i] = x[0];
-    axis[1][i] = x[1];
-    axis[2][i] = x[2];
+    axis[0][i] = a[0];
+    axis[1][i] = a[1];
+    axis[2][i] = a[2];
 
     // find initial point in horizontal line from axis
     t[0] = 1.;
     t[1] = 0.;
     t[2] = 0.;
-    x[0] = x[0] + 0.02;  // move off axis to avoid zero gradient
+    x[1] = phi[i];
+    x[2] = a[2];
     result = fio_find_val(f, val, x, tol, 0.1, 1, t, h);
 
     if(result != FIO_SUCCESS) {
