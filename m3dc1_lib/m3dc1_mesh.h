@@ -21,9 +21,9 @@ class m3dc1_mesh {
  public:
   int* nneighbors;
   int** neighbor;
+  virtual int max_neighbors() const {return 3;}
 
  protected:
-  virtual int max_neighbors() const {return 3;}
 
   //  static const double tol = 1e-1;
 

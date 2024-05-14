@@ -281,7 +281,7 @@ void m3dc1_file::load_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
 
 bool m3dc1_file::read_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
 {
-  if(version < 35) {
+  if(version < 45) {
     std::cerr << "Mesh adjacency data not found." << std::endl;
     std::cerr << "M3D-C1 output version = " << version << std::endl;
     return false;
