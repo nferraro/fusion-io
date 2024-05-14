@@ -268,7 +268,7 @@ void m3dc1_file::load_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
 
   if(!read_adjacency(mesh, mesh_group))
     mesh->find_neighbors();
-
+  /*
   std::ofstream file;
   file.open("adjacency",std::ofstream::out | std::ofstream::trunc);
   for(int i=0; i<mesh->nelms; i++) {
@@ -277,6 +277,7 @@ void m3dc1_file::load_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
     file << std::endl;
   }
   file.close();
+  */
 }
 
 bool m3dc1_file::read_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
