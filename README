@@ -22,6 +22,18 @@
 
    You will need an installation of HDF5, MPI, and LAPACK
 
+   * If compiling on flux:
+     Recommended modules to compile fusion-io:
+       anaconda3/2023.09-0-gcc-13.2.0-ajty2
+       glib/2.78.0-gcc-11.3.1-d4yec
+       gcc/13.2.0-gcc-11.3.1-tjrkt
+       openmpi-4.1.5/gcc-13.2.0/netcdf-c/4.9.2-ntznx
+       openmpi/4.1.5-gcc-13.2.0-a27lm
+       openmpi-4.1.5/gcc-13.2.0/hdf5/1.14.1-2-evfpn
+       netlib-lapack/3.11.0-gcc-13.2.0-72t2p
+     In addition, to use the Python interface version 13 of libstdcxx must be
+     installed, e.g. conda install -c conda-forge libstdcxx-ng=13
+
    * If compiling on Portal:
      CentOS 6:
        ACML_HOME should also be changed to: /usr/pppl/acml/5.3.1
