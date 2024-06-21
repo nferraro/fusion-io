@@ -11,6 +11,7 @@
 int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
+int ibootstrap;
 double dl_tor = 0.01;     // step size when finding surfaces
 double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
@@ -22,7 +23,7 @@ double te_start = -1;
 double te_end = -1;
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
-fio_compound_field ion_density, ion_temperature, psin, mag;
+fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB;
 double axis[3];
 double psi0, psi1;
 
@@ -99,6 +100,17 @@ int main(int argc, char* argv[])
   b[0] = new double[nr*nphi*ntheta];
   b[1] = new double[nr*nphi*ntheta];
   b[2] = new double[nr*nphi*ntheta];
+  double** telec = new double*[1];
+  double** tion = new double*[1];
+  double** nelec= new double*[1];
+  double** nion = new double*[1];
+  double** jdotb = new double*[1];
+
+  telec[0] = new double[nr*nphi*ntheta];
+  tion[0] = new double[nr*nphi*ntheta];
+  nelec[0] = new double[nr*nphi*ntheta];
+  nion[0] = new double[nr*nphi*ntheta];
+  jdotb[0]= new double[nr*nphi*ntheta];
 
   double* q = new double[nr];
   double* psi_surf = new double[nr];
@@ -106,6 +118,7 @@ int main(int argc, char* argv[])
   double* te = new double[nr];
   double* ni = new double[nr];
   double* ti = new double[nr];
+  double* JpdotB_fluxavg = new double[nr];
   double* psi_t = new double[nr];
   double* dpsi_t = new double[nr];
   double* psi_p = new double[nr];
@@ -250,6 +263,42 @@ int main(int argc, char* argv[])
     std::cerr << "Error finding B" << std::endl;
   }
 
+  // calculate Te at each point
+  std::cerr << "Calculating Te on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&electron_temperature, nr*nphi*ntheta, path, telec, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding Te" << std::endl;
+  }
+
+  // calculate Ti at each point
+  std::cerr << "Calculating Ti on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&ion_temperature, nr*nphi*ntheta, path, tion, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding Ti" << std::endl;
+  }
+
+  // calculate ne at each point
+  std::cerr << "Calculating Ne on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&electron_density, nr*nphi*ntheta, path, nelec, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding ne" << std::endl;
+  }
+
+  // calculate ni at each point
+  std::cerr << "Calculating Ni on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&ion_density, nr*nphi*ntheta, path, nion, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding ni" << std::endl;
+  }
+
+  // calculate jdotb at each point
+  if (ibootstrap==1){
+  std::cerr << "Calculating JpdotB on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&JpdotB, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding J.B" << std::endl;
+  }
+  }
   // Calculate flux surface averages for profiles
   std::cerr << "Calculating flux surface averages..." << std::endl;  
   result = fio_surface_average(&electron_density, nr, nphi, ntheta, path,
@@ -258,7 +307,10 @@ int main(int argc, char* argv[])
 			       jac, ti, h);
   result = fio_surface_average(&ion_density, nr, nphi, ntheta, path,
 			       jac, ni, h);
-
+             if (ibootstrap==1){
+  result = fio_surface_average(&JpdotB, nr, nphi, ntheta, path,
+			       jac, JpdotB_fluxavg, h);
+             }
   // swap indices
   double* R = new double[nr*nphi*ntheta];
   double* Z = new double[nr*nphi*ntheta];
@@ -266,6 +318,13 @@ int main(int argc, char* argv[])
   double* BPhi = new double[nr*nphi*ntheta];
   double* BZ   = new double[nr*nphi*ntheta];
   double* Jac = new double[nr*nphi*ntheta];
+
+  double* Te_3d = new double[nr*nphi*ntheta];
+  double* Ti_3d = new double[nr*nphi*ntheta];
+  double* Ne_3d = new double[nr*nphi*ntheta];
+  double* Ni_3d = new double[nr*nphi*ntheta];
+  double* JpdotB_3d = new double[nr*nphi*ntheta];
+
 
   for(int i=0; i<nr; i++) {
     for(int j=0; j<nphi; j++) {
@@ -276,6 +335,13 @@ int main(int argc, char* argv[])
 	BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
 	BPhi[i + j*nr + k*nr*nphi] = b[1][k + j*ntheta + i*ntheta*nphi];
 	BZ  [i + j*nr + k*nr*nphi] = b[2][k + j*ntheta + i*ntheta*nphi];
+  Te_3d  [i + j*nr + k*nr*nphi] = telec[0][k + j*ntheta + i*ntheta*nphi];
+	Ti_3d  [i + j*nr + k*nr*nphi] = tion[0][k + j*ntheta + i*ntheta*nphi];
+	Ne_3d  [i + j*nr + k*nr*nphi] = nelec[0][k + j*ntheta + i*ntheta*nphi];
+  Ni_3d  [i + j*nr + k*nr*nphi] = nion[0][k + j*ntheta + i*ntheta*nphi];
+  if (ibootstrap==1){
+  JpdotB_3d  [i + j*nr + k*nr*nphi] = jdotb[0][k + j*ntheta + i*ntheta*nphi];
+  }
       }
     }
   }
@@ -486,11 +552,12 @@ int main(int argc, char* argv[])
   nc_put_att_double(ncid, NC_GLOBAL, "psi_1", NC_FLOAT, 1, &psi1);
 
   //  std::cerr << " defining variables..." << std::endl;  
-  int nr_dimid, np_dimid, nt_dimid, npsi_dimid;
+  int nr_dimid, np_dimid, nt_dimid, npsi_dimid, single_value_dimid;
   nc_def_dim(ncid, "npsi", nr,   &npsi_dimid);
   nc_def_dim(ncid, "nr", nr,     &nr_dimid);
   nc_def_dim(ncid, "np", ntheta, &np_dimid);
   nc_def_dim(ncid, "nt", nphi,   &nt_dimid);
+  nc_def_dim(ncid, "single_value", 1,   &single_value_dimid);
 
   int phi_id;
   nc_def_var(ncid, "Phi", NC_FLOAT, 1, &nt_dimid, &phi_id);
@@ -507,12 +574,16 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "dPsi_t", NC_FLOAT, 1, &nr_dimid, &dpsi_t_id);  // ver 3
   nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
   nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
-  int ne_id, te_id, ni_id, ti_id, psi0_id;
+  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
   nc_def_var(ncid, "Te0",  NC_FLOAT, 1, &npsi_dimid, &te_id);
   nc_def_var(ncid, "ni0",  NC_FLOAT, 1, &npsi_dimid, &ni_id);
   nc_def_var(ncid, "Ti0",  NC_FLOAT, 1, &npsi_dimid, &ti_id);
+  if (ibootstrap==1){
+  nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
+  }
+  nc_def_var(ncid, "temax",  NC_FLOAT, 0, &single_value_dimid, &temax_id); 
 
   int r_id, z_id, jac_id, br_id, bphi_id, bz_id;
   int dims[3];
@@ -525,7 +596,15 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "B_R",   NC_FLOAT, 3, dims, &br_id);   // added in version 3
   nc_def_var(ncid, "B_Phi", NC_FLOAT, 3, dims, &bphi_id); // added in version 3
   nc_def_var(ncid, "B_Z",   NC_FLOAT, 3, dims, &bz_id);   // added in version 3
-
+  
+  int te3d_id, ti3d_id, ne3d_id, ni3d_id, JpdotB3d_id;
+  nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id);   // added in version 3
+  nc_def_var(ncid, "ti_3d", NC_FLOAT, 3, dims, &ti3d_id); // added in version 3
+  nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id);   // added in version 3
+  nc_def_var(ncid, "ni_3d", NC_FLOAT, 3, dims, &ni3d_id); // added in version 3
+  if (ibootstrap==1){
+  nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id); // added in version 3
+  }
   nc_enddef(ncid);
 
   //  std::cerr << " writing variables..." << std::endl;  
@@ -539,12 +618,26 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, te_id, te);
   nc_put_var_double(ncid, ni_id, ni);
   nc_put_var_double(ncid, ti_id, ti);
+  if (ibootstrap==1){
+  nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
+  }
+
+  nc_put_var_double(ncid, temax_id, &te_max);
   nc_put_var_double(ncid, r_id, R);
   nc_put_var_double(ncid, z_id, Z);
   nc_put_var_double(ncid, jac_id, Jac);
   nc_put_var_double(ncid, br_id, BR);
   nc_put_var_double(ncid, bphi_id, BPhi);
   nc_put_var_double(ncid, bz_id, BZ);
+
+  nc_put_var_double(ncid, te3d_id, Te_3d);
+  nc_put_var_double(ncid, ti3d_id, Ti_3d);
+  nc_put_var_double(ncid, ne3d_id, Ne_3d);
+  nc_put_var_double(ncid, ni3d_id, Ni_3d);
+  if (ibootstrap==1){
+  nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
+  }
+
   nc_put_var_double(ncid, psi_t_id, psi_t);
   nc_put_var_double(ncid, dpsi_t_id, dpsi_t);
   nc_put_var_double(ncid, psi_p_id, psi_p);
@@ -590,6 +683,14 @@ int main(int argc, char* argv[])
   delete[] axis_3d[0];
   delete[] axis_3d[1];
   delete[] axis_3d[2];
+
+  delete[] telec[0];
+  delete[] tion[0];
+  delete[] nelec[0];
+  delete[] nion[0];
+  if (ibootstrap==1){
+  delete[] jdotb[0];
+  }
 
   // Deallocate fields
   src0->deallocate_search_hint(&h);
@@ -779,9 +880,26 @@ bool create_source(const int type, const int argc, const std::string argv[])
   } else {
     fopt.set_option(FIO_PART, FIO_PERTURBED_ONLY);
   }
+  
+  
+
+
 
   // Read fields
   fio_field* field;
+  if (ibootstrap==1){
+   result = src->get_field(FIO_JBS, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field " << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB.add_field(field, FIO_ADD, 1., hint);
+  } else {
+    std::cerr << "No bootstrap model, ibootstrap=" 
+          << ibootstrap
+          << std::endl;
+}
 
   result = src->get_field(FIO_MAGNETIC_FIELD, &field, &fopt);
   if(result != FIO_SUCCESS) {
@@ -833,8 +951,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
     delete(src);
     return result;
   }
-  ion_temperature.add_field(field, FIO_ADD, 1., hint);
-  
+  ion_temperature.add_field(field, FIO_ADD, 1., hint);  
 
   // Add source to list
   sources.push_back(src);
@@ -849,10 +966,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 13;
+  const int num_opts = 14;
   std::string arg_list[num_opts] = 
-    { "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol" };
+    { "-dR0", "-bootstrap", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
+      "-ntheta", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol"};
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -899,9 +1016,20 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 {
   bool argc_err = false;
 
+  
+
   if(opt=="-dR0") {
     if(argc==1) dR0 = atof(argv[0].c_str());
     else argc_err = true;    
+  } else if(opt=="-bootstrap") {
+    if(argc==1) ibootstrap = atof(argv[0].c_str());
+    else ibootstrap = 0; 
+    if(ibootstrap !=0 && ibootstrap !=1){
+    std::cerr << "Error: bootstrap option either 0 or 1 \n bootstrap="
+              << ibootstrap
+              << std::endl;
+    return FIO_UNSUPPORTED;
+    }
   } else if(opt=="-m3dc1") {
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-max_step") {
@@ -960,16 +1088,18 @@ void print_usage()
 {
   std::cerr << "write_neo_input"
 	    << " -dR0 <dR0>"
+      << " -bootstrap <0/1>"
 	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"
 	    << " -nphi <nphi>"
 	    << " -nr <nr>"
 	    << " -ntheta <ntheta>"
 	    << " -psi_end <psi_end>"
-	    << " -psi_start <psi_start>"
+	    << " -psi_start <psi_start>"	    
 	    << std::endl;
 
   std::cerr
     << "<dR0>:          offset to major radius\n"
+    << "<bootstrap 0/1>:flag to output <j.B> if the bootstrap model is on (1) in M3D-C1\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
     << "<nphi>:         number of toroidal points per surface\n"
     << "<nr>:           number of surfaces\n"
@@ -979,7 +1109,7 @@ void print_usage()
     << "<psi_start>:    psi_norm of innermost surface\n"
     << "<scale>:        scale factor to apply to linear perturbation\n"
     << "<time>:         timeslice of fields to read\n"
-    << "<tol>:          tolerance for finding Te isourface (in eV)\n";
+    << "<tol>:          tolerance for finding Te isourface (in eV)\n";    
 }
 
 void delete_sources()

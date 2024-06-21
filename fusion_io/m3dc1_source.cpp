@@ -124,6 +124,7 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_VECTOR_POTENTIAL);
   fields->push_back(FIO_ELECTRIC_FIELD);
   fields->push_back(FIO_RESISTIVITY);
+  fields->push_back(FIO_JBS);
 
   return FIO_SUCCESS;
 }
@@ -302,6 +303,11 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     if(s!=0) unneeded_species = true;
     break;
 
+  
+ case(FIO_JBS):
+    mf = new m3dc1_scalar_field(this, "JpdotB", J0);
+    if(s!=0) unneeded_species = true;
+    break;
   default:
     return FIO_UNSUPPORTED;
   };
