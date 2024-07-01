@@ -132,6 +132,7 @@ int main(int argc, char* argv[])
   double* by_fa = new double[nr];
   double* bz_fa = new double[nr];
   double* bmag_fa = new double[nr];
+  double* b2_fa = new double[nr];
   
   // Surfaces
   std::ofstream gplot, splot;
@@ -332,6 +333,7 @@ int main(int argc, char* argv[])
   by_fa[i] += b[1][ijk]*jac[ijk];
   bz_fa[i] += b[2][ijk]*jac[ijk];
   bmag_fa[i] += sqrt(b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
+  bmag_fa[i] += (b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
 	dV += jac[ijk];
       }
     }
@@ -339,6 +341,7 @@ int main(int argc, char* argv[])
     by_fa[i] /= dV;
     bz_fa[i] /= dV;
     bmag_fa[i] /= dV;
+    b2_fa[i] /= dV;
   }
 
 
@@ -606,7 +609,7 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "dPsi_t", NC_FLOAT, 1, &nr_dimid, &dpsi_t_id);  // ver 3
   nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
   nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
-  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id;
+  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id,b2_fa_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
   nc_def_var(ncid, "Te0",  NC_FLOAT, 1, &npsi_dimid, &te_id);
@@ -616,6 +619,7 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "by_fa",  NC_FLOAT, 1, &npsi_dimid, &by_fa_id);
   nc_def_var(ncid, "bz_fa",  NC_FLOAT, 1, &npsi_dimid, &bz_fa_id);
   nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &bmag_fa_id);
+  nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);
   if (ibootstrap==1){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
   }
@@ -658,6 +662,7 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, by_fa_id, by_fa);
   nc_put_var_double(ncid, bz_fa_id, bz_fa);
   nc_put_var_double(ncid, bmag_fa_id, bmag_fa);
+  nc_put_var_double(ncid, b2_fa_id, b2_fa);
   if (ibootstrap==1){
   nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
   }
