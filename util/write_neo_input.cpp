@@ -619,7 +619,7 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "by_fa",  NC_FLOAT, 1, &npsi_dimid, &by_fa_id);
   nc_def_var(ncid, "bz_fa",  NC_FLOAT, 1, &npsi_dimid, &bz_fa_id);
   nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &bmag_fa_id);
-  nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);
+  nc_def_var(ncid, "b2_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);
   if (ibootstrap==1){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
   }
