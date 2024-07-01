@@ -333,7 +333,7 @@ int main(int argc, char* argv[])
   by_fa[i] += b[1][ijk]*jac[ijk];
   bz_fa[i] += b[2][ijk]*jac[ijk];
   bmag_fa[i] += sqrt(b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
-  bmag_fa[i] += (b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
+  b2_fa[i] += (b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
 	dV += jac[ijk];
       }
     }
