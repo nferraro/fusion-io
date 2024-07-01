@@ -127,6 +127,11 @@ int main(int argc, char* argv[])
   axis_3d[0] = new double[nphi];
   axis_3d[1] = new double[nphi];
   axis_3d[2] = new double[nphi];
+
+  double* bx_fa = new double[nr];
+  double* by_fa = new double[nr];
+  double* bz_fa = new double[nr];
+  double* bmag_fa = new double[nr];
   
   // Surfaces
   std::ofstream gplot, splot;
@@ -307,10 +312,38 @@ int main(int argc, char* argv[])
 			       jac, ti, h);
   result = fio_surface_average(&ion_density, nr, nphi, ntheta, path,
 			       jac, ni, h);
+
              if (ibootstrap==1){
   result = fio_surface_average(&JpdotB, nr, nphi, ntheta, path,
 			       jac, JpdotB_fluxavg, h);
              }
+  // Finding flux surface averages for the magnetic field
+  for(int i=0; i<nr; i++) {
+    bx_fa[i] = 0.;
+    by_fa[i] = 0.;
+    bz_fa[i] = 0.;
+    bmag_fa[i] = 0.;
+    
+    double dV = 0.;
+    for(int j=0; j<nphi; j++) {
+      for(int k=0; k<ntheta; k++) {
+	int ijk = k + j*ntheta + i*ntheta*nphi;
+  bx_fa[i] += b[0][ijk]*jac[ijk];
+  by_fa[i] += b[1][ijk]*jac[ijk];
+  bz_fa[i] += b[2][ijk]*jac[ijk];
+  bmag_fa[i] += sqrt(b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
+	dV += jac[ijk];
+      }
+    }
+    bx_fa[i] /= dV;
+    by_fa[i] /= dV;
+    bz_fa[i] /= dV;
+    bmag_fa[i] /= dV;
+  }
+
+
+
+
   // swap indices
   double* R = new double[nr*nphi*ntheta];
   double* Z = new double[nr*nphi*ntheta];
@@ -345,7 +378,6 @@ int main(int argc, char* argv[])
       }
     }
   }
-
 
   // Toroidal Flux
   std::cerr << "Calculating toroidal flux" << std::endl;
@@ -574,12 +606,16 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "dPsi_t", NC_FLOAT, 1, &nr_dimid, &dpsi_t_id);  // ver 3
   nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
   nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
-  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id;
+  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
   nc_def_var(ncid, "Te0",  NC_FLOAT, 1, &npsi_dimid, &te_id);
   nc_def_var(ncid, "ni0",  NC_FLOAT, 1, &npsi_dimid, &ni_id);
   nc_def_var(ncid, "Ti0",  NC_FLOAT, 1, &npsi_dimid, &ti_id);
+  nc_def_var(ncid, "bx_fa",  NC_FLOAT, 1, &npsi_dimid, &bx_fa_id);
+  nc_def_var(ncid, "by_fa",  NC_FLOAT, 1, &npsi_dimid, &by_fa_id);
+  nc_def_var(ncid, "bz_fa",  NC_FLOAT, 1, &npsi_dimid, &bz_fa_id);
+  nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &bmag_fa_id);
   if (ibootstrap==1){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
   }
@@ -618,6 +654,10 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, te_id, te);
   nc_put_var_double(ncid, ni_id, ni);
   nc_put_var_double(ncid, ti_id, ti);
+  nc_put_var_double(ncid, bx_fa_id, bx_fa);
+  nc_put_var_double(ncid, by_fa_id, by_fa);
+  nc_put_var_double(ncid, bz_fa_id, bz_fa);
+  nc_put_var_double(ncid, bmag_fa_id, bmag_fa);
   if (ibootstrap==1){
   nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
   }
