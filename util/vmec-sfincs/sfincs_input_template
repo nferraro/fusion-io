@@ -1,0 +1,88 @@
+! Input file for SFINCS version 3. Generated for imitation VMEC use with fusion-io data.
+! See the user manual for documentation of the parameters in this file.
+!----------------------------------------------------------------------
+
+!ss scanType = 21
+!ss runSpecFile = 'runspec.dat'
+
+&general
+  outputFileName = 'sfincsOutput.h5'
+/
+
+&geometryParameters
+  psiN_wish = 0.5 ! set by sfincsScan.
+  geometryScheme = 5
+  inputRadialCoordinate = 1  ! psiN_wish
+  inputRadialCoordinateForGradients = 1 ! d/dpsiN 
+  equilibriumFile = './wout-test.nc' ! this location is correct after this file is copied to subdirs
+  VMECRadialOption=0 ! use interpolation for flux-surfaces
+/
+
+&speciesParameters
+  ! density, temp, and gradients are set from runspec file for radial scans (scanType=21)
+  nHats = 0.33800742430196645  0.33800742430196645
+  dnHatdpsiNs = -0.1410707374941252  -0.1410707374941252
+  THats = 2.8544470265584283  5.30098253145517
+  dTHatdpsiNs = -1.7883629983908158  -3.321867055503763
+
+  Zs = -1  1
+  mHats = 0.000548561  1.00723
+/
+
+&physicsParameters
+  dPhiHatdpsiN = 0.0 ! E_r - set to zero for quasisymmetric equilibria
+
+  ! Delta, alpha, nu_n set the reference parameters (shouldn't need to modify)
+  Delta = 4.5694d-3
+  alpha = 1d+0
+  nu_n = -1
+
+  collisionOperator = 0 ! Fokker-Planck
+  includeXDotTerm = .true.
+  includeElectricFieldTermInXiDot = .true.
+  useDKESExBDrift = .false.
+/
+
+&resolutionParameters
+
+  Ntheta = 51
+!ss NthetaMinFactor = 0.5
+!ss NthetaMaxFactor = 1.5
+!ss NthetaNumRuns = 7
+
+  Nzeta = 49
+!ss NzetaMinFactor = 0.5
+!ss NzetaMaxFactor = 1.5
+!ss NzetaNumRuns = 7
+
+  Nxi = 55
+!ss NxiMinFactor = 0.5
+!ss NxiMaxFactor = 1.5
+!ss NxiNumRuns = 7
+
+  Nx = 6
+!ss NxMinFactor = 0.5
+!ss NxMaxFactor = 1.5
+!ss NxNumRuns = 7
+
+  NL = 4
+!ss NLMinFactor = 0.5
+!ss NLMaxFactor = 1.5
+!ss NLNumRuns = 3
+
+  solverTolerance = 1e-06
+!ss solverToleranceMinFactor = 0.1
+!ss solverToleranceMaxFactor = 10
+!ss solverToleranceNumRuns = 3
+/
+
+&otherNumericalParameters
+Nxi_for_x_option = 0
+/
+
+&preconditionerOptions
+  !preconditioner_species = 1
+  !preconditioner_x = 1
+  !preconditioner_x_min_L = 0
+  !preconditioner_xi = 0
+/
