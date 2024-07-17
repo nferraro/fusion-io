@@ -59,7 +59,7 @@ def m3dc1_to_vmec(
     '''
 
     # fusion-io DIR
-    fio_bin = os.path.join(os.environ['FIO_ROOT'], "install/bin")
+    fio_bin = os.path.join(os.environ['FIO_INSTALL_DIR'], "bin")
     
     # Double VMEC resolution to get half and full mesh
     nsurf = 2*nsurf_nominal
@@ -76,7 +76,7 @@ def m3dc1_to_vmec(
     else:
         # fusion-io/install/bin should be in PATH
         if (os.path.exists(os.path.join(fio_bin, "write_neo_input"))):
-            cmd = "write_neo_input -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, dR0, tol)
+            cmd = "~/src/fusion-io/util/_stellar/write_neo_input -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, dR0, tol)
             subprocess.run(cmd, cwd=os.getcwd(), shell=True)
         else:
             print("Unable to find write_neo_input executable. Check that FIO_ROOT is set in your environment. Exiting...")
