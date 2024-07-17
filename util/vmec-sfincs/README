@@ -1,0 +1,25 @@
+OVERVIEW:
+
+The m3dc1_to_vmec_sfincs.py script uses the C1.h5 output from M3D-C1 to generate:
+
+* An imitation VMEC output file
+  -- This imitation VMEC file only contains those VMEC quantities required to initialize the SFINCS neoclassical transport code, including
+
+* (optional) SFINCS input file and temperature/density profile information in the form of a SFINCS-compatible 'runspec.dat' file
+
+REQUIREMENTS:
+- fusion-io and write_neo_input must be compiled and installed
+- FIO_ROOT must be set to the location of the fusion-io repo
+
+
+EXECUTION:
+- The 'driver_script.py' file here includes an example of running this script
+- Copy this script into the M3D-C1 output directory where the C1.h5 file is located
+- Edit the driver script with desired arguments
+- Then execute: 'python driver_script.py'
+
+OUTPUTS:
+- The imitation VMEC file will have a name such as 'imVMEC-*.nc'
+- The SFINCS input file will be called 'input.namelist'
+- The SFINCS profile information will be in a file called 'runspec.dat'
+- Quantities used in the construction of the imitation VMEC file (in the form of a python dict) are stored in the pickled data file 'imVMEC_data.pkl'
