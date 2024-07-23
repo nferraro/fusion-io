@@ -1295,14 +1295,18 @@ int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
 	  jac_sign = (jac[ijk] > 0) ? 1 : -1;
 	} else {
 	  if(jac[ijk]*jac_sign <= 0.) {
-	    std::cerr << "Error: Jacobian flips sign. "
-		      << i << ", " << j << ", " << k << std::endl;
+	    //	    std::cerr << "Error: Jacobian flips sign. "
+	    //		      << i << ", " << j << ", " << k << std::endl;
 	    ierr = 1.;
 	  }
 	}
 
       }
     }
+  }
+
+  if(ierr==1) {
+    std::cerr << "Error: Jacobian flips sign" << std::endl;
   }
 
   return ierr;

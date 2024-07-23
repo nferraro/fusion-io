@@ -2,6 +2,7 @@
 #include <math.h>
 
 #include <iostream>
+#include <fstream>
 
 m3dc1_file::m3dc1_file()
 {
@@ -21,6 +22,8 @@ bool m3dc1_file::open(const char* filename)
     std::cerr << "Error: couldn't open file " << filename << std::endl;
     return false;
   }
+
+  read_parameter("version", &version);
 
   return true; 
 }
@@ -240,12 +243,81 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
   mesh->nplanes = nplanes;
 
   // Calculate connectivity tree
-  mesh->find_neighbors();
+  load_adjacency(mesh, mesh_group);
 
   H5Gclose(mesh_group);
   H5Gclose(time_group);
 
   return mesh;
+}
+
+void m3dc1_file::load_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
+{
+  if(mesh->nneighbors || mesh->neighbor) {
+    std::cerr << "Warning: m3dc1 adjacency already allocated" << std::endl;
+    mesh->clear_neighbors();
+  }
+
+  mesh->nneighbors = new int[mesh->nelms];
+  mesh->neighbor = new int*[mesh->nelms];
+
+  for(int i=0; i<mesh->nelms; i++) {
+    mesh->nneighbors[i] = 0;
+    mesh->neighbor[i] = new int[mesh->max_neighbors()];
+  }
+
+  if(!read_adjacency(mesh, mesh_group))
+    mesh->find_neighbors();
+  /*
+  std::ofstream file;
+  file.open("adjacency",std::ofstream::out | std::ofstream::trunc);
+  for(int i=0; i<mesh->nelms; i++) {
+    for(int j=0; j<mesh->nneighbors[i]; j++)
+      file << mesh->neighbor[i][j] << ", ";
+    file << std::endl;
+  }
+  file.close();
+  */
+}
+
+bool m3dc1_file::read_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group)
+{
+  if(version < 45) {
+    std::cerr << "Mesh adjacency data not found." << std::endl;
+    std::cerr << "M3D-C1 output version = " << version << std::endl;
+    return false;
+  }
+
+  hid_t adj_dataset = H5Dopen(mesh_group, "adjacency", H5P_DEFAULT);
+  if(adj_dataset < 0) {
+    std::cerr << "Mesh adjacency data not found." << std::endl;
+    std::cerr << "M3D-C1 output version = " << version << std::endl;
+    return false;
+  }
+
+  std::cerr << "Reading adjacency data." << std::endl;
+  std::cerr << "Max neighbors = " << mesh->max_neighbors() << std::endl;
+
+  int* data = new int[mesh->max_neighbors()*mesh->nelms];
+  H5Dread(adj_dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, 
+	  (void*)data);
+  H5Dclose(adj_dataset);
+
+  int k=0;
+  for(int i=0; i<mesh->nelms; i++) {
+    mesh->nneighbors[i] = 0;
+    for(int j=0; j<mesh->max_neighbors(); j++) {
+      mesh->neighbor[i][j] = data[k];
+      if(mesh->neighbor[i][j] >= 0) {
+	mesh->nneighbors[i]++;
+      }
+      k++;
+    }
+  }
+
+  delete[] data;
+
+  return true;
 }
 
 

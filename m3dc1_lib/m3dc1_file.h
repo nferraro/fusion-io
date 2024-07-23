@@ -11,6 +11,7 @@
 typedef std::vector<double> m3dc1_scalar_list;
 
 class m3dc1_file {
+  int version;
   hid_t file;
 
   typedef std::map<int, m3dc1_timeslice> m3dc1_timeslice_map;
@@ -23,6 +24,7 @@ class m3dc1_file {
   hid_t open_timeslice(int time);
   m3dc1_timeslice* load_timeslice(const int time);
   m3dc1_mesh* read_mesh(int time);
+  void load_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group);
 
  public:
   const static int M3DC1_ADD_EQUILIBRIUM = 1;
@@ -45,6 +47,7 @@ class m3dc1_file {
   bool unload_field(const char* name, const int time);
   bool read_parameter(const char*, int*); 
   bool read_parameter(const char*, double*);
+  bool read_adjacency(m3dc1_mesh* mesh, const hid_t mesh_group);
 
   bool extent(int, double*, double*, double*, double*, double*, double*);
 };

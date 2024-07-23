@@ -37,7 +37,6 @@ m3dc1_mesh::~m3dc1_mesh()
 	    << "hits+misses = " << evals
 	    << std::endl;
   */
-
   delete[] a;
   delete[] b;
   delete[] c;
@@ -47,12 +46,7 @@ m3dc1_mesh::~m3dc1_mesh()
   delete[] z;
   delete[] bound;
   delete[] region;
-  if(neighbor != 0) {
-    for(int i=0; i<nelms; i++)
-      delete[] neighbor[i];
-    delete[] neighbor;
-  }
-  if(nneighbors != 0) delete[] nneighbors;
+  clear_neighbors();
   clear_memory();
 }
 
@@ -259,7 +253,7 @@ int m3dc1_mesh::in_element(double X, double Phi, double Z,
 int m3dc1_mesh::shared_nodes(const int i, const int j)
 {
   int match = 0;
-  double R[3], Z[3];
+  double R[3], Z[3], R0[3], Z0[3];
   const double t = (a[i] + b[i] + c[i])*TOL;
 
   R[0] = x[i];
@@ -268,16 +262,31 @@ int m3dc1_mesh::shared_nodes(const int i, const int j)
   Z[0] = z[i];
   Z[1] = z[i] + (a[i]+b[i])*sn[i];
   Z[2] = z[i] + c[i]*co[i] + b[i]*sn[i];
+  R0[0] = x[j];
+  R0[1] = x[j] + (a[j]+b[j])*co[j];
+  R0[2] = x[j] + b[j]*co[j] - c[j]*sn[j];
+  Z0[0] = z[j];
+  Z0[1] = z[j] + (a[j]+b[j])*sn[j];
+  Z0[2] = z[j] + c[j]*co[j] + b[j]*sn[j];
 
   for(int k=0; k<3; k++) {
-    if(fabs(R[k] - x[j]) < t) {
-      if(fabs(Z[k] - z[j]) < t) match++;
+    if(fabs(R[k] - R0[0]) < t) {
+      if(fabs(Z[k] - Z0[0]) < t) {
+	match++;
+	continue;
+      }
     } 
-    if(fabs(R[k] - (x[j] + (a[j]+b[j])*co[j])) < t) {
-      if(fabs(Z[k] - (z[j] + (a[j]+b[j])*sn[j])) < t) match++;
+    if(fabs(R[k] - R0[1]) < t) {
+      if(fabs(Z[k] - Z0[1]) < t) {
+	match++;
+	continue;
+      }
     } 
-    if(fabs(R[k] - (x[j] + b[j]*co[j] - c[j]*sn[j])) < t) {
-      if(fabs(Z[k] - (z[j] + c[j]*co[j] + b[j]*sn[j])) < t) match++;
+    if(fabs(R[k] - R0[2]) < t) {
+      if(fabs(Z[k] - Z0[2]) < t) {
+	match++;
+	continue;
+      }
     }
   }
   
@@ -324,17 +333,14 @@ int m3dc1_3d_mesh::shared_nodes(const int i, const int j)
 }
 */
 
+
+
 void m3dc1_mesh::find_neighbors()
 {
   std::cerr << "Calculating M3D-C1 mesh connectivity..." << std::endl;
-  nneighbors = new int[nelms];
-  neighbor = new int*[nelms];
 
-  for(int i=0; i<nelms; i++) {
-    nneighbors[i] = 0;
-    neighbor[i] = new int[max_neighbors()];
-  }
-
+#pragma omp parallel
+#pragma omp for
   for(int i=0; i<nelms/nplanes; i++) {
     for(int j=i+1; j<nelms/nplanes; j++) {
       if(elements_are_neighbors(i, j)) {
@@ -361,7 +367,17 @@ void m3dc1_mesh::find_neighbors()
 		<< std::endl;
     }
   }
-  std::cerr << "Done calculating M3D-C1 mesh connectivity..." << std::endl;
+  std::cerr << "Done calculating M3D-C1 mesh connectivity." << std::endl;
+}
+
+void m3dc1_mesh::clear_neighbors()
+{
+  if(neighbor != 0) {
+    for(int i=0; i<nelms; i++)
+      delete[] neighbor[i];
+    delete[] neighbor;
+  }
+  if(nneighbors != 0) delete[] nneighbors;
 }
 
 void m3dc1_3d_mesh::find_neighbors()
