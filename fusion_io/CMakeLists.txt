@@ -28,7 +28,7 @@ target_include_directories(fusionio_fusionio PUBLIC $<BUILD_INTERFACE:${CMAKE_CU
 )
 target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
 target_compile_options(fusionio_fusionio PRIVATE
-       $<$<COMPILE_LANGUAGE:Fortran>: -fdefault-real-8 -fimplicit-none>)
+       $<$<COMPILE_LANGUAGE:Fortran>: -fdefault-real-8 -fimplicit-none> -fPIC)
 target_compile_definitions(fusionio_fusionio PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::fusionio ALIAS fusionio_fusionio)
@@ -55,3 +55,19 @@ target_link_libraries(fio_py PUBLIC fusionio::fusionio Python3::Python)
 # we can configure a setup.py and use add_custom_target to build the module
 set_target_properties(fio_py PROPERTIES PREFIX "" POSITION_INDEPENDENT_CODE ON
                       SUFFIX ".so")
+
+install(TARGETS fusionio_fusionio fusionio_m3dc1
+        EXPORT fusionio-target)
+install(EXPORT fusionio-target
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)
+install(EXPORT fusionio-target
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio
+        NAMESPACE fusionio::
+        FILE fusionio-config.cmake
+)
+write_basic_package_version_file(
+        "${PROJECT_BINARY_DIR}/fusionio-config-version.cmake"
+        COMPATIBILITY AnyNewerVersion)
+install(FILES
+        "${PROJECT_BINARY_DIR}/fusionio-config-version.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)

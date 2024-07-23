@@ -1,3 +1,9 @@
+list(GET HDF5_LIBRARIES 0 HDF5_LIB)
+cmake_path(GET HDF5_LIB PARENT_PATH HDF5_LIB_PARENT)
+SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath -Wl,${HDF5_LIB_PARENT}")
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data 
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(example example.cpp)
 target_link_libraries(example PRIVATE fusionio::fusionio)
@@ -12,3 +18,11 @@ target_compile_options(example_fortran PRIVATE -fdefault-real-8 -fimplicit-none)
 add_executable(example_push example_push.f90)
 target_link_libraries(example_push PRIVATE fusionio::push)
 target_compile_options(example_push PRIVATE -fdefault-real-8 -fimplicit-none)
+
+
+add_test(cpp_example_m3dc1 ./example m3dc1)
+add_test(cpp_example_geqdsk ./example geqdsk)
+add_test(cpp_example_gpec ./example gpec)
+
+add_test(c_example ./example_c)
+add_test(fortran_example ./example_fortran)
