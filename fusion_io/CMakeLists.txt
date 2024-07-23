@@ -63,8 +63,7 @@ install(EXPORT fusionio-target
 install(EXPORT fusionio-target
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio
         NAMESPACE fusionio::
-        FILE fusionio-config.cmake
-)
+        FILE fusionio-config.cmake)
 write_basic_package_version_file(
         "${PROJECT_BINARY_DIR}/fusionio-config-version.cmake"
         COMPATIBILITY AnyNewerVersion)
