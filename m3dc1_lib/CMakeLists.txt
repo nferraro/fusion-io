@@ -7,7 +7,7 @@ add_library(fusionio_m3dc1
         m3dc1_file.cpp
 )
 target_include_directories(fusionio_m3dc1 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-target_link_libraries(fusionio_m3dc1 PUBLIC HDF5::HDF5)
+target_link_libraries(fusionio_m3dc1 PUBLIC PkgConfig::HDF5)
 target_compile_options(fusionio_m3dc1 PRIVATE -fPIC)
 add_library(fusionio::m3dc1 ALIAS fusionio_m3dc1)
 
