@@ -849,9 +849,9 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 13;
+  const int num_opts = 14;
   std::string arg_list[num_opts] = 
-    { "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
+    { "-dl", "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
       "-ntheta", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
@@ -899,7 +899,10 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 {
   bool argc_err = false;
 
-  if(opt=="-dR0") {
+  if(opt=="-dl") {
+    if(argc==1) dl_pol = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-dR0") {
     if(argc==1) dR0 = atof(argv[0].c_str());
     else argc_err = true;    
   } else if(opt=="-m3dc1") {
@@ -959,6 +962,7 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 void print_usage()
 {
   std::cerr << "write_neo_input"
+	    << " -dl <dl>"
 	    << " -dR0 <dR0>"
 	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"
 	    << " -nphi <nphi>"
@@ -969,6 +973,7 @@ void print_usage()
 	    << std::endl;
 
   std::cerr
+    << "<dl>:           poloidal step size when tracing isosurface\n"
     << "<dR0>:          offset to major radius\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
     << "<nphi>:         number of toroidal points per surface\n"
