@@ -23,6 +23,10 @@ def m3dc1_to_vmec(
         vmec_ntor,
         te_start=-1,
         te_end=-1,
+        psi_start = -1,
+        psi_end = -1,
+        bootstrap = 0,
+        usingT = 0,
         tol=1,
         dR0=0.0,
         write_sfincs_input=True,
@@ -44,6 +48,10 @@ def m3dc1_to_vmec(
     * vmec_ntor (int): Max toroidal Fourier resolution for VMEC reconstruction
     * te_start (float): Starting electron temperature for write_neo_input
     * te_end (float): End electron temperature for write_neo_input
+    * psi_start (float): Starting psi_normal for write_neo_input
+    * psi_end (float): End psi_normal for write_neo_input
+    * usingT (int): flag to use psi or te for write_neo_input
+    * bootstrap (int): flag to use bootstrap current output in write_neo_input if the model is on in the m3dc1 simulations 
     * tol (float): Tolerance for write_neo_input solve
     * dR0 (float): Guess for magnetic axis for write_neo_input
     * write_sfincs_input (bool): If True, create a SFINCS input file and corresponding runspec.dat file
@@ -69,15 +77,19 @@ def m3dc1_to_vmec(
         imVMEC_outname = "imVMEC.nc"
     else:
         imVMEC_outname = "imVMEC-{}.nc".format(vmec_file_descriptor)
-
-    
+  
     if (os.path.exists("neo_input.nc")):
         print("neo_input.nc file already exists!")
     else:
         # fusion-io/install/bin should be in PATH
+        
         if (os.path.exists(os.path.join(fio_bin, "write_neo_input"))):
-            cmd = "~/src/fusion-io/util/_stellar/write_neo_input -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, dR0, tol)
-            subprocess.run(cmd, cwd=os.getcwd(), shell=True)
+            if (usingT ==1):
+                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, dR0, tol)
+                subprocess.run(cmd, cwd=os.getcwd(), shell=True)
+            else:
+                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -psi_start {} -psi_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, psi_start, psi_end, nsurf, nphi, ntheta, dR0, tol)
+                subprocess.run(cmd, cwd=os.getcwd(), shell=True)
         else:
             print("Unable to find write_neo_input executable. Check that FIO_ROOT is set in your environment. Exiting...")
             exit()
