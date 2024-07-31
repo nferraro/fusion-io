@@ -8,7 +8,6 @@ add_library(fusionio_m3dc1
 )
 target_include_directories(fusionio_m3dc1 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_link_libraries(fusionio_m3dc1 PUBLIC PkgConfig::HDF5)
-target_compile_options(fusionio_m3dc1 PRIVATE -fPIC)
 add_library(fusionio::m3dc1 ALIAS fusionio_m3dc1)
 
 add_library(fusionio_m3dc1_fortran
@@ -19,4 +18,3 @@ add_library(fusionio::m3dc1_fortran ALIAS fusionio_m3dc1_fortran)
 # tests
 add_executable(m3dc1_fortran_test test.f90)
 target_link_libraries(m3dc1_fortran_test PRIVATE fusionio::m3dc1_fortran)
-target_compile_options(m3dc1_fortran_test PRIVATE -fdefault-real-8 -fimplicit-none)

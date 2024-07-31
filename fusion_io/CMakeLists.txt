@@ -27,8 +27,6 @@ target_include_directories(fusionio_fusionio PUBLIC $<BUILD_INTERFACE:${CMAKE_CU
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_fusionio,Fortran_MODULE_DIRECTORY>>
 )
 target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
-target_compile_options(fusionio_fusionio PRIVATE
-       $<$<COMPILE_LANGUAGE:Fortran>: -fdefault-real-8 -fimplicit-none> -fPIC)
 target_compile_definitions(fusionio_fusionio PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::fusionio ALIAS fusionio_fusionio)
@@ -40,8 +38,6 @@ set_target_properties(fusionio_push PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_
 target_include_directories(fusionio_push PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_push,Fortran_MODULE_DIRECTORY>>
 )
-target_compile_options(fusionio_push PRIVATE
-        $<$<COMPILE_LANGUAGE:Fortran>: -fdefault-real-8 -fimplicit-none>)
 target_compile_definitions(fusionio_push PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::push ALIAS fusionio_push)
