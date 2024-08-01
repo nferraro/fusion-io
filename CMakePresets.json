@@ -1,0 +1,12 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "scorec",
+            "cacheVariables": {
+                "CMAKE_Fortran_FLAGS": "-fdefault-real-8",
+                "CMAKE_CXX_FLAGS": "-fPIC"
+            }
+        }
+    ]
+}
