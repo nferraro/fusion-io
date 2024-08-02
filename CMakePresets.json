@@ -1,8 +1,8 @@
 {
-    "version": 6,
+    "version": 3,
     "configurePresets": [
         {
-            "name": "scorec",
+            "name": "perlmutter",
             "cacheVariables": {
                 "CMAKE_Fortran_FLAGS": "-fdefault-real-8",
                 "CMAKE_CXX_FLAGS": "-fPIC"
