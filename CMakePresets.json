@@ -4,7 +4,7 @@
         {
             "name": "perlmutter",
             "cacheVariables": {
-                "CMAKE_Fortran_FLAGS": "-fdefault-real-8",
+                "CMAKE_Fortran_FLAGS": "-fdefault-real-8 -fPIC",
                 "CMAKE_CXX_FLAGS": "-fPIC"
             }
         }
