@@ -43,14 +43,16 @@ target_compile_definitions(fusionio_push PRIVATE
 add_library(fusionio::push ALIAS fusionio_push)
 
 
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-add_library(fio_py SHARED python_interface.cpp)
-target_link_libraries(fio_py PUBLIC fusionio::fusionio Python3::Python)
+if (FUSIONIO_ENABLE_PYTHON)
+        find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+        add_library(fio_py SHARED python_interface.cpp)
+        target_link_libraries(fio_py PUBLIC fusionio::fusionio Python3::Python)
 
-# note this will fail on windows. If building on windows is a priority
-# we can configure a setup.py and use add_custom_target to build the module
-set_target_properties(fio_py PROPERTIES PREFIX "" POSITION_INDEPENDENT_CODE ON
-                      SUFFIX ".so")
+        # note this will fail on windows. If building on windows is a priority
+        # we can configure a setup.py and use add_custom_target to build the module
+        set_target_properties(fio_py PROPERTIES PREFIX "" POSITION_INDEPENDENT_CODE ON
+                        SUFFIX ".so")
+endif()
 
 install(TARGETS fusionio_fusionio fusionio_m3dc1
         EXPORT fusionio-target)

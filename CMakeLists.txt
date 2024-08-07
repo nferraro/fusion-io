@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(fusion_io VERSION 1.0.0 LANGUAGES C CXX Fortran)
 
 enable_testing()
@@ -8,9 +8,15 @@ include(FindPkgConfig)
 
 pkg_check_modules(HDF5 REQUIRED IMPORTED_TARGET hdf5)
 
+option(FUSIONIO_ENABLE_PYTHON "Enable Python" ON)
+
 add_subdirectory(m3dc1_lib)
 add_subdirectory(fusion_io)
-add_subdirectory(trace)
+
+option(FUSIONIO_ENABLE_TRACE "Enable Trace" ON)
+if (FUSIONIO_ENABLE_TRACE)
+    add_subdirectory(trace)
+endif()
 
 option(BUILD_TESTING "Build for CTest" OFF)
 if (BUILD_TESTING)
