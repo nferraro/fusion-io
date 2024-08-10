@@ -5,10 +5,15 @@ enable_testing()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(FindPkgConfig)
-
 pkg_check_modules(HDF5 REQUIRED IMPORTED_TARGET hdf5)
 
 option(FUSIONIO_ENABLE_PYTHON "Enable Python" ON)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+    set(CMAKE_Fortran_FLAGS "-fdefault-real-8")
+endif()
 
 add_subdirectory(m3dc1_lib)
 add_subdirectory(fusion_io)
