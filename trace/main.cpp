@@ -368,10 +368,10 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 19;
+  const int num_opts = 21;
   std::string arg_list[num_opts] = 
     { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
-      "-dR", "-dZ", "-dR0", "-dZ0", 
+      "-dR", "-dZ", "-dR0", "-dZ0","-R0","-Z0",
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
       "-reverse", "-tavg" };
@@ -615,6 +615,17 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
     else argc_err = true;
   } else if(opt=="-dZ0") {
     if(argc==1) dZ0 = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-R0") {
+    if(argc==1) {
+      R0 = atof(argv[0].c_str());
+      R0_set = true;
+    } else argc_err = true;
+  } else if(opt=="-Z0") {
+    if(argc==1) {
+      Z0 = atof(argv[0].c_str());
+      Z0_set = true;
+    }
     else argc_err = true;
   } else if(opt=="-ds") {
     if(argc==1) ds = atof(argv[0].c_str());

@@ -25,7 +25,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     xm_nyq_1 = data_1.variables['xm_nyq'][:]
     xn_nyq_1 = data_1.variables['xn_nyq'][:]
     nsurf_1 = data_1.variables['ns'][:]
-    tflux_1 = data_1.variables['phi'][:]
+    tflux_1 = np.abs(data_1.variables['phi'][:])
     bmnc_1 = data_1.variables['bmnc'][:,:]
     bsubumnc_1 = data_1.variables['bsubumnc'][:,:]
     bsubvmnc_1 = data_1.variables['bsubvmnc'][:,:]
@@ -39,11 +39,6 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     xm_1 = data_1.variables['xm'][:]
     xn_1 = data_1.variables['xn'][:]
 
-    Jac_real = data_1.variables['aux'][:,:,:]
-    B_sub_theta_real = data_1.variables['B_sub_theta'][:,:,:]
-    B_sub_psi_real = data_1.variables['B_sub_psi'][:,:,:]
-    B_sup_theta_real = data_1.variables['B_sup_theta'][:,:,:]
-    test_Jac = data_1.variables['test_Jac'][:,:,:]
 
     # Read second vmec file
     data_2 = Dataset(vmec_wout2, mode='r')    
@@ -52,7 +47,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     xm_nyq_2 = data_2.variables['xm_nyq'][:]
     xn_nyq_2 = data_2.variables['xn_nyq'][:]
     nsurf_2 = data_2.variables['ns'][:]
-    tflux_2 = data_2.variables['phi'][:]
+    tflux_2 = np.abs(data_2.variables['phi'][:])
     bmnc_2 = data_2.variables['bmnc'][:,:]
     bsubumnc_2 = data_2.variables['bsubumnc'][:,:]
     bsubvmnc_2 = data_2.variables['bsubvmnc'][:,:]
@@ -60,7 +55,6 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     bsupumnc_2 = data_2.variables['bsupumnc'][:,:]
     bsupvmnc_2 = data_2.variables['bsupvmnc'][:,:]
     gmnc_2 = data_2.variables['gmnc'][:,:]
-    lmns_2 = data_2.variables['lmns'][:,:]
     rmnc_2 = data_2.variables['rmnc'][:,:]
     zmns_2 = data_2.variables['zmns'][:,:]
     mnmax_2 = data_2.variables['mnmax'][:]
@@ -86,6 +80,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     fsa_B_sup_theta_1 = np.zeros(nsurf_1)
     fsa_B_sup_phi_1 = np.zeros(nsurf_1)
     fsa_Jac_1 = np.zeros(nsurf_1)
+    dV_ds_1 = np.zeros(nsurf_1)
 
     theta_2 = np.linspace(0,2*np.pi,ntheta)
     phi_2 = np.linspace(0, 2*np.pi, nphi)
@@ -106,6 +101,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     fsa_B_sup_theta_2 = np.zeros(nsurf_2)
     fsa_B_sup_phi_2 = np.zeros(nsurf_2)
     fsa_Jac_2 = np.zeros(nsurf_2)
+    dV_ds_2 = np.zeros(nsurf_2)
 
     theta_1_grid, phi_1_grid = np.meshgrid(theta_1, phi_1, indexing='ij')
     theta_2_grid, phi_2_grid = np.meshgrid(theta_2, phi_2, indexing='ij')
@@ -119,6 +115,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
             B_sup_theta_1[isurf] += bsupumnc_1[isurf,imn]*np.cos(xm_nyq_1[imn]*theta_1_grid - xn_nyq_1[imn]*phi_1_grid)
             B_sup_phi_1[isurf] += bsupvmnc_1[isurf,imn]*np.cos(xm_nyq_1[imn]*theta_1_grid - xn_nyq_1[imn]*phi_1_grid)
             Jac_1[isurf] += gmnc_1[isurf,imn]*np.cos(xm_nyq_1[imn]*theta_1_grid - xn_nyq_1[imn]*phi_1_grid)
+
         fsa_mod_B_1[isurf] = flux_surface_average(mod_B_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
         fsa_B_sub_theta_1[isurf] = flux_surface_average(B_sub_theta_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
         fsa_B_sub_phi_1[isurf] = flux_surface_average(B_sub_phi_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
@@ -126,6 +123,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
         fsa_B_sup_theta_1[isurf] = flux_surface_average(B_sup_theta_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
         fsa_B_sup_phi_1[isurf] = flux_surface_average(B_sup_phi_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
         fsa_Jac_1[isurf] = flux_surface_average(Jac_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1)
+        dV_ds_1[isurf] = flux_surface_average(Jac_1[isurf,:,:], Jac_1[isurf,:,:], theta_1, phi_1, volume=True)
         
     for isurf in range(nsurf_2):
         for imn in range(mnmax_nyq_2):
@@ -143,6 +141,7 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
         fsa_B_sup_theta_2[isurf] = flux_surface_average(B_sup_theta_2[isurf,:,:], Jac_2[isurf,:,:], theta_2, phi_2)
         fsa_B_sup_phi_2[isurf] = flux_surface_average(B_sup_phi_2[isurf,:,:], Jac_2[isurf,:,:], theta_2, phi_2)
         fsa_Jac_2[isurf] = flux_surface_average(Jac_2[isurf,:,:], Jac_2[isurf,:,:], theta_2, phi_2)
+        dV_ds_2[isurf] = flux_surface_average(Jac_2[isurf,:,:], Jac_2[isurf,:,:], theta_2, phi_2, volume=True)
 
 
             
@@ -162,9 +161,9 @@ def compare_FSA_quantities(vmec_wout1, vmec_wout2, ntheta, nphi, vmec1_descripto
     ax[0,2].set_title(r"$<B_{\phi}>$")
     ax[0,2].set_xlabel(r"$\psi_t$")
     
-    ax[1,0].plot(tflux_1[1:], fsa_Jac_1[1:], label=r"{}".format(vmec1_descriptor))
-    ax[1,0].plot(tflux_2[1:], fsa_Jac_2[1:], label=r"{}".format(vmec2_descriptor))
-    ax[1,0].set_title(r"$<g>$")
+    ax[1,0].plot(tflux_1[1:-1], dV_ds_1[1:-1], label=r"{}".format(vmec1_descriptor))
+    ax[1,0].plot(tflux_2[1:-1], dV_ds_2[1:-1], label=r"{}".format(vmec2_descriptor))
+    ax[1,0].set_title(r"$dV/ds$")
     ax[1,0].set_xlabel(r"$\psi_t$")
     
     ax[1,1].plot(tflux_1[1:], fsa_B_sup_theta_1[1:], label=r"{}".format(vmec1_descriptor))
@@ -195,8 +194,8 @@ def flux_surface_average(quantity, jacobian, theta, phi, volume=False):
 
 vmec1 = sys.argv[1]
 vmec2 = sys.argv[2]
-ntheta = 400
-nphi = 80
+ntheta = 200
+nphi = 32
 
 compare_FSA_quantities(vmec1, vmec2, ntheta, nphi, vmec1_descriptor="fusion-io VMEC", vmec2_descriptor="original VMEC")
     

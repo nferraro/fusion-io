@@ -74,10 +74,11 @@ def m3dc1_to_vmec(
     phi = np.linspace(0, 2*np.pi, nphi, endpoint=False)
     theta = np.linspace(0, 2*np.pi, ntheta, endpoint=False)
     if (vmec_file_descriptor) == None:
-        imVMEC_outname = "imVMEC.nc"
+        imVMEC_outname = "wout_imVMEC.nc"
     else:
-        imVMEC_outname = "imVMEC-{}.nc".format(vmec_file_descriptor)
-  
+        imVMEC_outname = "wout_imVMEC-{}.nc".format(vmec_file_descriptor)
+
+    
     if (os.path.exists("neo_input.nc")):
         print("neo_input.nc file already exists!")
     else:
@@ -108,10 +109,12 @@ def m3dc1_to_vmec(
         B_sub_phi = np.zeros((nsurf,nphi,ntheta))
         B_sup_theta = np.zeros((nsurf,nphi,ntheta))
         B_sup_phi = np.zeros((nsurf,nphi,ntheta))
+        Jac_vmec = np.zeros((nsurf,nphi,ntheta))
+        avg_minor_radius = [-1.0]
     
-        calculate_field_in_vmec_coordinates("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, nsurf, theta, phi)
+        calculate_field_in_vmec_coordinates("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius)
 
-        imVMEC_data = put_quantities_in_vmec_format("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp)
+        imVMEC_data = put_quantities_in_vmec_format("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius)
     
         with open("imVMEC_data.pkl", "wb") as fp:
             pickle.dump(imVMEC_data, fp)
@@ -127,7 +130,7 @@ def m3dc1_to_vmec(
 
         
 
-def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp):
+def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius):
 
     '''
     This function converts quantities from fusion-io and write_neo_input into the variables and formats used in VMEC. This is mainly performing FFTs on the geometry of the flux surfaces and on the various components of the magnetic field
@@ -139,7 +142,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     neo_file = Dataset(neo_input_file, mode="r")
     R = np.swapaxes(neo_file.variables['R'][:,:,:], 0,2)
     Z = np.swapaxes(neo_file.variables['Z'][:,:,:], 0,2)
-    Jac = np.swapaxes(neo_file.variables['Jac'][:,:,:], 0,2)
+    #Jac = np.swapaxes(neo_file.variables['Jac'][:,:,:], 0,2)
     B_R = np.swapaxes(neo_file.variables['B_R'][:,:,:], 0,2)
     B_Phi = np.swapaxes(neo_file.variables['B_Phi'][:,:,:], 0,2)
     B_Z = np.swapaxes(neo_file.variables['B_Z'][:,:,:], 0,2)
@@ -149,7 +152,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     te = neo_file.variables['Te0'][:]
     ni = neo_file.variables['ni0'][:]
     ti = neo_file.variables['Ti0'][:]
-
+    
     ntheta = len(theta)
     nphi = len(phi)
     theta_periodic = np.append(theta, 2*np.pi)
@@ -159,10 +162,10 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     mnmax = len(xm)
     mnmax_nyq = len(xm_nyq)
     iota = 1./q
-
+    
     elementary_charge = 1.602176634e-19
     pressure = elementary_charge * (ne*te + ni*ti) # Pressure in Pa
-
+    
     phi_vmec = psi_t
     phi_vmec_lcfs = phi_vmec[-1]
     s = phi_vmec / phi_vmec_lcfs
@@ -183,6 +186,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     imVMEC_data['mnmax_nyq'] = mnmax_nyq
     imVMEC_data['nsurf'] = nsurf_nominal
     imVMEC_data['stell_sym'] = 0
+    imVMEC_data['aminor_avg'] = avg_minor_radius[0]
     imVMEC_data['ne'] = np.zeros(nsurf_nominal)
     imVMEC_data['Te'] = np.zeros(nsurf_nominal)
     imVMEC_data['ni'] = np.zeros(nsurf_nominal)
@@ -210,17 +214,9 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     imVMEC_data['bsubvmnc'] = np.zeros((nsurf_nominal, mnmax_nyq))
     imVMEC_data['bsubvmns'] = np.zeros((nsurf_nominal, mnmax_nyq))
     imVMEC_data['fio_ntheta'] = ntheta
-    imVMEC_data['fio_nphi'] = nphi
-    #imVMEC_data['aux'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_R'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_Phi'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_Z'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_sub_psi'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_sub_theta'] = np.zeros((nsurf_nominal, nphi, ntheta))
-    #imVMEC_data['B_sup_theta'] = np.zeros((nsurf_nominal, nphi, ntheta))
-   
+    imVMEC_data['fio_nphi'] = nphi   
 
-    # It is assumed that of the nsurf surfaces computed, the even surfaces will be considered the 'full mesh' and the odd surfaces will be considered the 'half mesh'
+    # It is assumed that of the nsurf surfaces computed, the even surfaces will be considered the 'full mesh' and the odd surfaces will be considered the 'half mesh'    
     for isurf in range(nsurf_nominal):
         half_mesh_idx = 2*isurf+1
         full_mesh_idx = 2*isurf
@@ -234,7 +230,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
         imVMEC_data['Ti'][isurf] = ti[full_mesh_idx]
         imVMEC_data['rmnc'][isurf,:], imVMEC_data['rmns'][isurf,:] = fourier_transform_2d(R[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm, xn)
         imVMEC_data['zmnc'][isurf,:], imVMEC_data['zmns'][isurf,:] = fourier_transform_2d(Z[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm, xn)
-        imVMEC_data['gmnc'][isurf,:], imVMEC_data['gmns'][isurf,:] = fourier_transform_2d(Jac[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm_nyq, xn_nyq)
+        imVMEC_data['gmnc'][isurf,:], imVMEC_data['gmns'][isurf,:] = fourier_transform_2d(Jac_vmec[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm_nyq, xn_nyq)
         imVMEC_data['bmnc'][isurf,:], imVMEC_data['bmns'][isurf,:] = fourier_transform_2d(modB[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm_nyq, xn_nyq)
         imVMEC_data['bsupumnc'][isurf,:], imVMEC_data['bsupumns'][isurf,:] = fourier_transform_2d(B_sup_theta[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm_nyq, xn_nyq)
         imVMEC_data['bsupvmnc'][isurf,:], imVMEC_data['bsupvmns'][isurf,:] = fourier_transform_2d(B_sup_phi[half_mesh_idx,:,:], theta_periodic, phi_periodic, xm_nyq, xn_nyq)
@@ -252,7 +248,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
         '''
     return imVMEC_data
 
-def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, nsurf, theta, phi):
+def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius):
 
     neo_file = Dataset(neo_input_file, mode="r")
     R = np.swapaxes(neo_file.variables['R'][:,:,:], 0,2)
@@ -281,24 +277,26 @@ def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_t
     dZ_dphi = np.zeros((nsurf,nphi,ntheta))
     
     # Converting Jacobian derivates w.r.t. index from write_neo_input into VMEC coordinates
-    Jac /= -dtheta
-    Jac /= dphi
+
+    np.copyto(Jac_vmec,Jac)
+    Jac_vmec /= -(dtheta*dphi)
     psi_t_end = psi_t[-1]
     psi_t_norm = psi_t / psi_t_end
 
-    # psi_t_end = phi[-1]   # If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
-    # psi_t_norm = psi_t / 4.4245216949037 # Need to normalize wrt toroidal flux on boundary of original vmec file for comparison purposes
-    
+    #psi_t_end = psi_t[-1]   # If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
+    #psi_t_norm = psi_t / 4.4245216949037 # Need to normalize wrt toroidal flux on boundary of original vmec file for comparison purposes
+    #psi_t_norm = psi_t / 0.4
+        
     for isurf in range(nsurf):
         for iphi in range(nphi):
             for itheta in range(ntheta):
 
                 surf_idx_pos = isurf if isurf==nsurf-1 else isurf+1
                 surf_idx_neg = 0 if isurf==0 else isurf-1
-                denom_fac = 1.0 if isurf==0 or isurf==nsurf-1 else 2.0
+                denom_fac = 1.0 if isurf==0 or isurf==nsurf-1 else 1.0
                 dR_dpsi[isurf,iphi,itheta] = (R[surf_idx_pos,iphi,itheta] - R[surf_idx_neg,iphi,itheta])/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
                 dZ_dpsi[isurf,iphi,itheta] = (Z[surf_idx_neg,iphi,itheta] - Z[surf_idx_neg,iphi,itheta])/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
-                Jac[isurf,iphi,itheta] /= denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg])
+                Jac_vmec[isurf,iphi,itheta] *= 2/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
 
                 phi_idx_pos = 0 if iphi==nphi-1 else iphi+1
                 phi_idx_neg = -1 if iphi==0 else iphi-1
@@ -329,6 +327,17 @@ def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_t
                 modB[isurf,iphi,itheta] = np.sqrt(B_sub_theta[isurf,iphi,itheta]*B_sup_theta[isurf,iphi,itheta] + B_sub_phi[isurf,iphi,itheta]*B_sup_phi[isurf,iphi,itheta])
 
 
+    # Calculate effective minor radius using geometry at outermost surface
+    dZ_dtheta_edge = dZ_dtheta[-1,:,:]
+    R_edge = R[-1,:,:]
+    Abar = np.trapz(np.trapz(R_edge*dZ_dtheta_edge, x=phi, axis=0), x=theta, axis=0) / (2*np.pi)
+    avg_minor_radius[0] = np.sqrt(Abar / np.pi)
+
+    if (avg_minor_radius[0] < 0):
+        print("Average minor radius was either calculated incorrectly or there is an issue with the geometry of the outermost surface. Exiting...")
+        exit()
+
+                
 def write_SFINCS_runspec(psiN, ne_fio, Te_fio, ni_fio, Ti_fio, Tbar=1000, nbar=1.e20, vmec_compare=False, s_vmec=None):
 
     '''
@@ -347,7 +356,7 @@ def write_SFINCS_runspec(psiN, ne_fio, Te_fio, ni_fio, Ti_fio, Tbar=1000, nbar=1
     if (vmec_compare):
         nradial = len(s_vmec)
     else:
-        nradial = len(ne_fio)
+        nradial = len(psiN)
         
     # Create splines from the data
     Ti = CubicSpline(psiN, Ti_fio/Tbar)
@@ -471,7 +480,8 @@ def write_imitation_VMEC(outfile, imVMEC_data, s_start, s_end):
     path = os.path.join(os.getcwd(), tail)
     
     file = Dataset(path, mode="w", format="NETCDF3_64BIT_OFFSET")
-    
+
+    s_start = imVMEC_data['phi'][0]
     # VMEC radial coordinate: s = rho^2 = Psi_t / Psi_t(LCFS)
     s_full = np.linspace(s_start, s_end, imVMEC_data['nsurf'])
     s_half = s_full[0:-1] + 0.5 / (imVMEC_data['nsurf'] - 1)
@@ -576,7 +586,7 @@ def write_imitation_VMEC(outfile, imVMEC_data, s_start, s_end):
     Aminor_p = file.createVariable("Aminor_p", np.float64)
     Aminor_p.long_name = "minor radius"
     Aminor_p.units = "m"
-    Aminor_p[:] = 1.0
+    Aminor_p[:] = imVMEC_data['aminor_avg']
     
     # R
     rmnc = file.createVariable("rmnc", np.float64, ("radius", "mn_mode"))
