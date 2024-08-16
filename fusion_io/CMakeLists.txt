@@ -50,8 +50,9 @@ if (FUSIONIO_ENABLE_PYTHON)
 
         # note this will fail on windows. If building on windows is a priority
         # we can configure a setup.py and use add_custom_target to build the module
-        set_target_properties(fio_py PROPERTIES PREFIX "" POSITION_INDEPENDENT_CODE ON
-                        SUFFIX ".so")
+        set_target_properties(fio_py PROPERTIES PREFIX "" SUFFIX ".so")
+
+        install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 install(TARGETS fusionio_fusionio fusionio_m3dc1
