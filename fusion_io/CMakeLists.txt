@@ -1,3 +1,9 @@
+set(FUSIONIO_HEADERS
+        fusion_io.h
+        fusion_io_c.h
+        fusion_io_defs.h
+)
+
 
 add_library(fusionio_fusionio
         interpolate.cpp
@@ -22,6 +28,8 @@ add_library(fusionio_fusionio
         c_interface.cpp
         fusion_io_fortran.F90
         )
+
+set_target_properties(fusionio_fusionio PROPERTIES PUBLIC_HEADER "${FUSIONIO_HEADERS}")
 set_target_properties(fusionio_fusionio PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(fusionio_fusionio PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_fusionio,Fortran_MODULE_DIRECTORY>>
