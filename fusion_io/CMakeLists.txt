@@ -4,7 +4,6 @@ set(FUSIONIO_HEADERS
         fusion_io_defs.h
 )
 
-
 add_library(fusionio_fusionio
         interpolate.cpp
         options.cpp
