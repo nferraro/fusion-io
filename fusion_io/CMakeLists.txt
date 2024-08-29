@@ -1,7 +1,28 @@
 set(FUSIONIO_HEADERS
-        fusion_io.h
+        coil_source.h
+        compound_field.h
+        diiid_coils.h
+        fio_operations.h
         fusion_io_c.h
         fusion_io_defs.h
+        fusion_io_field.h
+        fusion_io_series.h
+        fusion_io_source.h
+        fusion_io_species.h
+        fusion_io.h
+        gato_field.h
+        gato_source.h
+        geqdsk_field.h
+        geqdsk_source.h
+        gpec_field.h
+        gpec_source.h
+        interpolate.h
+        isosurface.h
+        m3dc1_field.h
+        m3dc1_source.h
+        mars_field.h
+        mars_source.h
+        options.h
 )
 
 add_library(fusionio_fusionio
@@ -28,9 +49,12 @@ add_library(fusionio_fusionio
         fusion_io_fortran.F90
         )
 
-set_target_properties(fusionio_fusionio PROPERTIES PUBLIC_HEADER "${FUSIONIO_HEADERS}")
-set_target_properties(fusionio_fusionio PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(fusionio_fusionio PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+set_target_properties(fusionio_fusionio PROPERTIES 
+        PUBLIC_HEADER "${FUSIONIO_HEADERS}"
+        Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(fusionio_fusionio PUBLIC 
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_fusionio,Fortran_MODULE_DIRECTORY>>
 )
 target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
@@ -62,7 +86,7 @@ if (FUSIONIO_ENABLE_PYTHON)
         install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
-install(TARGETS fusionio_fusionio fusionio_m3dc1
+install(TARGETS fusionio_fusionio
         EXPORT fusionio-target)
 install(EXPORT fusionio-target
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)
