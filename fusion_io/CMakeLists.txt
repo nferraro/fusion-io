@@ -86,14 +86,15 @@ if (FUSIONIO_ENABLE_PYTHON)
         install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
-install(TARGETS fusionio_fusionio
+install(TARGETS fusionio_fusionio 
         EXPORT fusionio-target)
-install(EXPORT fusionio-target
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)
 install(EXPORT fusionio-target
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio
         NAMESPACE fusionio::
-        FILE fusionio-config.cmake)
+        FILE fusionio-target.cmake
+        COMPONENT fusionio-target)
+install(FILES fusionio-config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)
 write_basic_package_version_file(
         "${PROJECT_BINARY_DIR}/fusionio-config-version.cmake"
         COMPATIBILITY AnyNewerVersion)

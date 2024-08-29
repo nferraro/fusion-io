@@ -30,11 +30,10 @@ add_library(fusionio::m3dc1_fortran ALIAS fusionio_m3dc1_fortran)
 install(TARGETS fusionio_m3dc1
         EXPORT fusionio_m3dc1-target)
 install(EXPORT fusionio_m3dc1-target
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio)
-install(EXPORT fusionio_m3dc1-target
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fusionio
         NAMESPACE fusionio::
-        FILE fusionio_m3dc1-config.cmake)
+        FILE fusionio_m3dc1-target.cmake
+        COMPONENT fusionio_m3dc1-target)
 
 # tests
 add_executable(m3dc1_fortran_test test.f90)
