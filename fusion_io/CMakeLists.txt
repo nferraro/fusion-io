@@ -86,6 +86,11 @@ if (FUSIONIO_ENABLE_PYTHON)
         set_target_properties(fio_py PROPERTIES PREFIX "" SUFFIX ".so")
 
         install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+        if(DEFINED PYTHON_MODULE_INSTALL_DIR)
+                install(FILES fpy.py DESTINATION ${PYTHON_MODULE_INSTALL_DIR})
+                install(TARGETS fio_py DESTINATION ${PYTHON_MODULE_INSTALL_DIR})
+        endif()
 endif()
 
 install(TARGETS fusionio_fusionio 
