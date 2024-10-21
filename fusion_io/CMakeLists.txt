@@ -61,6 +61,7 @@ target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
 target_compile_definitions(fusionio_fusionio PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::fusionio ALIAS fusionio_fusionio)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/fusion_io.mod TYPE INCLUDE)
 
 
 add_library(fusionio_push push_interface.f90)
@@ -72,6 +73,7 @@ target_include_directories(fusionio_push PUBLIC $<BUILD_INTERFACE:${CMAKE_CURREN
 target_compile_definitions(fusionio_push PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::push ALIAS fusionio_push)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/fio_push.mod TYPE INCLUDE)
 
 
 if (FUSIONIO_ENABLE_PYTHON)
