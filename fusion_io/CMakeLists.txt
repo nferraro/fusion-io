@@ -87,9 +87,9 @@ if (FUSIONIO_ENABLE_PYTHON)
 
         install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-        if(DEFINED PYTHON_MODULE_INSTALL_DIR)
-                install(FILES fpy.py DESTINATION ${PYTHON_MODULE_INSTALL_DIR})
-                install(TARGETS fio_py DESTINATION ${PYTHON_MODULE_INSTALL_DIR})
+        if(DEFINED PYTHON_MODULE_INSTALL_PATH)
+                install(FILES fpy.py DESTINATION ${PYTHON_MODULE_INSTALL_PATH})
+                install(TARGETS fio_py DESTINATION ${PYTHON_MODULE_INSTALL_PATH})
         endif()
 endif()
 
