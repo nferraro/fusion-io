@@ -166,7 +166,7 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
   // Test neighbors
   for(int n=0; n<mesh->nneighbors[*e]; n++) {
     int m = mesh->neighbor[*e][n];
-    if(elm[m].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+    if(elm[m].is_in_element(R,phi,Z,xi_frac,zi_frac,eta_frac)) {
       *e = m;
       return true;
     }
@@ -177,7 +177,7 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     int m = mesh->neighbor[*e][n];
     for(int nn=0; nn<mesh->nneighbors[m]; nn++) {
       int l = mesh->neighbor[m][nn];
-      if(elm[l].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+      if(elm[l].is_in_element(R,phi,Z,xi_frac,zi_frac,eta_frac)) {
 	*e = l;
 	return true;
       }
