@@ -108,10 +108,9 @@ public:
 			 double* xi=0, double* zi=0, double* eta=0, 
 			 int guess=-1);
 
-  virtual void extent(double *X0, double* X1,
+  virtual bool extent(double *X0, double* X1,
 		      double *Phi0, double* Phi1,
 		      double *Z0, double* Z1) const;
-
 };
 
 

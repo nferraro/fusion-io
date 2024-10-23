@@ -131,6 +131,14 @@ int m3dc1_scalar_field::load(const fio_option_list* opt)
   return FIO_SUCCESS;
 }
 
+int m3dc1_scalar_field::get_bounding_box(double* min, double* max) const
+{
+  if(!f1->extent(&(min[0]), &(max[0]), &(min[1]), &(max[1]),
+		 &(min[2]), &(max[2])))
+     return 1;
+
+  return FIO_SUCCESS;
+}
 
 int m3dc1_scalar_field::eval(const double* x, double* v, fio_hint s)
 {

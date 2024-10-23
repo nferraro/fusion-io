@@ -148,6 +148,27 @@ bool m3dc1_coord_map::load(m3dc1_field* Rf, m3dc1_field* Zf)
   return true;
 }
 
+bool m3dc1_coord_map::extent(double *X0, double* X1,
+			     double *Phi0, double* Phi1,
+			     double *Z0, double* Z1) const
+{
+  for(int i=0; i<mesh->nelms; i++) {
+    for(int j=0; j<6; j++) {
+      double R = elm[i].R[j];
+      double Z = elm[i].Z[j];
+      if(i==0 || R < *X0) *X0 = R;
+      if(i==0 || R > *X1) *X1 = R;
+      if(i==0 || Z < *Z0) *Z0 = Z;
+      if(i==0 || Z > *Z1) *Z1 = Z;
+    }
+  }
+  *Phi0 = 0.;
+  *Phi1 = mesh->period;
+
+  return true;
+}
+
+
 bool m3dc1_coord_map::find_element(const double R, const double Phi, const double Z,
 			      double *xi_frac, double *zi_frac, double *eta_frac, int* e) const
 {

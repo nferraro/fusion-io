@@ -26,7 +26,7 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io \
 
 OBJS = trace_integrator.o
 
-all : trace plot_dr
+all : trace #plot_dr
 
 trace : main.o libtrace.a
 	$(LD) $(LDFLAGS) $< -L. -ltrace $(LIBS) -o $@

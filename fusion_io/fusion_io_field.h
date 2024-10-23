@@ -23,12 +23,14 @@ class fio_field {
 
   virtual int get_real_parameter(const field_parameter, double*)
   {  return FIO_UNSUPPORTED; }
-
+  
   fio_field& operator+(const fio_field&);
   fio_field& operator*(const fio_field&);
 
   int find_val_on_line(const double, const double*, const double*, 
 		       double*, fio_hint =0, const double=1e-4);
+  virtual int get_bounding_box(double*, double*) const
+  { return FIO_UNSUPPORTED; }
 };
 
 #endif
