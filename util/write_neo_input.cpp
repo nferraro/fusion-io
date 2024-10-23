@@ -16,6 +16,7 @@ double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
 double tol = 0.1;         // Tolerance for Te when finding isosurface
 double dR0 = 0.0;         // Guess for offset from magnetic axis
+double R0 = 0.0;          // Guess for R coordinate of magnetic axis
 double psi_start = -1;
 double psi_end = -1;
 double te_start = -1;
@@ -130,7 +131,11 @@ int main(int argc, char* argv[])
   n[1] = 1.;
   n[2] = 0.;
 
-  x[0] = axis[0] + dR0 - 0.01;
+  if(R0 > 0.0) {
+    x[0] = R0;
+  } else {		 
+    x[0] = axis[0] + dR0 - 0.01;
+  }
   x[1] = 0.;
   x[2] = 0.;
 
@@ -849,10 +854,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 14;
+  const int num_opts = 15;
   std::string arg_list[num_opts] = 
     { "-dl", "-dR0", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol" };
+      "-ntheta", "-psi_end", "-psi_start", "-R0", "-te_start", "-te_end", "-tol" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -925,6 +930,9 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
   } else if(opt=="-psi_start") {
     if(argc==1) psi_start = atof(argv[0].c_str());
     else argc_err = true;
+  } else if(opt=="-R0") {
+    if(argc==1) R0 = atof(argv[0].c_str());
+    else argc_err = true;    
   } else if(opt=="-te_end") {
     if(argc==1) te_end = atof(argv[0].c_str());
     else argc_err = true;
