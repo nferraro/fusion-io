@@ -18,5 +18,5 @@ add_executable(plot_dr plot_dr.c)
 target_link_libraries(plot_dr PRIVATE LAPACK::LAPACK)
 
 install(TARGETS trace plot_dr
-   RUNTIME DESTINATION "bin"
+   RUNTIME DESTINATION ${BINDIR}
 )
