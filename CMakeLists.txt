@@ -11,8 +11,16 @@ option(FUSIONIO_ENABLE_PYTHON "Enable Python" ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    set(CMAKE_Fortran_FLAGS "-s real64")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_Fortran_FLAGS "-fdefault-real-8")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+    set(CMAKE_Fortran_FLAGS "-real-size 64")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    set(CMAKE_Fortran_FLAGS "-r8")
+else()
+    set(CMAKE_Fortran_FLAGS "-r8")
 endif()
 
 add_subdirectory(m3dc1_lib)
