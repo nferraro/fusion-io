@@ -86,3 +86,6 @@ Nxi_for_x_option = 0
   !preconditioner_x_min_L = 0
   !preconditioner_xi = 0
 /
+
+&export_f
+/

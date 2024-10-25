@@ -101,6 +101,9 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_VELOCITY):          *s = "velocity";         break; 
   case(FIO_VISCOSITY):         *s = "viscosity";        break;
   case(FIO_JBS):               *s = "JpdotB";        break;
+  case(FIO_JBS_dndpsi):        *s = "JpdotB_dndpsi";        break;
+  case(FIO_JBS_dtedpsi):       *s = "JpdotB_dtedpsi";        break;
+  case(FIO_JBS_dtidpsi):       *s = "JpdotB_dtidpsi";        break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;

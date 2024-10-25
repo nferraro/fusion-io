@@ -293,10 +293,11 @@ def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_t
 
                 surf_idx_pos = isurf if isurf==nsurf-1 else isurf+1
                 surf_idx_neg = 0 if isurf==0 else isurf-1
+                numer_fac = 1.0 if isurf==0 or isurf==nsurf-1 else 2.0
                 denom_fac = 1.0 if isurf==0 or isurf==nsurf-1 else 1.0
                 dR_dpsi[isurf,iphi,itheta] = (R[surf_idx_pos,iphi,itheta] - R[surf_idx_neg,iphi,itheta])/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
                 dZ_dpsi[isurf,iphi,itheta] = (Z[surf_idx_neg,iphi,itheta] - Z[surf_idx_neg,iphi,itheta])/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
-                Jac_vmec[isurf,iphi,itheta] *= 2/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
+                Jac_vmec[isurf,iphi,itheta] *= numer_fac/(denom_fac*(psi_t_norm[surf_idx_pos]-psi_t_norm[surf_idx_neg]))
 
                 phi_idx_pos = 0 if iphi==nphi-1 else iphi+1
                 phi_idx_neg = -1 if iphi==0 else iphi-1

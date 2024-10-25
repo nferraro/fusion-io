@@ -125,6 +125,9 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_ELECTRIC_FIELD);
   fields->push_back(FIO_RESISTIVITY);
   fields->push_back(FIO_JBS);
+  fields->push_back(FIO_JBS_dndpsi);
+  fields->push_back(FIO_JBS_dtedpsi);
+  fields->push_back(FIO_JBS_dtidpsi);
 
   return FIO_SUCCESS;
 }
@@ -304,10 +307,23 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     break;
 
   
- case(FIO_JBS):
+  case(FIO_JBS):
     mf = new m3dc1_scalar_field(this, "JpdotB", J0);
     if(s!=0) unneeded_species = true;
     break;
+  case(FIO_JBS_dndpsi):
+    mf = new m3dc1_scalar_field(this, "JpdotB_dndpsi", J0);
+    if(s!=0) unneeded_species = true;
+    break;
+  case(FIO_JBS_dtedpsi):
+    mf = new m3dc1_scalar_field(this, "JpdotB_dtedpsi", J0);
+    if(s!=0) unneeded_species = true;
+    break;
+  case(FIO_JBS_dtidpsi):
+    mf = new m3dc1_scalar_field(this, "JpdotB_dtidpsi", J0);
+    if(s!=0) unneeded_species = true;
+    break;
+
   default:
     return FIO_UNSUPPORTED;
   };

@@ -17,13 +17,14 @@ double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
 double tol = 0.1;         // Tolerance for Te when finding isosurface
 double dR0 = 0.0;         // Guess for offset from magnetic axis
+double R0 = 0.0;          // Guess for R coordinate of magnetic axis
 double psi_start = -1;
 double psi_end = -1;
 double te_start = -1;
 double te_end = -1;
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
-fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB;
+fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
 double axis[3];
 double psi0, psi1;
 
@@ -119,6 +120,10 @@ int main(int argc, char* argv[])
   double* ni = new double[nr];
   double* ti = new double[nr];
   double* JpdotB_fluxavg = new double[nr];
+  double* JpdotB_dndpsi_fluxavg = new double[nr];
+  double* JpdotB_dtedpsi_fluxavg = new double[nr];
+  double* JpdotB_dtidpsi_fluxavg = new double[nr];
+  
   double* psi_t = new double[nr];
   double* dpsi_t = new double[nr];
   double* psi_p = new double[nr];
@@ -149,7 +154,11 @@ int main(int argc, char* argv[])
   n[1] = 1.;
   n[2] = 0.;
 
-  x[0] = axis[0] + dR0 - 0.01;
+  if(R0 > 0.0) {
+    x[0] = R0;
+  } else {		 
+    x[0] = axis[0] + dR0 - 0.01;
+  }
   x[1] = 0.;
   x[2] = 0.;
 
@@ -304,6 +313,18 @@ int main(int argc, char* argv[])
   if(result != FIO_SUCCESS) {
     std::cerr << "Error finding J.B" << std::endl;
   }
+  result = fio_eval_on_path(&JpdotB_dndpsi, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_dndpsi" << std::endl;
+  }
+  result = fio_eval_on_path(&JpdotB_dtedpsi, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_dtedpsi" << std::endl;
+  }
+  result = fio_eval_on_path(&JpdotB_dtidpsi, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_dtidpsi" << std::endl;
+  }
   }
   // Calculate flux surface averages for profiles
   std::cerr << "Calculating flux surface averages..." << std::endl;  
@@ -317,6 +338,12 @@ int main(int argc, char* argv[])
              if (ibootstrap==1){
   result = fio_surface_average(&JpdotB, nr, nphi, ntheta, path,
 			       jac, JpdotB_fluxavg, h);
+  result = fio_surface_average(&JpdotB_dndpsi, nr, nphi, ntheta, path,
+			       jac, JpdotB_dndpsi_fluxavg, h);
+  result = fio_surface_average(&JpdotB_dtedpsi, nr, nphi, ntheta, path,
+			       jac, JpdotB_dtedpsi_fluxavg, h);
+  result = fio_surface_average(&JpdotB_dtidpsi, nr, nphi, ntheta, path,
+			       jac, JpdotB_dtidpsi_fluxavg, h);
              }
   // Finding flux surface averages for the magnetic field
   for(int i=0; i<nr; i++) {
@@ -609,7 +636,8 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "dPsi_t", NC_FLOAT, 1, &nr_dimid, &dpsi_t_id);  // ver 3
   nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
   nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
-  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,JpdotB_fluxavg_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id,b2_fa_id;
+  int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id,b2_fa_id;
+  int JpdotB_fluxavg_id,JpdotB_dndpsi_fluxavg_id,JpdotB_dtedpsi_fluxavg_id,JpdotB_dtidpsi_fluxavg_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
   nc_def_var(ncid, "Te0",  NC_FLOAT, 1, &npsi_dimid, &te_id);
@@ -619,9 +647,12 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "by_fa",  NC_FLOAT, 1, &npsi_dimid, &by_fa_id);
   nc_def_var(ncid, "bz_fa",  NC_FLOAT, 1, &npsi_dimid, &bz_fa_id);
   nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &bmag_fa_id);
-  nc_def_var(ncid, "b2_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);
+  nc_def_var(ncid, "b2_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);  
   if (ibootstrap==1){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_dndpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dndpsi_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_dtedpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dtedpsi_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_dtidpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dtidpsi_fluxavg_id);
   }
   nc_def_var(ncid, "temax",  NC_FLOAT, 0, &single_value_dimid, &temax_id); 
 
@@ -665,6 +696,9 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, b2_fa_id, b2_fa);
   if (ibootstrap==1){
   nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
+  nc_put_var_double(ncid, JpdotB_dndpsi_fluxavg_id, JpdotB_dndpsi_fluxavg);
+  nc_put_var_double(ncid, JpdotB_dtedpsi_fluxavg_id, JpdotB_dtedpsi_fluxavg);
+  nc_put_var_double(ncid, JpdotB_dtidpsi_fluxavg_id, JpdotB_dtidpsi_fluxavg);
   }
 
   nc_put_var_double(ncid, temax_id, &te_max);
@@ -940,6 +974,31 @@ bool create_source(const int type, const int argc, const std::string argv[])
     return result;
    }
    JpdotB.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_dndpsi, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field dndpsi " << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_dndpsi.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_dtedpsi, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field dtedpsi" << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_dtedpsi.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_dtidpsi, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field dtidpsi" << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_dtidpsi.add_field(field, FIO_ADD, 1., hint);
+
   } else {
     std::cerr << "No bootstrap model, ibootstrap=" 
           << ibootstrap
@@ -1011,10 +1070,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 14;
+  const int num_opts = 16;
   std::string arg_list[num_opts] = 
-    { "-dR0", "-bootstrap", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-te_start", "-te_end", "-tol"};
+    { "-dl","-dR0", "-bootstrap", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
+      "-ntheta", "-psi_end", "-psi_start", "-R0", "-te_start", "-te_end", "-tol"};
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -1061,9 +1120,10 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 {
   bool argc_err = false;
 
-  
-
-  if(opt=="-dR0") {
+  if(opt=="-dl") {
+    if(argc==1) dl_pol = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-dR0") {
     if(argc==1) dR0 = atof(argv[0].c_str());
     else argc_err = true;    
   } else if(opt=="-bootstrap") {
@@ -1094,6 +1154,9 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
     else argc_err = true;
   } else if(opt=="-psi_start") {
     if(argc==1) psi_start = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-R0") {
+    if(argc==1) R0 = atof(argv[0].c_str());
     else argc_err = true;
   } else if(opt=="-te_end") {
     if(argc==1) te_end = atof(argv[0].c_str());
@@ -1132,6 +1195,7 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 void print_usage()
 {
   std::cerr << "write_neo_input"
+  	  << " -dl <dl>"
 	    << " -dR0 <dR0>"
       << " -bootstrap <0/1>"
 	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"

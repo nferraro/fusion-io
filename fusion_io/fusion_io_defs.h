@@ -39,6 +39,9 @@ FIO_DEFINE_INT(FIO_RESISTIVITY,      20)
 FIO_DEFINE_INT(FIO_VISCOSITY,        30)
 FIO_DEFINE_INT(FIO_THERMAL_DIFFUSIVITY, 40)
 FIO_DEFINE_INT(FIO_JBS,              50)
+FIO_DEFINE_INT(FIO_JBS_dndpsi,       60)
+FIO_DEFINE_INT(FIO_JBS_dtedpsi,      70)
+FIO_DEFINE_INT(FIO_JBS_dtidpsi,      80)
 
 
 COMMENT(      species-dependent scalar fields      )
