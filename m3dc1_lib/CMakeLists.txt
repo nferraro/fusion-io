@@ -38,3 +38,4 @@ install(EXPORT fusionio_m3dc1-target
 # tests
 add_executable(m3dc1_fortran_test test.f90)
 target_link_libraries(m3dc1_fortran_test PRIVATE fusionio::m3dc1_fortran)
+set_property(TARGET m3dc1_fortran_test PROPERTY LINKER_LANGUAGE Fortran)
