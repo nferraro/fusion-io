@@ -231,11 +231,20 @@ m3dc1_mesh* m3dc1_file::read_mesh(const int t)
     }
   }
   if(is_stell) {
-    hid_t nperiods_attr = H5Aopen(mesh_group, "nperiods", H5P_DEFAULT);
-    H5Aread(nperiods_attr, H5T_NATIVE_INT, &mesh->nperiods);
-    H5Aclose(nperiods_attr);
+    int ifull_torus;
+    hid_t ifull_torus_attr = H5Aopen(mesh_group, "ifull_torus", H5P_DEFAULT);
+    H5Aread(ifull_torus_attr, H5T_NATIVE_INT, &ifull_torus);
+    H5Aclose(ifull_torus_attr);
+
+    if(ifull_torus==1) {
+      mesh->nperiods = 1;
+    } else {
+      hid_t nperiods_attr = H5Aopen(mesh_group, "nperiods", H5P_DEFAULT);
+      H5Aread(nperiods_attr, H5T_NATIVE_INT, &mesh->nperiods);
+      H5Aclose(nperiods_attr);
+    }
   } else {
-    mesh->nperiods = 1.;
+    mesh->nperiods = 1;
   }
   std::cerr << "period = " << mesh->period << std::endl;
   std::cerr << "nperiods = " << mesh->nperiods << std::endl;
