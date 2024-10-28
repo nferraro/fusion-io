@@ -74,7 +74,7 @@ int fio_find_val(fio_field* f, const double val, double* x,
 
     // Check if we are within tolerance
     error = v - val;
-    if(fabs(error) < tol) {
+    if(abs(error) < tol) {
       //      std::cerr << "Found." << std::endl;
       return FIO_SUCCESS;
     }
@@ -134,7 +134,7 @@ int fio_find_val(fio_field* f, const double val, double* x,
     // derivative in the direction to move
     df = dv[0]*s[0] + dv[1]*s[1] + dv[2]*s[2];
 
-    if(fabs(df) < tol) {
+    if(abs(df) < tol) {
       std::cerr << "Error in fio_find_val: zero gradient" << std::endl;
       return FIO_DIVERGED;
     }
@@ -284,7 +284,7 @@ int fio_find_max(fio_field* f, double* val, double* x,
 	      << dv[0] << ", " << dv[1] << ", " << dv[2] << " )"
 	      << std::endl;
     */
-    if(fabs(df) < tol) {
+    if(abs(df) < tol) {
       /*
       std::cerr << "Found maximum at ("
 		<< x[0] << ", " << x[1] << ", " << x[2]
@@ -344,14 +344,26 @@ int fio_find_max(fio_field* f, double* val, double* x,
     if(x[1] >= toroidal_extent) x[1] -= toroidal_extent;
   }
 
+  /*
   std::cerr << "Error: fio_find_max did not converge after " << max_its
 	    << " iterations" << std::endl;
 
-  /*
+  std::cerr << "Intial guess was ( "
+               << x0[0] << ", " << x0[1] << ", " << x0[2]
+               << " )" << std::endl;
+  std::cerr << "Last point was ( "
+               << x0[0] << ", " << x0[1] << ", " << x0[2]
+               << " )" << std::endl;
+  std::cerr << "Last value was " << *val << std::endl;
+  std::cerr << "Last dv was ( "
+               << dv[0] << ", " << dv[1] << ", " << dv[2]
+               << " )" << std::endl;
+  */
+
   x[0] = x0[0];
   x[1] = x0[1];
   x[2] = x0[2];
-  */
+
   return FIO_DIVERGED;
 }
 
@@ -1021,7 +1033,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     t[2] = 0.;
     a[1] = phi[i];
     
-    result = fio_find_max(f, &te_max, a, tol, max_step, 2, t, h);
+    result = fio_find_max(f, &te_max, a, 10.*tol, max_step, 2, t, h);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error finding magnetic axis at phi = "
 		<< phi[i] << std::endl;
