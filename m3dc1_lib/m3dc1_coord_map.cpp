@@ -5,9 +5,9 @@
 bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const double z,
 		     double *xi_frac, double *zi_frac, double *eta_frac) const
 {
-  // determine whether phi falls inside element
   const double tol = 1e-6;
 
+  // determine whether phi falls inside element
   if(phi < Phi[0]-tol) return false;
   if(phi > Phi[1]+tol) return false;
   double d = (phi - Phi[0]) / (Phi[1] - Phi[0]);
@@ -35,38 +35,6 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
   *eta_frac = ((r - R0)*(Z1 - Z0) - (z - Z0)*(R1 - R0)) /
     ((R2 - R0)*(Z1 - Z0) - (Z2 - Z0)*(R1 - R0));
 
-    /*  
-  std::cerr << "found at " << *xi_frac << " " << *zi_frac << " " << *eta_frac << std::endl;
-
-  if(*xi_frac > 1.+tol || *xi_frac < -1.-tol) {
-    std::cerr << "xi_frac out of bounds" << std::endl;
-    std::cerr << *xi_frac << std::endl;
-    std::cerr << "(" << r << ", " << z << ")" << std::endl;
-    std::cerr << "(" << R0 << ", " << Z0 << ") "
-	      << "(" << R1 << ", " << Z1 << ") "
-	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
-    std::cerr << dot << " " << l2 << std::endl;
-    std::cerr << "(" << R3 << ", " << Z3 << ") " << std::endl;
-  }
-  */
-  /*
-  if(*eta_frac < -tol || *eta_frac > 1.+tol) {
-    std::cerr << "eta_frac out of bounds" << std::endl;
-    std::cerr << *eta_frac << std::endl;
-    std::cerr << "(" << r << ", " << z << ")" << std::endl;
-    std::cerr << "(" << R0 << ", " << Z0 << ") "
-	      << "(" << R1 << ", " << Z1 << ") "
-	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
-  }
-  */
-  /*
-  if(*zi_frac < 0. || *zi_frac > 1.+tol) {
-    std::cerr << "zi_frac out of bounds "
-	      << phi << " "
-	      << Phi[0] << " "
-	      << Phi[1] << std::endl;
-  }
-  */
   return true;
 }
 
