@@ -24,16 +24,16 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
   if((r - R1)*(Z2 - Z1) - (z - Z1)*(R2 - R1) > tol) return false;
   if((r - R2)*(Z0 - Z2) - (z - Z2)*(R0 - R2) > tol) return false;
 
-  double l2 = (R1 - R0)*(R1 - R0) + (Z1 - Z0)*(Z1 - Z0);
-  double dot_l = ((R2 - R0)*(R1 - R0) + (Z2 - Z0)*(Z1 - Z0))/l2;
-  double R3 = dot_l*(R1 - R0) + R0;
-  double Z3 = dot_l*(Z1 - Z0) + Z0;
-
   // return "fractional" local coordinates
-  *xi_frac = ((r - R3)*(R1 - R0) + (z - Z3)*(Z1 - Z0)) / l2;
+
+  double h2 = (R1-R0)*(R1-R0) + (Z1-Z0)*(Z1-Z0);
+  double co_h = (R1 - R0)/h2;
+  double sn_h = (Z1 - Z0)/h2;
+  double b_h = ( (R2 - R0)*(R1 - R0) + (Z2 - Z0)*(Z1 - Z0))/h2;
+  double c_h = (-(R2 - R0)*(Z1 - Z0) + (Z2 - Z0)*(R1 - R0))/h2;
+  *xi_frac =    (r - R0)*co_h + (z - Z0)*sn_h - b_h;
+  *eta_frac = (-(r - R0)*sn_h + (z - Z0)*co_h) / c_h;
   *zi_frac = d;
-  *eta_frac = ((r - R0)*(Z1 - Z0) - (z - Z0)*(R1 - R0)) /
-    ((R2 - R0)*(Z1 - Z0) - (Z2 - Z0)*(R1 - R0));
 
   return true;
 }
@@ -161,6 +161,8 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     }
   }
 
+  std::cerr << "Failed; guess was " << *e << std::endl;
+
   return false;
 }
 
@@ -173,12 +175,20 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // find element containing the R, Phi, Z point
   if(!find_element(R, Phi, Z, &xi_frac, &zi_frac, &eta_frac, e)) {
-    /*
     std::cerr << "failed find_element containing ("
 	      << R << ", " << Phi << ", " << Z << ")" << std::endl;
-    */
     return false;
   }
+
+  // ensure that local coordinates are inside triangle
+  double h = mesh->a[*e] + mesh->b[*e];
+  if(xi_frac >  mesh->a[*e]/h) xi_frac =  mesh->a[*e]/h;
+  if(xi_frac < -mesh->b[*e]/h) xi_frac = -mesh->b[*e]/h;
+  if(eta_frac > 1.+(h/mesh->b[*e])*xi_frac) eta_frac = 1.+(h/mesh->b[*e])*xi_frac;
+  if(eta_frac > 1.-(h/mesh->a[*e])*xi_frac) eta_frac = 1.-(h/mesh->a[*e])*xi_frac;
+  if(eta_frac < 0.) eta_frac = 0.;
+  if(zi_frac < 0.) zi_frac = 0.;
+  if(zi_frac > 1.) zi_frac = 1.;
 
   // calculate local coordinates in element
   // these coordinates have been calculated using a linear interpolation of
