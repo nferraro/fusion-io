@@ -374,7 +374,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 		      const double dl, const double tol, const double max_step,
 		      int* n, double*** path, fio_hint h=0)
 {
-  const int max_pts = 1000;
+  const int max_pts = 10000;
 
   int nn;
   double x[3];
