@@ -28,7 +28,7 @@ def m3dc1_to_vmec(
         bootstrap = 0,
         usingT = 0,
         tol=1,
-        dR0=0.0,
+        R0=0.0,
         write_sfincs_input=True,
         vmec_file_descriptor=None
 ):
@@ -86,10 +86,10 @@ def m3dc1_to_vmec(
         
         if (os.path.exists(os.path.join(fio_bin, "write_neo_input"))):
             if (usingT ==1):
-                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, dR0, tol)
+                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -te_start {} -te_end {} -nr {} -nphi {} -ntheta {} -R0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, te_start, te_end, nsurf, nphi, ntheta, R0, tol)
                 subprocess.run(cmd, cwd=os.getcwd(), shell=True)
             else:
-                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -psi_start {} -psi_end {} -nr {} -nphi {} -ntheta {} -dR0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, psi_start, psi_end, nsurf, nphi, ntheta, dR0, tol)
+                cmd = "~/src/fusion-io/util/_stellar/write_neo_input -bootstrap {} -m3dc1 {} {} -psi_start {} -psi_end {} -nr {} -nphi {} -ntheta {} -R0 {} -tol {}".format(bootstrap,m3dc1_outfile, timeslice, psi_start, psi_end, nsurf, nphi, ntheta, R0, tol)
                 subprocess.run(cmd, cwd=os.getcwd(), shell=True)
         else:
             print("Unable to find write_neo_input executable. Check that FIO_ROOT is set in your environment. Exiting...")
@@ -285,8 +285,11 @@ def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_t
 
     #psi_t_end = psi_t[-1]   # If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
     #psi_t_norm = psi_t / 4.4245216949037 # Need to normalize wrt toroidal flux on boundary of original vmec file for comparison purposes
-    #psi_t_norm = psi_t / 0.4
-        
+
+    psi_t_end=1#0.5144
+    psi_t_norm = psi_t /psi_t_end # 1 for benchmarking case, 0.5144 for NCSX case, 0.4 for tcv comparison case If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
+    print('psi_t_end')
+    print(psi_t_end)
     for isurf in range(nsurf):
         for iphi in range(nphi):
             for itheta in range(ntheta):
