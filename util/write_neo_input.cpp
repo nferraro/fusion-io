@@ -1124,6 +1124,10 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
     if(argc==1) dl_pol = atof(argv[0].c_str());
     else argc_err = true;
   } else if(opt=="-dR0") {
+  if(opt=="-dl") {
+    if(argc==1) dl_pol = atof(argv[0].c_str());
+    else argc_err = true;
+  } else if(opt=="-dR0") {
     if(argc==1) dR0 = atof(argv[0].c_str());
     else argc_err = true;    
   } else if(opt=="-bootstrap") {
@@ -1207,6 +1211,7 @@ void print_usage()
 	    << std::endl;
 
   std::cerr
+    << "<dl>:           poloidal step size when tracing isosurface\n"
     << "<dR0>:          offset to major radius\n"
     << "<bootstrap 0/1>:flag to output <j.B> if the bootstrap model is on (1) in M3D-C1\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
