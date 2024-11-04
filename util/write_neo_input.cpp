@@ -1120,10 +1120,7 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
 {
   bool argc_err = false;
 
-  if(opt=="-dl") {
-    if(argc==1) dl_pol = atof(argv[0].c_str());
-    else argc_err = true;
-  } else if(opt=="-dR0") {
+
   if(opt=="-dl") {
     if(argc==1) dl_pol = atof(argv[0].c_str());
     else argc_err = true;
