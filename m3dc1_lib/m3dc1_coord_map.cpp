@@ -5,9 +5,9 @@
 bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const double z,
 		     double *xi_frac, double *zi_frac, double *eta_frac) const
 {
-  // determine whether phi falls inside element
   const double tol = 1e-6;
 
+  // determine whether phi falls inside element
   if(phi < Phi[0]-tol) return false;
   if(phi > Phi[1]+tol) return false;
   double d = (phi - Phi[0]) / (Phi[1] - Phi[0]);
@@ -24,49 +24,17 @@ bool m3dc1_mesh_element::is_in_element(const double r, const double phi, const d
   if((r - R1)*(Z2 - Z1) - (z - Z1)*(R2 - R1) > tol) return false;
   if((r - R2)*(Z0 - Z2) - (z - Z2)*(R0 - R2) > tol) return false;
 
-  double l2 = (R1 - R0)*(R1 - R0) + (Z1 - Z0)*(Z1 - Z0);
-  double dot_l = ((R2 - R0)*(R1 - R0) + (Z2 - Z0)*(Z1 - Z0))/l2;
-  double R3 = dot_l*(R1 - R0) + R0;
-  double Z3 = dot_l*(Z1 - Z0) + Z0;
-
   // return "fractional" local coordinates
-  *xi_frac = ((r - R3)*(R1 - R0) + (z - Z3)*(Z1 - Z0)) / l2;
+
+  double h2 = (R1-R0)*(R1-R0) + (Z1-Z0)*(Z1-Z0);
+  double co_h = (R1 - R0)/h2;
+  double sn_h = (Z1 - Z0)/h2;
+  double b_h = ( (R2 - R0)*(R1 - R0) + (Z2 - Z0)*(Z1 - Z0))/h2;
+  double c_h = (-(R2 - R0)*(Z1 - Z0) + (Z2 - Z0)*(R1 - R0))/h2;
+  *xi_frac =    (r - R0)*co_h + (z - Z0)*sn_h - b_h;
+  *eta_frac = (-(r - R0)*sn_h + (z - Z0)*co_h) / c_h;
   *zi_frac = d;
-  *eta_frac = ((r - R0)*(Z1 - Z0) - (z - Z0)*(R1 - R0)) /
-    ((R2 - R0)*(Z1 - Z0) - (Z2 - Z0)*(R1 - R0));
 
-    /*  
-  std::cerr << "found at " << *xi_frac << " " << *zi_frac << " " << *eta_frac << std::endl;
-
-  if(*xi_frac > 1.+tol || *xi_frac < -1.-tol) {
-    std::cerr << "xi_frac out of bounds" << std::endl;
-    std::cerr << *xi_frac << std::endl;
-    std::cerr << "(" << r << ", " << z << ")" << std::endl;
-    std::cerr << "(" << R0 << ", " << Z0 << ") "
-	      << "(" << R1 << ", " << Z1 << ") "
-	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
-    std::cerr << dot << " " << l2 << std::endl;
-    std::cerr << "(" << R3 << ", " << Z3 << ") " << std::endl;
-  }
-  */
-  /*
-  if(*eta_frac < -tol || *eta_frac > 1.+tol) {
-    std::cerr << "eta_frac out of bounds" << std::endl;
-    std::cerr << *eta_frac << std::endl;
-    std::cerr << "(" << r << ", " << z << ")" << std::endl;
-    std::cerr << "(" << R0 << ", " << Z0 << ") "
-	      << "(" << R1 << ", " << Z1 << ") "
-	      << "(" << R2 << ", " << Z2 << ") " << std::endl;
-  }
-  */
-  /*
-  if(*zi_frac < 0. || *zi_frac > 1.+tol) {
-    std::cerr << "zi_frac out of bounds "
-	      << phi << " "
-	      << Phi[0] << " "
-	      << Phi[1] << std::endl;
-  }
-  */
   return true;
 }
 
@@ -166,7 +134,7 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
   // Test neighbors
   for(int n=0; n<mesh->nneighbors[*e]; n++) {
     int m = mesh->neighbor[*e][n];
-    if(elm[m].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+    if(elm[m].is_in_element(R,phi,Z,xi_frac,zi_frac,eta_frac)) {
       *e = m;
       return true;
     }
@@ -177,7 +145,7 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     int m = mesh->neighbor[*e][n];
     for(int nn=0; nn<mesh->nneighbors[m]; nn++) {
       int l = mesh->neighbor[m][nn];
-      if(elm[l].is_in_element(R,Phi,Z,xi_frac,zi_frac,eta_frac)) {
+      if(elm[l].is_in_element(R,phi,Z,xi_frac,zi_frac,eta_frac)) {
 	*e = l;
 	return true;
       }
@@ -193,6 +161,8 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     }
   }
 
+  std::cerr << "Failed; guess was " << *e << std::endl;
+
   return false;
 }
 
@@ -205,12 +175,20 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // find element containing the R, Phi, Z point
   if(!find_element(R, Phi, Z, &xi_frac, &zi_frac, &eta_frac, e)) {
-    /*
     std::cerr << "failed find_element containing ("
 	      << R << ", " << Phi << ", " << Z << ")" << std::endl;
-    */
     return false;
   }
+
+  // ensure that local coordinates are inside triangle
+  double h = mesh->a[*e] + mesh->b[*e];
+  if(xi_frac >  mesh->a[*e]/h) xi_frac =  mesh->a[*e]/h;
+  if(xi_frac < -mesh->b[*e]/h) xi_frac = -mesh->b[*e]/h;
+  if(eta_frac > 1.+(h/mesh->b[*e])*xi_frac) eta_frac = 1.+(h/mesh->b[*e])*xi_frac;
+  if(eta_frac > 1.-(h/mesh->a[*e])*xi_frac) eta_frac = 1.-(h/mesh->a[*e])*xi_frac;
+  if(eta_frac < 0.) eta_frac = 0.;
+  if(zi_frac < 0.) zi_frac = 0.;
+  if(zi_frac > 1.) zi_frac = 1.;
 
   // calculate local coordinates in element
   // these coordinates have been calculated using a linear interpolation of

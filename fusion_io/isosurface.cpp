@@ -42,7 +42,7 @@ int fio_find_val(fio_field* f, const double val, double* x,
   n[2] = norm[2] / d;
 
   double s[3];
-  double error, last_error, df;
+  double error, df;
 
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
@@ -77,36 +77,6 @@ int fio_find_val(fio_field* f, const double val, double* x,
     if(abs(error) < tol) {
       //      std::cerr << "Found." << std::endl;
       return FIO_SUCCESS;
-    }
-
-    if(i>10 && last_error < error) {
-      if(error*last_error < 0) {
-	// spiralling; split the difference
-	/*
-	std::cerr << "Spiralling.  re-stepping. " << i << std::endl;
-	std::cerr << dx[0] << ", " << dx[2] << ", " << dl << std::endl;
-	std::cerr << x[0] << ", " << x[2] << std::endl;
-	*/
-	dx[0] /= 2.;
-	dx[1] /= 2.;
-	dx[2] /= 2.;
-	x[0] = last_x[0] + dx[0];
-	x[1] = last_x[1] + dx[1];
-	x[2] = last_x[2] + dx[2];
-	continue;
-      } else {
-	// moving in wrong direction; back up
-	//	std::cerr << "Moving in wrong direction.  re-stepping. " << i << std::endl;
-	dx[0] /= 2.;
-	dx[1] /= 2.;
-	dx[2] /= 2.;
-	x[0] = last_x[0] + dx[0];
-	x[1] = last_x[1] + dx[1];
-	x[2] = last_x[2] + dx[2];
-	continue;
-      }
-    } else {
-      last_error = error;
     }
 
     // Evaluate the derivative of the field and take a step
@@ -231,7 +201,7 @@ int fio_find_max(fio_field* f, double* val, double* x,
 
 
   double s[3];
-  double error, last_error;
+  double error, last_val;
 
   for(int i=0; i<max_its; i++) {
     // Evaluate the field
@@ -276,6 +246,7 @@ int fio_find_max(fio_field* f, double* val, double* x,
     }
     double df = sqrt(dv[0]*dv[0] + dv[1]*dv[1] + dv[2]*dv[2]);
 
+    last_val = *val;
     result = f->eval(x, val, h);
     /*
     std::cerr << "Te( " << x[0] << ", " << x[1] << ", " << x[2] << " ) = "
@@ -284,7 +255,7 @@ int fio_find_max(fio_field* f, double* val, double* x,
 	      << dv[0] << ", " << dv[1] << ", " << dv[2] << " )"
 	      << std::endl;
     */
-    if(abs(df) < tol) {
+    if(i>0 && abs(last_val - *val) < tol) {
       /*
       std::cerr << "Found maximum at ("
 		<< x[0] << ", " << x[1] << ", " << x[2]
@@ -374,7 +345,7 @@ int fio_isosurface_2d(fio_field* f, const double val, const double* guess,
 		      const double dl, const double tol, const double max_step,
 		      int* n, double*** path, fio_hint h=0)
 {
-  const int max_pts = 1000;
+  const int max_pts = 10000;
 
   int nn;
   double x[3];
@@ -1033,7 +1004,7 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     t[2] = 0.;
     a[1] = phi[i];
     
-    result = fio_find_max(f, &te_max, a, 10.*tol, max_step, 2, t, h);
+    result = fio_find_max(f, &te_max, a, tol, max_step, 2, t, h);
     if(result != FIO_SUCCESS) {
       std::cerr << "Error finding magnetic axis at phi = "
 		<< phi[i] << std::endl;
