@@ -1020,9 +1020,9 @@ int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
     t[2] = 0.;
     x[1] = phi[i];
     x[2] = a[2];
-    result = fio_find_val(f, val, x, tol, 0.1, 1, t, h);
+    result = fio_find_val(f, val, x, tol, max_step, 1, t, h);
 
-    if(result != FIO_SUCCESS) {
+    if(result == FIO_OUT_OF_BOUNDS) {
       std::cerr << "Error finding initial point" << std::endl;
       break;
     }
