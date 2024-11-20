@@ -530,7 +530,8 @@ PyObject* fio_set_int_option_py(PyObject* self, PyObject *args)
 PyObject* fio_set_str_option_py(PyObject* self, PyObject *args)
 {
   int iopt;
-  char v[256];
+  /*char v[256];*/
+  char* v;
   if(!PyArg_ParseTuple(args, "is", &iopt, &v))
     return NULL;
 
