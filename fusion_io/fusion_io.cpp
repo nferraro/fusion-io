@@ -100,6 +100,7 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
   case(FIO_VISCOSITY):         *s = "viscosity";        break;
+  case(FIO_SCALAR_FIELD):      *s = "other scalar field"; break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;
