@@ -25,6 +25,7 @@ add_library(fusionio_m3dc1_fortran
             m3dc1_fortran.cpp)
 target_link_libraries(fusionio_m3dc1_fortran PUBLIC fusionio::m3dc1)
 add_library(fusionio::m3dc1_fortran ALIAS fusionio_m3dc1_fortran)
+message(STATUS "Found HDF5 ${HDF5_LINK_LIBRARIES}")
 
 
 install(TARGETS fusionio_m3dc1
@@ -37,5 +38,5 @@ install(EXPORT fusionio_m3dc1-target
 
 # tests
 add_executable(m3dc1_fortran_test test.f90)
-target_link_libraries(m3dc1_fortran_test PRIVATE fusionio::m3dc1_fortran)
+target_link_libraries(m3dc1_fortran_test PUBLIC fusionio::m3dc1_fortran PkgConfig::HDF5)
 set_property(TARGET m3dc1_fortran_test PROPERTY LINKER_LANGUAGE Fortran)

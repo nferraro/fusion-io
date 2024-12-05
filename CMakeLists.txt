@@ -5,6 +5,7 @@ enable_testing()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(FindPkgConfig)
+# set(PKG_CONFIG_ARGN "--static")
 pkg_check_modules(HDF5 REQUIRED IMPORTED_TARGET hdf5)
 
 option(FUSIONIO_ENABLE_PYTHON "Enable Python" ON)
@@ -22,6 +23,8 @@ elseif (CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC")
 else()
     set(CMAKE_Fortran_FLAGS "-r8")
 endif()
+
+include_directories(${PROJECT_SOURCE_DIR}/output_stream)
 
 add_subdirectory(m3dc1_lib)
 add_subdirectory(fusion_io)

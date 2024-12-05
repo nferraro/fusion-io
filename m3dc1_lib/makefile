@@ -17,7 +17,7 @@ VPATH=$(SRCDIR)
 include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
 LIBS := $(HDF5_LIBS) $(LIBS)
-INCLUDE := $(HDF5_INCLUDE) $(INCLUDE)
+INCLUDE := $(HDF5_INCLUDE) $(INCLUDE) -I$(FIO_ROOT)/output_stream
 
 OBJS = m3dc1_mesh.o m3dc1_field.o m3dc1_coord_map.o m3dc1_stell_field.o m3dc1_timeslice.o m3dc1_file.o
 
