@@ -7,24 +7,24 @@ from spack.package import *
 
 
 class FusionIo(CMakePackage):
-    """Fusion-IO"""
+    """Fusion-IO is a library providing common interface (C++, C, Fortran, Python)
+    to data from various fusion simulation codes. It supported reading data from
+    M3D-C1, GPEC, MARS, GATO outputs and GEQDSK files."""
 
-    homepage = ""
     git = "https://github.com/nferraro/fusion-io"
 
-    maintainers("changliu")
+    maintainers("changliu777")
 
-    license("BSD-3-Clause")
+    license("MIT")
 
-    # We will use the scorec/core master branch as the 'nightly' version
-    # of pumi in spack.  The master branch is more stable than the
-    # scorec/core develop branch and we prefer not to expose spack users
-    # to the added instability.
-    version("master", submodules=True, branch="cmake_changliu")
+    version("master", submodules=True, branch="master")
 
     variant("python", default=True, description="Enable Python support")
     variant("trace", default=True, description="Build trace program")
 
+    depends_on("c", type="build")
+    depends_on("cxx", type="build")
+    depends_on("fortran", type="build")
     depends_on("mpi")
     depends_on("hdf5")
     depends_on("cmake@3:", type="build")
@@ -35,15 +35,14 @@ class FusionIo(CMakePackage):
         spec = self.spec
 
         args = [
-            "-DCMAKE_C_COMPILER=%s" % spec["mpi"].mpicc,
-            "-DCMAKE_CXX_COMPILER=%s" % spec["mpi"].mpicxx,
-            "-DCMAKE_Fortran_COMPILER=%s" % spec["mpi"].mpifc,
-            self.define_from_variant("ENABLE_TRACE", "trace"),
+            self.define("CMAKE_C_COMPILER", spec["mpi"].mpicc),
+            self.define("CMAKE_CXX_COMPILER", spec["mpi"].mpicxx),
+            self.define("CMAKE_Fortran_COMPILER", spec["mpi"].mpifc),
+            self.define_from_variant("FUSIONIO_ENABLE_TRACE", "trace"),
+            self.define_from_variant("FUSIONIO_ENABLE_PYTHON", "python"),
         ]
 
-        if self.spec.variants["python"].value:
-            args.extend(["-DENABLE_PYTHON:BOOL=ON"])
+        if self.spec.satisfies("+python"):
             args.append(self.define("PYTHON_MODULE_INSTALL_PATH", python_platlib))
 
         return args
-
