@@ -30,7 +30,8 @@ def m3dc1_to_vmec(
         tol=1,
         R0=0.0,
         write_sfincs_input=True,
-        vmec_file_descriptor=None
+        vmec_file_descriptor=None,
+        psi_t_end_input =1.0,
 ):
 
     '''
@@ -77,8 +78,14 @@ def m3dc1_to_vmec(
         imVMEC_outname = "wout_imVMEC.nc"
     else:
         imVMEC_outname = "wout_imVMEC-{}.nc".format(vmec_file_descriptor)
+    print("Inputs:")
+    print(f"m3dc1_outfile= {m3dc1_outfile},\ntimeslice={timeslice}\
+          \nnfp= {nfp},ntheta={ntheta},\nnphi={nphi},\nnsurf_nominal={nsurf_nominal}\
+        \nvmec_mpol={vmec_mpol},\nvmec_ntor={vmec_ntor},\nte_start={te_start},\nte_end={te_end},\
+        \npsi_start ={psi_start}, psi_end ={psi_end},\nbootstrap={bootstrap}, \nusingT ={usingT},\
+        \ntol={tol},  \nR0={R0}, \nwrite_sfincs_input={write_sfincs_input},\nmec_file_descriptor={vmec_file_descriptor},\
+        \npsi_t_end ={psi_t_end_input}")
 
-    
     if (os.path.exists("neo_input.nc")):
         print("neo_input.nc file already exists!")
     else:
@@ -112,9 +119,9 @@ def m3dc1_to_vmec(
         Jac_vmec = np.zeros((nsurf,nphi,ntheta))
         avg_minor_radius = [-1.0]
     
-        calculate_field_in_vmec_coordinates("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius)
+        calculate_field_in_vmec_coordinates("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius,psi_t_end_input)
 
-        imVMEC_data = put_quantities_in_vmec_format("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius)
+        imVMEC_data = put_quantities_in_vmec_format("neo_input.nc", modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius,psi_t_end_input)
     
         with open("imVMEC_data.pkl", "wb") as fp:
             pickle.dump(imVMEC_data, fp)
@@ -125,12 +132,12 @@ def m3dc1_to_vmec(
     # path stuff
     if (write_sfincs_input):
         toroidal_flux = 0.45
-        write_SFINCS_input(imVMEC_data=imVMEC_data, imitation_vmec_file=imVMEC_outname, input_type="radial", )
+        write_SFINCS_input(imVMEC_data=imVMEC_data, imitation_vmec_file=imVMEC_outname, input_type="radial", psi_t_end_input=psi_t_end_input)
 
 
         
 
-def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius):
+def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, vmec_mpol, vmec_ntor, nfp, avg_minor_radius,psi_t_end_input):
 
     '''
     This function converts quantities from fusion-io and write_neo_input into the variables and formats used in VMEC. This is mainly performing FFTs on the geometry of the flux surfaces and on the various components of the magnetic field
@@ -167,7 +174,13 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
     pressure = elementary_charge * (ne*te + ni*ti) # Pressure in Pa
     
     phi_vmec = psi_t
-    phi_vmec_lcfs = phi_vmec[-1]
+    if psi_t_end_input==0:
+        phi_vmec_lcfs = phi_vmec[-1]
+    elif psi_t_end_input==1:
+        phi_vmec_lcfs = phi_vmec[-1]
+    else:
+        phi_vmec_lcfs = psi_t_end_input#psi_t[-1]
+    print("In put_quantities_in_vmec_format,psi_t_end=",phi_vmec_lcfs)
     s = phi_vmec / phi_vmec_lcfs
     dphids = np.zeros(nsurf)
     for i in range(nsurf-1):
@@ -248,7 +261,7 @@ def put_quantities_in_vmec_format(neo_input_file, modB, B_sub_psi, B_sub_theta, 
         '''
     return imVMEC_data
 
-def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius):
+def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_theta, B_sub_phi, B_sup_theta, B_sup_phi, Jac_vmec, nsurf, theta, phi, avg_minor_radius,psi_t_end_input):
 
     neo_file = Dataset(neo_input_file, mode="r")
     R = np.swapaxes(neo_file.variables['R'][:,:,:], 0,2)
@@ -280,16 +293,22 @@ def calculate_field_in_vmec_coordinates(neo_input_file, modB, B_sub_psi, B_sub_t
 
     np.copyto(Jac_vmec,Jac)
     Jac_vmec /= -(dtheta*dphi)
-    psi_t_end = psi_t[-1]
+    if psi_t_end_input==0:
+        psi_t_end = psi_t[-1]
+    elif psi_t_end_input==1:
+        psi_t_end = 1
+    else:
+        psi_t_end = psi_t_end_input#psi_t[-1]
+    print("In calculate_field_in_vmec_coordinates,psi_t_end=",psi_t_end)
     psi_t_norm = psi_t / psi_t_end
 
     #psi_t_end = psi_t[-1]   # If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
     #psi_t_norm = psi_t / 4.4245216949037 # Need to normalize wrt toroidal flux on boundary of original vmec file for comparison purposes
 
-    psi_t_end=1#0.5144
-    psi_t_norm = psi_t /psi_t_end # 1 for benchmarking case, 0.5144 for NCSX case, 0.4 for tcv comparison case If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
-    print('psi_t_end')
-    print(psi_t_end)
+    #psi_t_end=1#0.5144
+    #psi_t_norm = psi_t /psi_t_end # 1 for benchmarking case, 0.5144 for NCSX case, 0.4 for tcv comparison case If comparing to a VMEC file, hard code phi_t_LCFS to phi[-1] from the VMEC file
+    #print('psi_t_end')
+    #print(psi_t_end)
     for isurf in range(nsurf):
         for iphi in range(nphi):
             for itheta in range(ntheta):
@@ -385,7 +404,7 @@ def write_SFINCS_runspec(psiN, ne_fio, Te_fio, ni_fio, Ti_fio, Tbar=1000, nbar=1
     run_spec.close()
     
     
-def write_SFINCS_input(imVMEC_data, imitation_vmec_file, input_type="surface", psiN=0.5, Tbar=1000, nbar=1.e20, vmec_compare=False, vmec_file=None):
+def write_SFINCS_input(imVMEC_data, imitation_vmec_file, input_type="surface", psiN=0.5, Tbar=1000, nbar=1.e20, vmec_compare=False, vmec_file=None,psi_t_end_input=0):
 
     '''
     Based on profile information and VMEC output file, this function will output a SFINCS input file
@@ -399,9 +418,19 @@ def write_SFINCS_input(imVMEC_data, imitation_vmec_file, input_type="surface", p
         print("SFINCS input_type must be either 'surface' or 'radial'. Exiting...")
         exit()
         
-    desired_psi_t = psiN * imVMEC_data['phi'][-1]
-    s = imVMEC_data['phi'] / imVMEC_data['phi'][-1]
-
+    if psi_t_end_input==0:
+        desired_psi_t = psiN * imVMEC_data['phi'][-1]
+        s = imVMEC_data['phi'] / imVMEC_data['phi'][-1]
+    elif psi_t_end_input==1:
+        desired_psi_t = psiN * imVMEC_data['phi'][-1]
+        s = imVMEC_data['phi'] / imVMEC_data['phi'][-1]
+    else:
+        desired_psi_t = psiN * imVMEC_data['phi'][-1]
+        s = imVMEC_data['phi'] / imVMEC_data['phi'][-1]
+        #desired_psi_t = psiN * psi_t_end_input
+        #s = imVMEC_data['phi'] / psi_t_end_input
+    
+    print("In write_SFINCS_input,psi_t_end=",psi_t_end_input)
     if (input_type == "radial"):
         if (vmec_compare):
             vmec_data = Dataset(sys.argv[1], mode='r')
@@ -446,7 +475,7 @@ def write_SFINCS_input(imVMEC_data, imitation_vmec_file, input_type="surface", p
             outfile.write("  psiN_wish = {} ! Set by sfincsScan.\n".format(psiN))
 
         elif "equilibriumFile" in line:
-            outfile.write("  equilibriumFile = '{}' ! this location is correct after this file is copied to subdirs\n".format(imitation_vmec_file))
+            outfile.write("  equilibriumFile = '../{}' ! this location is correct after this file is copied to subdirs\n".format(imitation_vmec_file))
 
         elif "nHats" in line:
             outfile.write("  nHats = {}  {}\n".format(ne/nbar, ni/nbar))
