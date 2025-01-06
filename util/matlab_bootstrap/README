@@ -1,0 +1,79 @@
+% *********************************************************************
+% MATLAB Script for Calculating Bootstrap Current Coefficients
+% *********************************************************************
+%
+% This MATLAB script computes the bootstrap current coefficients based 
+% on input data from the 'neo_input.nc' file. 
+%
+% Output Files:
+% --------------------
+% The script generates one of the following output file names:
+% 
+% 1. ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G
+% 2. ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G
+% 
+% The output files contain the following 8 columns:
+% 
+% Column 1: Te or Psi         
+% Column 2: L31               - Bootstrap current coefficient L31.
+% Column 3: L32               - Bootstrap current coefficient L32.
+% Column 4: L34               - Bootstrap current coefficient L34.
+% Column 5: alpha             - Amplification factor for the bootstrap current.
+% Column 6: 1/<B²>            - Inverse of Flux surface average magnetic field squared.
+% Column 7: dTe/dPsi_t * 2π   - 
+% Column 8: Gbar/(i-N)        - Landreman et al (2022)'s isomorphism parameter
+%
+% These coefficients are calculated offline using the 'neo_input.nc' file as input.
+% The script also plots these coefficients, uncomment this part below to
+% generate the plots
+% *********************************************************************
+%
+% File Placement:
+% -----------------
+% The output file must be placed in the M3D-C1 working case directory 
+% for further processing in M3D-C1 simulations.
+%
+% *********************************************************************
+%
+% M3D-C1 Input File Settings:
+% ------------------------------
+% In order to use the bootstrap current coefficients in M3D-C1, the 
+% following parameters must be set in the M3D-C1 input file:
+%
+% - ibootstrap = 2            ! 1 when using profiles as a function of psi
+%                             ! 2 when using dTe/dPsi_t for bootstrap 
+% - ibootstrap_model = 4      ! Choose the bootstrap model:
+%                             !  1 = Sauter (with eqsubtract = 0/1)
+%                             !  2 = Redl   (with eqsubtract = 0/1)
+%                             !  3 = Sauter (with eqsubtract = 0)
+%                             !  4 = Redl   (with eqsubtract = 0)
+% - bootstrap_alpha = 1       ! Amplification factor for the bootstrap current.
+%                             !  Set to 1 for no amplification.
+% - ibootstrap_map_te = 1     ! 1 to map bootstrap coefficients with 
+%                             !  respect to Te (used for stellarator cases).
+%                             !  This setting is to be used with 
+%                             !  ibootstrap = 2, ibootstrap_model = 3/4.
+% - ibootstrap_regular = 1e-8 ! default 1e-8
+%                             ! regularization term for the expression = ((del_p, del_Te)) / (grad_Te_magnitude**2 + adaptive_regularization)
+
+% *********************************************************************
+
+
+
+%%
+%========================================================
+% Set initial flags and parameters in the matlab script 
+%========================================================
+%
+% - UseSauter0Redl1 = 1       ! Choose bootstrap current model:
+%                             !  0 = Sauter Calculations
+%                             !  1 = Redl Calculations
+% - imap_te = 1               !  1: mapping of the bootstrap coefficients w.r.t Te,
+% - N = 0                     !  N from Landreman's formula: 
+%                             !   Gbar/(i-N) = (G + NI) / (i - N), where N is the number of grid points.
+% - UseBfore = 1              % 1: epsilon = (Bmax - Bmin) / (Bmax + Bmin);
+%                                 0: epsilon = Rmin/Rc %Rc =(R_+ + R_-)/2 see IIIA of Hager & Chang (2016)
+%                                 where R_+ and R_- are major radii at the outer and inner-most points of a flux surface         
+% - psi_start, psi_end    
+% - filename = neo_input.nc filename
+% *********************************************************************
