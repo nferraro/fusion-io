@@ -55,7 +55,7 @@
 %                             !  ibootstrap = 2, ibootstrap_model = 3/4.
 % - ibootstrap_regular = 1e-8 ! default 1e-8
 %                             ! regularization term for the expression = ((del_p, del_Te)) / (grad_Te_magnitude**2 + adaptive_regularization)
-
+% - iwrite_aux_vars = 1       ! required to generate the bootstrap outputs in M3D-C1
 % *********************************************************************
 
 
