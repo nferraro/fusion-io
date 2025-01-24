@@ -233,7 +233,10 @@ class sim_data:
             If none, it will read for self.timeslice
         """
 
-        return self.field(self, field=self.typedict[field][0], time=time, species=self.typedict[field][2], ftype=self.typedict[field][1])
+        if field in self.typedict.keys():
+            return self.field(self, field=self.typedict[field][0], time=time, species=self.typedict[field][2], ftype=self.typedict[field][1])
+        else:
+            return self.field(self, field=field, time=time, species=None, ftype='scalar')
 
     def get_mesh(self, time=None, quiet=False):
         """
@@ -287,7 +290,11 @@ class sim_data:
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_ELECTRON)
             elif species == 'main ion':
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_MAIN_ION)
-            itype  = sim_data._available_fields[field]
+            if field in sim_data._available_fields.keys():
+                itype  = sim_data._available_fields[field]
+            else:
+                itype = fio_py.FIO_SCALAR_FIELD
+                fio_py.set_str_option(fio_py.FIO_FIELD_NAME, field)
             self._ifield = fio_py.get_field(sim_data._isrc, itype)
             self.sim_data.fields.append(self._ifield)
             self.ftype = ftype

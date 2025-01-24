@@ -1,6 +1,6 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC -std=c++11 #-qopenmp
+CFLAGS = -O3 -qopt-report=0 -qopt-report-phase=vec -fPIC -std=c++17 #-qopenmp
 
 F90 = mpif90
 F90FLAGS = -O3 -r8 -qopt-report=0 -qopt-report-phase=vec -fPIC

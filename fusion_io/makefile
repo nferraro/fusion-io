@@ -19,7 +19,7 @@ include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 LIBS := -L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
 	$(HDF5_LIBS) $(LIBS) 
 
-INCLUDE := -I$(FIO_ROOT)/m3dc1_lib \
+INCLUDE := -I$(FIO_ROOT)/m3dc1_lib -I$(FIO_ROOT)/output_stream\
 	$(HDF5_INCLUDE) $(INCLUDE)
 
 LIB = libfusionio.a

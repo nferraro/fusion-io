@@ -1,3 +1,5 @@
+Option 1: Use Make
+
 1. Set the environment variables FIO_ROOT, FIO_ARCH, FIO_INSTALL_DIR, and PYTHON
 
 * FIO_ROOT should be set to the directory containing this README
@@ -85,3 +87,28 @@
     PATH:             $FIO_INSTALL_DIR/bin
     LD_LIBRARY_PATH:  $FIO_INSTALL_DIR/lib
     PYTHONPATH:       $FIO_INSTALL_DIR/lib
+
+Option 2: Use CMake
+
+1. Create a build folder in the source code directory
+   mkdir build
+   cd build
+
+2. Run the CMake command
+   cmake .. \
+     -DCMAKE_C_COMPILER=mpicc \
+     -DCMAKE_CXX_COMPILER=mpic++ \
+     -DCMAKE_Fortran_COMPILER=mpifort \
+     -DCMAKE_INSTALL_PREFIX=$FIO_INSTALL_DIR \
+     -DCMAKE_PREFIX_PATH=$FIO_LIBRARY_DIR \
+     -DFUSIONIO_ENABLE_PYTHON=ON \
+     -DPYTHON_MODULE_INSTALL_PATH=$FIO_INSTALL_DIR/lib \
+     -DFUSIONIO_ENABLE_TRACE=ON
+
+   Here you can specify the C, C++ and Fortran compilers to use, set the
+   target installation directory, and choose whether you want to compile
+   the Python module or the trace tool. You should specify the location of
+   dependent libraries (HDF5, LAPACK) in $FIO_LIBRARY_DIR.
+
+3. Build and install fusion-io
+   cmake --build . --target install

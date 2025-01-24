@@ -1,4 +1,3 @@
-
 #include "fusion_io.h"
 #include <Python.h>
 
@@ -32,6 +31,7 @@ extern "C" {
   static PyObject* fio_get_int_parameter_py(PyObject*, PyObject*);
   static PyObject* fio_get_real_parameter_py(PyObject*, PyObject*);
   static PyObject* fio_get_real_field_parameter_py(PyObject*, PyObject*);
+  static PyObject* fio_set_quiet_option_py(PyObject*, PyObject*);
 
   static PyMethodDef fio_methods[] = {
     {"add_field", fio_add_field_py, METH_VARARGS, ""},
@@ -61,6 +61,7 @@ extern "C" {
     {"get_int_parameter", fio_get_int_parameter_py, METH_VARARGS, ""},
     {"get_real_parameter", fio_get_real_parameter_py, METH_VARARGS, ""},
     {"get_real_field_parameter", fio_get_real_field_parameter_py, METH_VARARGS, ""},
+    {"set_quiet_option", fio_set_quiet_option_py, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}
   };
 
@@ -530,7 +531,8 @@ PyObject* fio_set_int_option_py(PyObject* self, PyObject *args)
 PyObject* fio_set_str_option_py(PyObject* self, PyObject *args)
 {
   int iopt;
-  char v[256];
+  /*char v[256];*/
+  char* v;
   if(!PyArg_ParseTuple(args, "is", &iopt, &v))
     return NULL;
 
@@ -548,6 +550,18 @@ PyObject* fio_set_real_option_py(PyObject* self, PyObject *args)
     return NULL;
 
   int ierr = fio_set_real_option(iopt, v);
+  if(ierr != FIO_SUCCESS)
+    return NULL;
+  Py_RETURN_NONE;
+}
+
+PyObject* fio_set_quiet_option_py(PyObject* self, PyObject *args)
+{
+  bool v;
+  if(!PyArg_ParseTuple(args, "p", &v))
+    return NULL;
+
+  int ierr = fio_set_quiet_option(v);
   if(ierr != FIO_SUCCESS)
     return NULL;
   Py_RETURN_NONE;

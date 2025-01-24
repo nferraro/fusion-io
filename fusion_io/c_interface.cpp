@@ -1,4 +1,5 @@
 #include "fusion_io.h"
+#include "output_stream.h"
 #include <iostream>
 #include <deque>
 #include <typeinfo>
@@ -182,3 +183,8 @@ int fio_sizeof_search_hint(const int isrc)
   return source_list[isrc]->sizeof_search_hint();
 }
 
+int fio_set_quiet_option(const bool v)
+{
+  output::quiet=v;
+  return FIO_SUCCESS;
+}
