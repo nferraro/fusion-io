@@ -24,6 +24,7 @@ double te_start = -1;
 double te_end = -1;
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
+fio_compound_field current_density;
 fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
 double axis[3];
 double psi0, psi1;
@@ -101,6 +102,12 @@ int main(int argc, char* argv[])
   b[0] = new double[nr*nphi*ntheta];
   b[1] = new double[nr*nphi*ntheta];
   b[2] = new double[nr*nphi*ntheta];
+
+  double** currden = new double*[3];
+  currden[0] = new double[nr*nphi*ntheta];
+  currden[1] = new double[nr*nphi*ntheta];
+  currden[2] = new double[nr*nphi*ntheta];
+
   double** telec = new double*[1];
   double** tion = new double*[1];
   double** nelec= new double*[1];
@@ -138,6 +145,9 @@ int main(int argc, char* argv[])
   double* bz_fa = new double[nr];
   double* bmag_fa = new double[nr];
   double* b2_fa = new double[nr];
+  double* jx_fa = new double[nr];
+  double* jy_fa = new double[nr];
+  double* jz_fa = new double[nr];
   
   // Surfaces
   std::ofstream gplot, splot;
@@ -278,6 +288,13 @@ int main(int argc, char* argv[])
     std::cerr << "Error finding B" << std::endl;
   }
 
+  // calculate B at each point
+  std::cerr << "Calculating J on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&current_density, nr*nphi*ntheta, path, currden, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding J" << std::endl;
+  }
+
   // calculate Te at each point
   std::cerr << "Calculating Te on the surfaces..." << std::endl;
   result = fio_eval_on_path(&electron_temperature, nr*nphi*ntheta, path, telec, h);
@@ -352,6 +369,9 @@ int main(int argc, char* argv[])
     bz_fa[i] = 0.;
     bmag_fa[i] = 0.;
     b2_fa[i]=0.;    
+    jx_fa[i] = 0.;
+    jy_fa[i] = 0.;
+    jz_fa[i] = 0.;
     double dV = 0.;
     for(int j=0; j<nphi; j++) {
       for(int k=0; k<ntheta; k++) {
@@ -361,6 +381,10 @@ int main(int argc, char* argv[])
         bz_fa[i] += b[2][ijk]*jac[ijk];
         bmag_fa[i] += sqrt(b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
         b2_fa[i] += (b[0][ijk]*b[0][ijk] +b[1][ijk]*b[1][ijk]+b[2][ijk]*b[2][ijk])*jac[ijk];
+        jx_fa[i] += currden[0][ijk]*jac[ijk];
+        jy_fa[i] += currden[1][ijk]*jac[ijk];
+        jz_fa[i] += currden[2][ijk]*jac[ijk];
+
 	dV += jac[ijk];
       }
     }
@@ -369,6 +393,10 @@ int main(int argc, char* argv[])
     bz_fa[i] /= dV;
     bmag_fa[i] /= dV;
     b2_fa[i] /= dV;
+    jx_fa[i] /= dV;
+    jy_fa[i] /= dV;
+    jz_fa[i] /= dV;
+
   }
 
 
@@ -637,6 +665,7 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "Psi_p", NC_FLOAT, 1, &nr_dimid, &psi_p_id);    // ver 4
   nc_def_var(ncid, "dPsi_p", NC_FLOAT, 1, &nr_dimid, &dpsi_p_id);  // ver 4  
   int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id,b2_fa_id;
+  int jx_fa_id,jy_fa_id,jz_fa_id;
   int JpdotB_fluxavg_id,JpdotB_dndpsi_fluxavg_id,JpdotB_dtedpsi_fluxavg_id,JpdotB_dtidpsi_fluxavg_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
@@ -648,6 +677,9 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "bz_fa",  NC_FLOAT, 1, &npsi_dimid, &bz_fa_id);
   nc_def_var(ncid, "bmag_fa",  NC_FLOAT, 1, &npsi_dimid, &bmag_fa_id);
   nc_def_var(ncid, "b2_fa",  NC_FLOAT, 1, &npsi_dimid, &b2_fa_id);  
+  nc_def_var(ncid, "jx_fa",  NC_FLOAT, 1, &npsi_dimid, &jx_fa_id);
+  nc_def_var(ncid, "jy_fa",  NC_FLOAT, 1, &npsi_dimid, &jy_fa_id);
+  nc_def_var(ncid, "jz_fa",  NC_FLOAT, 1, &npsi_dimid, &jz_fa_id);
   if (ibootstrap==1){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
   nc_def_var(ncid, "JpdotB_dndpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dndpsi_fluxavg_id);
@@ -694,6 +726,9 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, bz_fa_id, bz_fa);
   nc_put_var_double(ncid, bmag_fa_id, bmag_fa);
   nc_put_var_double(ncid, b2_fa_id, b2_fa);
+  nc_put_var_double(ncid, jx_fa_id, jx_fa);
+  nc_put_var_double(ncid, jy_fa_id, jy_fa);
+  nc_put_var_double(ncid, jz_fa_id, jz_fa);
   if (ibootstrap==1){
   nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
   nc_put_var_double(ncid, JpdotB_dndpsi_fluxavg_id, JpdotB_dndpsi_fluxavg);
@@ -753,6 +788,9 @@ int main(int argc, char* argv[])
   delete[] b[2];
   delete[] b;
   delete[] b_surf;
+  delete[] currden[0];
+  delete[] currden[1];
+  delete[] currden[2];
   delete[] path_plane;
   delete[] path_surf;
   delete[] path[0];
@@ -1012,6 +1050,14 @@ bool create_source(const int type, const int argc, const std::string argv[])
     return result;
   }
   mag.add_field(field, FIO_ADD, 1., hint);
+
+  result = src->get_field(FIO_CURRENT_DENSITY, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening current density field" << std::endl;
+    delete(src);
+    return result;
+  }
+  current_density.add_field(field, FIO_ADD, 1., hint);
   
   result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &field, &fopt);
   if(result != FIO_SUCCESS) {
