@@ -1,6 +1,6 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -fPIC -std=c++11
+CFLAGS = -O3 -fPIC -std=c++17
 
 F90 = mpif90
 F90FLAGS = -O3 -r8 -fPIC

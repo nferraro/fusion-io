@@ -1,4 +1,5 @@
 #include "m3dc1_coord_map.h"
+#include "output_stream.h"
 
 #include <iostream>
 
@@ -161,7 +162,8 @@ bool m3dc1_coord_map::find_element(const double R, const double Phi, const doubl
     }
   }
 
-  std::cerr << "Failed; guess was " << *e << std::endl;
+  /* std::cerr << "Failed; guess was " << *e << std::endl; */
+  output::qerr << "Failed; guess was " << *e << std::endl;
 
   return false;
 }
@@ -175,7 +177,9 @@ bool m3dc1_coord_map::find_coordinates(const double R, const double Phi, const d
 
   // find element containing the R, Phi, Z point
   if(!find_element(R, Phi, Z, &xi_frac, &zi_frac, &eta_frac, e)) {
-    std::cerr << "failed find_element containing ("
+    /* std::cerr << "failed find_element containing (" */
+	      /* << R << ", " << Phi << ", " << Z << ")" << std::endl; */
+    output::qerr << "failed find_element containing ("
 	      << R << ", " << Phi << ", " << Z << ")" << std::endl;
     return false;
   }

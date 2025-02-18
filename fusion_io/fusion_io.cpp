@@ -104,6 +104,7 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_JBS_dndpsi):        *s = "JpdotB_dndpsi";        break;
   case(FIO_JBS_dtedpsi):       *s = "JpdotB_dtedpsi";        break;
   case(FIO_JBS_dtidpsi):       *s = "JpdotB_dtidpsi";        break;
+  case(FIO_SCALAR_FIELD):      *s = "other scalar field"; break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;

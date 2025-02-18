@@ -43,6 +43,7 @@ FIO_DEFINE_INT(FIO_JBS_dndpsi,       60)
 FIO_DEFINE_INT(FIO_JBS_dtedpsi,      70)
 FIO_DEFINE_INT(FIO_JBS_dtidpsi,      80)
 
+FIO_DEFINE_INT(FIO_SCALAR_FIELD,     99)
 
 COMMENT(      species-dependent scalar fields      )
 FIO_DEFINE_INT(FIO_PRESSURE,          101)
@@ -104,7 +105,8 @@ FIO_DEFINE_INT(FIO_REAL_OPT_END,      103)
 
 COMMENT(      field options (strings)      )
 FIO_DEFINE_INT(FIO_STR_OPT_START,     10000)
-FIO_DEFINE_INT(FIO_STR_OPT_END,       10001)
+FIO_DEFINE_INT(FIO_FIELD_NAME,        10001)
+FIO_DEFINE_INT(FIO_STR_OPT_END,       10002)
 
 COMMENT(      field operations      )
 FIO_DEFINE_INT(FIO_ADD,               1)

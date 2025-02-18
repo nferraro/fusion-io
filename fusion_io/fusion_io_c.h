@@ -26,6 +26,7 @@ int fio_set_real_option(const int, const double);
 int fio_get_int_parameter(const int, const int,  int*);
 int fio_get_real_parameter(const int, const int, double*);
 int fio_get_real_field_parameter(const int, const int, double*);
+int fio_set_quiet_option(const bool);
 int fio_sizeof_search_hint(const int);
 #ifdef __cplusplus
 }

@@ -104,6 +104,7 @@ int m3dc1_source::get_field_options(fio_option_list* opt) const
   opt->add_option(FIO_PHASE, 0.);
   opt->add_option(FIO_PART, FIO_TOTAL);
   opt->add_option(FIO_SPECIES, 0);
+  opt->add_option(FIO_FIELD_NAME, std::string("P"));
 
   return FIO_SUCCESS;
 }
@@ -173,6 +174,7 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
   double psi0_val, psi1_val;
   bool unneeded_species = false;
   int s, result;
+  std::string field_name;
 
   result = FIO_SUCCESS;
 
@@ -321,6 +323,9 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     break;
   case(FIO_JBS_dtidpsi):
     mf = new m3dc1_scalar_field(this, "JpdotB_dtidpsi", J0);
+  case(FIO_SCALAR_FIELD):
+    opt->get_option(FIO_FIELD_NAME, &field_name);
+    mf = new m3dc1_scalar_field(this, field_name.c_str(), 1.);
     if(s!=0) unneeded_species = true;
     break;
 
