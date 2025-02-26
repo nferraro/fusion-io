@@ -15,7 +15,10 @@ import fio_py
 import numpy as np
 import h5py
 import os
-from scipy.integrate import cumtrapz
+try:
+    from scipy.integrate import cumulative_trapezoid as cumtrapz
+except:
+    from scipy.integrate import cumtrapz
 
 class sim_data:
     """
