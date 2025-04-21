@@ -26,6 +26,7 @@ std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
 fio_compound_field current_density;
 fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
+fio_compound_field JpdotB_L31, JpdotB_L32, JpdotB_L34, JpdotB_alpha;
 double axis[3];
 double psi0, psi1;
 
@@ -130,6 +131,10 @@ int main(int argc, char* argv[])
   double* JpdotB_dndpsi_fluxavg = new double[nr];
   double* JpdotB_dtedpsi_fluxavg = new double[nr];
   double* JpdotB_dtidpsi_fluxavg = new double[nr];
+  double* JpdotB_L31_fluxavg = new double[nr];
+  double* JpdotB_L32_fluxavg = new double[nr];
+  double* JpdotB_L34_fluxavg = new double[nr];
+  double* JpdotB_alpha_fluxavg = new double[nr];
   
   double* psi_t = new double[nr];
   double* dpsi_t = new double[nr];
@@ -324,7 +329,7 @@ int main(int argc, char* argv[])
   }
 
   // calculate jdotb at each point
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 || ibootstrap ==3){
   std::cerr << "Calculating JpdotB on the surfaces..." << std::endl;
   result = fio_eval_on_path(&JpdotB, nr*nphi*ntheta, path, jdotb, h);
   if(result != FIO_SUCCESS) {
@@ -343,6 +348,27 @@ int main(int argc, char* argv[])
     std::cerr << "Error finding JpdotB_dtidpsi" << std::endl;
   }
   }
+  if (ibootstrap ==3 ){
+  std::cerr << "Calculating JpdotB Coeffs on the surfaces..." << std::endl;
+ 
+  result = fio_eval_on_path(&JpdotB_L31, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_L31" << std::endl;
+  }
+  result = fio_eval_on_path(&JpdotB_L32, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_L32" << std::endl;
+  }
+  result = fio_eval_on_path(&JpdotB_L34, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_L34" << std::endl;
+  }
+  result = fio_eval_on_path(&JpdotB_alpha, nr*nphi*ntheta, path, jdotb, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding JpdotB_alpha" << std::endl;
+  }
+
+  }
   // Calculate flux surface averages for profiles
   std::cerr << "Calculating flux surface averages..." << std::endl;  
   result = fio_surface_average(&electron_density, nr, nphi, ntheta, path,
@@ -352,7 +378,7 @@ int main(int argc, char* argv[])
   result = fio_surface_average(&ion_density, nr, nphi, ntheta, path,
 			       jac, ni, h);
 
-             if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 || ibootstrap ==3){
   result = fio_surface_average(&JpdotB, nr, nphi, ntheta, path,
 			       jac, JpdotB_fluxavg, h);
   result = fio_surface_average(&JpdotB_dndpsi, nr, nphi, ntheta, path,
@@ -361,7 +387,17 @@ int main(int argc, char* argv[])
 			       jac, JpdotB_dtedpsi_fluxavg, h);
   result = fio_surface_average(&JpdotB_dtidpsi, nr, nphi, ntheta, path,
 			       jac, JpdotB_dtidpsi_fluxavg, h);
-             }
+  }
+  if (ibootstrap ==3){
+  result = fio_surface_average(&JpdotB_L31, nr, nphi, ntheta, path,
+			       jac, JpdotB_L31_fluxavg, h);
+  result = fio_surface_average(&JpdotB_L32, nr, nphi, ntheta, path,
+			       jac, JpdotB_L32_fluxavg, h);
+  result = fio_surface_average(&JpdotB_L34, nr, nphi, ntheta, path,
+			       jac, JpdotB_L34_fluxavg, h);
+  result = fio_surface_average(&JpdotB_alpha, nr, nphi, ntheta, path,
+			       jac, JpdotB_alpha_fluxavg, h);
+  }
   // Finding flux surface averages for the magnetic field
   for(int i=0; i<nr; i++) {
     bx_fa[i] = 0.;
@@ -430,7 +466,7 @@ int main(int argc, char* argv[])
 	Ti_3d  [i + j*nr + k*nr*nphi] = tion[0][k + j*ntheta + i*ntheta*nphi];
 	Ne_3d  [i + j*nr + k*nr*nphi] = nelec[0][k + j*ntheta + i*ntheta*nphi];
   Ni_3d  [i + j*nr + k*nr*nphi] = nion[0][k + j*ntheta + i*ntheta*nphi];
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap==2 || ibootstrap==3){
   JpdotB_3d  [i + j*nr + k*nr*nphi] = jdotb[0][k + j*ntheta + i*ntheta*nphi];
   }
       }
@@ -667,6 +703,7 @@ int main(int argc, char* argv[])
   int ne_id, te_id, ni_id, ti_id, psi0_id, temax_id,bx_fa_id,by_fa_id,bz_fa_id,bmag_fa_id,b2_fa_id;
   int jx_fa_id,jy_fa_id,jz_fa_id;
   int JpdotB_fluxavg_id,JpdotB_dndpsi_fluxavg_id,JpdotB_dtedpsi_fluxavg_id,JpdotB_dtidpsi_fluxavg_id;
+  int JpdotB_L31_fluxavg_id,JpdotB_L32_fluxavg_id,JpdotB_L34_fluxavg_id,JpdotB_alpha_fluxavg_id;
   nc_def_var(ncid, "psi0", NC_FLOAT, 1, &npsi_dimid, &psi0_id);
   nc_def_var(ncid, "ne0",  NC_FLOAT, 1, &npsi_dimid, &ne_id);
   nc_def_var(ncid, "Te0",  NC_FLOAT, 1, &npsi_dimid, &te_id);
@@ -680,11 +717,17 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "jx_fa",  NC_FLOAT, 1, &npsi_dimid, &jx_fa_id);
   nc_def_var(ncid, "jy_fa",  NC_FLOAT, 1, &npsi_dimid, &jy_fa_id);
   nc_def_var(ncid, "jz_fa",  NC_FLOAT, 1, &npsi_dimid, &jz_fa_id);
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   nc_def_var(ncid, "JpdotB_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_fluxavg_id);
   nc_def_var(ncid, "JpdotB_dndpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dndpsi_fluxavg_id);
   nc_def_var(ncid, "JpdotB_dtedpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dtedpsi_fluxavg_id);
   nc_def_var(ncid, "JpdotB_dtidpsi_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_dtidpsi_fluxavg_id);
+  }
+  if (ibootstrap ==3){
+  nc_def_var(ncid, "JpdotB_L31_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_L31_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_L32_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_L32_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_L34_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_L34_fluxavg_id);
+  nc_def_var(ncid, "JpdotB_alpha_fluxavg",  NC_FLOAT, 1, &npsi_dimid, &JpdotB_alpha_fluxavg_id);
   }
   nc_def_var(ncid, "temax",  NC_FLOAT, 0, &single_value_dimid, &temax_id); 
 
@@ -705,7 +748,7 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "ti_3d", NC_FLOAT, 3, dims, &ti3d_id); // added in version 3
   nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id);   // added in version 3
   nc_def_var(ncid, "ni_3d", NC_FLOAT, 3, dims, &ni3d_id); // added in version 3
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id); // added in version 3
   }
   nc_enddef(ncid);
@@ -729,13 +772,18 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, jx_fa_id, jx_fa);
   nc_put_var_double(ncid, jy_fa_id, jy_fa);
   nc_put_var_double(ncid, jz_fa_id, jz_fa);
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
   nc_put_var_double(ncid, JpdotB_dndpsi_fluxavg_id, JpdotB_dndpsi_fluxavg);
   nc_put_var_double(ncid, JpdotB_dtedpsi_fluxavg_id, JpdotB_dtedpsi_fluxavg);
   nc_put_var_double(ncid, JpdotB_dtidpsi_fluxavg_id, JpdotB_dtidpsi_fluxavg);
   }
-
+  if (ibootstrap ==3){
+  nc_put_var_double(ncid, JpdotB_L31_fluxavg_id, JpdotB_L31_fluxavg);
+  nc_put_var_double(ncid, JpdotB_L32_fluxavg_id, JpdotB_L32_fluxavg);
+  nc_put_var_double(ncid, JpdotB_L34_fluxavg_id, JpdotB_L34_fluxavg);
+  nc_put_var_double(ncid, JpdotB_alpha_fluxavg_id, JpdotB_alpha_fluxavg);
+  }
   nc_put_var_double(ncid, temax_id, &te_max);
   nc_put_var_double(ncid, r_id, R);
   nc_put_var_double(ncid, z_id, Z);
@@ -748,7 +796,7 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, ti3d_id, Ti_3d);
   nc_put_var_double(ncid, ne3d_id, Ne_3d);
   nc_put_var_double(ncid, ni3d_id, Ni_3d);
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
   }
 
@@ -805,7 +853,7 @@ int main(int argc, char* argv[])
   delete[] tion[0];
   delete[] nelec[0];
   delete[] nion[0];
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   delete[] jdotb[0];
   }
 
@@ -1004,7 +1052,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
 
   // Read fields
   fio_field* field;
-  if (ibootstrap==1){
+  if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
    result = src->get_field(FIO_JBS, &field, &fopt);
    if(result != FIO_SUCCESS) {
     std::cerr << "Error opening bootstrap current field " << std::endl;
@@ -1037,11 +1085,48 @@ bool create_source(const int type, const int argc, const std::string argv[])
    }
    JpdotB_dtidpsi.add_field(field, FIO_ADD, 1., hint);
 
-  } else {
+  } 
+
+  if (ibootstrap ==3){
+   result = src->get_field(FIO_JBS_L31, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field L31 " << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_L31.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_L32, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field L32 " << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_L32.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_L34, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field L34" << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_L34.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_alpha, &field, &fopt);
+   if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening bootstrap current field alpha" << std::endl;
+    delete(src);
+    return result;
+   }
+   JpdotB_alpha.add_field(field, FIO_ADD, 1., hint);
+
+  } 
+
+  if(ibootstrap !=1 ||ibootstrap!=2 ||ibootstrap!=3) {
     std::cerr << "No bootstrap model, ibootstrap=" 
           << ibootstrap
           << std::endl;
-}
+  }
 
   result = src->get_field(FIO_MAGNETIC_FIELD, &field, &fopt);
   if(result != FIO_SUCCESS) {
@@ -1176,8 +1261,8 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
   } else if(opt=="-bootstrap") {
     if(argc==1) ibootstrap = atof(argv[0].c_str());
     else ibootstrap = 0; 
-    if(ibootstrap !=0 && ibootstrap !=1){
-    std::cerr << "Error: bootstrap option either 0 or 1 \n bootstrap="
+    if(ibootstrap !=0 && ibootstrap !=1 && ibootstrap !=2 && ibootstrap !=3){
+    std::cerr << "Error: bootstrap option either 0 or 1 or 2 or 3 \n bootstrap="
               << ibootstrap
               << std::endl;
     return FIO_UNSUPPORTED;

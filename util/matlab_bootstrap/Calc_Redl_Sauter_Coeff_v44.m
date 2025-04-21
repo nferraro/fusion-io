@@ -12,6 +12,7 @@
 % 
 % 1. ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G
 % 2. ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G
+% 3. ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax
 % 
 % The output files contain the following 8 columns:
 % 
@@ -23,6 +24,14 @@
 % Column 6: 1/<B²>            - Inverse of Flux surface average magnetic field squared.
 % Column 7: dTe/dPsi_t * 2π   - 
 % Column 8: Gbar/(i-N)        - Landreman et al (2022)'s isomorphism parameter
+
+% In File 3, there are additional outputs for in M3D-C1 calculation of
+% bootstrap parameters
+% Column 9:  ftrap             - trapped fraction
+% Column 10: qR 
+% Column 11: epsilon           - Inverse aspect ratio 
+% Column 12: Temax             - For initial time step interpolation of dTe_norm/dPsi_t * 2π
+
 %
 % These coefficients are calculated offline using the 'neo_input.nc' file as input.
 % The script also plots these coefficients, uncomment this part below to
@@ -41,8 +50,9 @@
 % In order to use the bootstrap current coefficients in M3D-C1, the 
 % following parameters must be set in the M3D-C1 input file:
 %
-% - ibootstrap = 2            ! 1 when using profiles as a function of psi
-%                             ! 2 when using dTe/dPsi_t for bootstrap 
+% - ibootstrap = 3            ! 1 when using psi: profiles as a function of psi
+%                             ! 2 when using Te: da/dpsit=da/dte dte/dpsit 
+%                             ! 3 when using tenorm: da/dpsit=da/dte dte/dpsit=-temax da/dte dtenorm/dpsit'
 % - ibootstrap_model = 4      ! Choose the bootstrap model:
 %                             !  1 = Sauter (with eqsubtract = 0/1)
 %                             !  2 = Redl   (with eqsubtract = 0/1)
@@ -50,10 +60,6 @@
 %                             !  4 = Redl   (with eqsubtract = 0)
 % - bootstrap_alpha = 1       ! Amplification factor for the bootstrap current.
 %                             !  Set to 1 for no amplification.
-% - ibootstrap_map_te = 1     ! 1 to map bootstrap coefficients with 
-%                             !  respect to Te (used for stellarator cases).
-%                             !  This setting is to be used with 
-%                             !  ibootstrap = 2, ibootstrap_model = 3/4.
 % - ibootstrap_regular = 1e-8 ! default 1e-8
 %                             ! regularization term for the expression = ((del_p, del_Te)) / (grad_Te_magnitude**2 + adaptive_regularization)
 
@@ -74,7 +80,9 @@ close all;
 % - UseSauter0Redl1 = 1       ! Choose bootstrap current model:
 %                             !  0 = Sauter Calculations
 %                             !  1 = Redl Calculations
-% - imap_te = 1               !  1: mapping of the bootstrap coefficients w.r.t Te,
+% - ibootstrap = 2            !  1: mapping of the bootstrap coefficients w.r.t psi,
+%                             !  2: mapping of the bootstrap coefficients w.r.t Te,
+%                             !  3: mapping of the bootstrap coefficients w.r.t Tenorm= 1-Te/Temax,
 % - N = 0                     !  N from Landreman's formula: 
 %                             !   Gbar/(i-N) = (G + NI) / (i - N), where N is the number of grid points.
 % - UseBfore = 1              % 1: epsilon = (Bmax - Bmin) / (Bmax + Bmin);
@@ -84,19 +92,22 @@ close all;
 % - filename = neo_input.nc filename
 % *********************************************************************
 
-UseSauter0Redl1 = 1; %0: Sauter Calculations, 2: Redl Calculations
-imap_te         = 1; % imap_te=1  ! mapping of the bootstrap coefficients w.r.t Te,
+UseSauter0Redl1 = 1; %0: Sauter Calculations, 1: Redl Calculations
+ibootstrap      = 3; % 1: mapping w.r.t psi, 2: mapping w.r.t Te ,3: mapping w.r.t Tenorm,
 Nzp             = 0; % N from Landremans Gbar/(i-N)=(G+NI)/(i-N)
 UseBfore        = 1; % 1: epsilon = (Bmax - Bmin) / (Bmax + Bmin);
                      % 0: epsilon = Rmin/Rc %Rc =(R_+ + R_-)/2 see IIIA of Hager & Chang (2016)
                      % where R_+ and R_- are major radii at the outer and inner-most points of a flux surface         
-filename = 'neo_input.nc'; % neo_input.nc filename
+filename = '../neo_input.nc'; % neo_input.nc filename
 
-if(imap_te==1)
+if(ibootstrap==3)
     % QA_Fig1 ~/src/fusion-io/util/_stellar/write_neo_input -bootstrap 0 -m3dc1 ../C1.h5 -1 -te_start 11950 -te_end 1500 -nr 40 -nphi 540 -ntheta 400 -tol 1 -R0 12.27
     % set according to the write_neo_input command used to generate neo_input.nc file
-    Te_psi_avgtart = 11950;
-    te_end         = 1500;
+    Te_psi_avgtart = 9400;
+    te_end         = 1200;
+elseif(ibootstrap==2)
+    Te_psi_avgtart = 9400;
+    te_end         = 1200;
 else
     % Circ1 ~/src/fusion-io/util/_stellar/write_neo_input -bootstrap 0 -m3dc1 ../C1.h5 -1 -psi_start 0.70 -psi_end 0.96 -nr 100 -tol 0.001
     % set psi_start and psi_end according to the write_neo_input command used to generate neo_input.nc file
@@ -127,9 +138,11 @@ tol=0.001;
 Zcharge=1;
 Zcharge_eff=1;
 
-if(imap_te==1)
+if(ibootstrap==2)
     psi_norm = (data.temax-data.Te)/data.temax;
-else
+elseif(ibootstrap==3)
+    psi_norm = (data.temax-data.Te)/data.temax;
+elseif(ibootstrap==1)
     for s=1:nr
         if(s==1)
 	        psi_norm (s,1)= psi_start;
@@ -152,12 +165,22 @@ end
 %========================================================
 tnorm=1000.0;
 for i=1:nr
-    if (i==1)
-        dtebydpsit(i,1)=(data.Te(i+1,1)-data.Te(i,1))/(data.psit(i+1,1)-data.psit(i,1))/tnorm;
-    elseif(i==nr)
-        dtebydpsit(i,1)=(data.Te(i,1)-data.Te(i-1,1))/(data.psit(i,1)-data.psit(i-1,1))/tnorm;
-    else
-        dtebydpsit(i,1)=(data.Te(i+1,1)-data.Te(i-1,1))/(data.psit(i+1,1)-data.psit(i-1,1))/tnorm;
+    if(ibootstrap==1 || ibootstrap==2)
+        if (i==1)
+            dtebydpsit(i,1)=(data.Te(i+1,1)-data.Te(i,1))/(data.psit(i+1,1)-data.psit(i,1))/tnorm;
+        elseif(i==nr)
+            dtebydpsit(i,1)=(data.Te(i,1)-data.Te(i-1,1))/(data.psit(i,1)-data.psit(i-1,1))/tnorm;
+        else
+            dtebydpsit(i,1)=(data.Te(i+1,1)-data.Te(i-1,1))/(data.psit(i+1,1)-data.psit(i-1,1))/tnorm;
+        end
+    elseif(ibootstrap==3)% finding dte/dpsit = -Temax dTnorm/dpsit, where tnorm= psinorm calculated above
+        if (i==1)
+            dtebydpsit(i,1)=(psi_norm(i+1,1)-psi_norm(i,1))/(data.psit(i+1,1)-data.psit(i,1));
+        elseif(i==nr)
+            dtebydpsit(i,1)=(psi_norm(i,1)-psi_norm(i-1,1))/(data.psit(i,1)-data.psit(i-1,1));
+        else
+            dtebydpsit(i,1)=(psi_norm(i+1,1)-psi_norm(i-1,1))/(data.psit(i+1,1)-data.psit(i-1,1));
+        end
     end
 end
 
@@ -212,7 +235,7 @@ ftrap = calc_ftrap(data, psi_count, lambda_count, Bmax_fpsi, psi_norm, value_psi
 [Zcharge_e, Zcharge_i, Zeff] = calculate_Zcharge(data.ne, data.ni, psi_count, Zcharge);
 
 Bmag_inversefa=1./data.Bmagfa;
-[nu_e_star, nu_i_star, epsilon] = calculate_collision_frequencies(psi_count, psi_norm, ...
+[nu_e_star, nu_i_star, epsilon, qR] = calculate_collision_frequencies(psi_count, psi_norm, ...
     data.ne, data.ni, data.Te, data.Ti, Zcharge, Zcharge_i, ...
     Bmax_fpsi, Bmin_fpsi, q_of_psi, data.R, value_psin, ...
     nphi, ntheta,  tol, UseBfore, GplusiI_fa, Bmag_inversefa, Nzp);
@@ -231,9 +254,9 @@ end
 %=======================================================
 % Writing Output Profile files
 %=======================================================
-write_profile_files(imap_te,psi_count, L31_1D, L32_1D, L34_1D, ...
+write_profile_files(ibootstrap,psi_count, L31_1D, L32_1D, L34_1D, ...
     alpha_nu_i_1D, dtebydpsit, Gbar_by_iminusN, ftrap, ...
-    Bmax_fpsi, data.B2fa, data.Bxfa, data.Byfa, data.Bzfa, psi_norm, data.ne, data.ni, data.Te, data.Ti);
+    Bmax_fpsi, data.B2fa, data.Bxfa, data.Byfa, data.Bzfa, psi_norm, data.ne, data.ni, data.Te, data.Ti,qR, epsilon,data.temax);
 
 
 %%
@@ -243,83 +266,95 @@ write_profile_files(imap_te,psi_count, L31_1D, L32_1D, L34_1D, ...
 % %=======================================================
 % 
 % 
-% %========================================================
-%     % Defaults for plots
-% width = 3;        % Width in inches 
-% height = 2.25;    % Height in inches 
-% alw = 0.75;       % AxesLineWidth 
-% fsz = 12;         % Fontsize 
-% lw = 2;           % LineWidth 
-% msz = 8;          % MarkerSize 
-% %=======================================================
-% 
-%     if imap_te == 1
-%         xdata =  data.Te;
-%         xlabeldata='$Te$'
-%     else
-%         xdata =  psi_norm;
-%         xlabeldata='$\psi$'
-%     end
-% 
-%     % Plot q 
-%     plot_generic(xdata, q_of_psi, xlabeldata, 'q', '$q(\psi)$', 'qvste', width, height, fsz, lw, alw, msz);
-% 
-%     % Plot ftrap 
-%     plot_generic(xdata, ftrap, xlabeldata, 'ftrap', '$f_{trap}$', 'ftrap_trapz', width, height, fsz, lw, alw, msz);
-% 
-%     % Plot Collisionality
-%     figure;
-%     plot(xdata, alpha_nu_i_1D, 'LineStyle', '--', 'Color', [0 0.4 0.8], 'LineWidth', lw);
-%     title('Collisionality');
-%     xlabel(xlabeldata, 'Interpreter', 'latex', 'FontSize', fsz);
-%     ylabel('$\alpha$', 'Interpreter', 'latex', 'FontSize', fsz);
-%     legend('$\alpha$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northeast');
-%     set_plot_properties(fsz, lw, alw, width, height ,msz);
-%     print('Coeffs_alphavspsi_1D', '-dpng', '-r300');
-% 
-%     % Plot Coefficients (L31, L32, L34)
-%     figure;
-%     plot(xdata, L31_1D, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
-%     plot(xdata, L32_1D, 'LineStyle', ':', 'Color', [1 0 0], 'LineWidth', lw);
-%     plot(xdata, L34_1D, 'LineStyle', '--', 'Color', [0 0.4 0.8], 'LineWidth', lw); hold off;
-%     xlabel(xlabeldata, 'Interpreter', 'latex', 'FontSize', fsz);
-%     legend('$L_{31}$', '$L_{32}$', '$L_{34}$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northwest');
-%     set_plot_properties(fsz, lw, alw, width, height, msz);
-%     print('Coeffs_eachvspsi_1D', '-dpng', '-r300');
-% 
-%     % Plot 1/B^2 vs Te
-%     plot_generic(data.Te, 1 ./ data.B2fa, 'Te', '1/B^2', '$1/<B^2>$', '1byB2', width, height, fsz, lw, alw, msz);
-% 
-% 
-%     % Plot Temperature vs psi
-%     figure;
-%     plot(psi_norm, data.Ti, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
-%     plot(psi_norm, data.Te, 'LineStyle', '--', 'Color', [1 0 0], 'LineWidth', lw); hold off;
-%     title('Temperature');
-%     xlabel('$\psi$', 'Interpreter', 'latex', 'FontSize', fsz);
-%     ylabel('$Temperature \: (eV)$', 'Interpreter', 'latex', 'FontSize', fsz);
-%     legend('$T_i$', '$T_e$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'southwest');
-%     set_plot_properties(fsz, lw, alw, width, height, msz);
-%     print('Temp', '-dpng', '-r300');
-% 
-%     % Plot Density vs psi
-%     figure;
-%     plot(psi_norm, data.ni, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
-%     plot(psi_norm, data.ne, 'LineStyle', '--', 'Color', [1 0 0], 'LineWidth', lw); hold off;
-%     title('Density');
-%     xlabel('$\psi$', 'Interpreter', 'latex', 'FontSize', fsz);
-%     ylabel('$n$', 'Interpreter', 'latex', 'FontSize', fsz);
-%     legend('$n_i$', '$n_e$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northwest');
-%     set_plot_properties(fsz, lw, alw, width, height, msz);
-%     print('Density', '-dpng', '-r300');
-% 
-% 
-%     % Plot dTe/dpsi_t
-%     changetoev = 1.6022e-9 * (4 * pi * 1e14) / (1e4^2); % Constants for conversion
-%     plot_generic(psi_norm, dtebydpsit * changetoev, '$\psi$', '$dT_e/d\psi_t$', '$dT_e/d\psi_t$', 'dtebydpsit', width, height, fsz, lw, alw, msz);
-% 
-% 
-% 
+%========================================================
+    % Defaults for plots
+width = 3;        % Width in inches 
+height = 2.25;    % Height in inches 
+alw = 0.75;       % AxesLineWidth 
+fsz = 12;         % Fontsize 
+lw = 2;           % LineWidth 
+msz = 8;          % MarkerSize 
+%=======================================================
+
+    if (ibootstrap ==1)
+        xdata =  psi_norm;
+        xlabeldata='$\psi$'
+    elseif(ibootstrap == 2) 
+        xdata =  data.Te;
+        xlabeldata='$Te$'
+    elseif(ibootstrap ==3)
+        xdata =  psi_norm;
+        xlabeldata='$1-T_e/T_{max}$'
+    end
+
+    % Plot q 
+    plot_generic(xdata, q_of_psi, xlabeldata, 'q', '$q(\psi)$', 'qvste', width, height, fsz, lw, alw, msz);
+
+    % Plot ftrap 
+    plot_generic(xdata, ftrap, xlabeldata, 'ftrap', '$f_{trap}$', 'ftrap_trapz', width, height, fsz, lw, alw, msz);
+
+    % Plot Collisionality
+
+    figure;
+    plot(xdata, nu_i_star, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
+    plot(xdata, nu_e_star, 'LineStyle', ':', 'Color', [1 0 0], 'LineWidth', lw);
+    xlabel(xlabeldata, 'Interpreter', 'latex', 'FontSize', fsz);
+    legend('$\nu_i^*$','$\nu_e^*$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northwest');
+    set_plot_properties(fsz, lw, alw, width, height, msz);
+    print('Collisionality', '-dpng', '-r300');
+    
+    % Plot Collisionality
+    figure;
+    plot(xdata, alpha_nu_i_1D, 'LineStyle', '--', 'Color', [0 0.4 0.8], 'LineWidth', lw);
+    title('Alpha');
+    xlabel(xlabeldata, 'Interpreter', 'latex', 'FontSize', fsz);
+    ylabel('$\alpha$', 'Interpreter', 'latex', 'FontSize', fsz);
+    legend('$\alpha$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northeast');
+    set_plot_properties(fsz, lw, alw, width, height ,msz);
+    print('Coeffs_alphavspsi_1D', '-dpng', '-r300');
+
+    % Plot Coefficients (L31, L32, L34)
+    figure;
+    plot(xdata, L31_1D, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
+    plot(xdata, L32_1D, 'LineStyle', ':', 'Color', [1 0 0], 'LineWidth', lw);
+    plot(xdata, L34_1D, 'LineStyle', '--', 'Color', [0 0.4 0.8], 'LineWidth', lw); hold off;
+    xlabel(xlabeldata, 'Interpreter', 'latex', 'FontSize', fsz);
+    legend('$L_{31}$', '$L_{32}$', '$L_{34}$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northwest');
+    set_plot_properties(fsz, lw, alw, width, height, msz);
+    print('Coeffs_eachvspsi_1D', '-dpng', '-r300');
+
+    % Plot 1/B^2 vs Te
+    plot_generic(data.Te, 1 ./ data.B2fa, 'Te', '1/B^2', '$1/<B^2>$', '1byB2', width, height, fsz, lw, alw, msz);
+
+
+    % Plot Temperature vs psi
+    figure;
+    plot(psi_norm, data.Ti, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
+    plot(psi_norm, data.Te, 'LineStyle', '--', 'Color', [1 0 0], 'LineWidth', lw); hold off;
+    title('Temperature');
+    xlabel('$\psi$', 'Interpreter', 'latex', 'FontSize', fsz);
+    ylabel('$Temperature \: (eV)$', 'Interpreter', 'latex', 'FontSize', fsz);
+    legend('$T_i$', '$T_e$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'southwest');
+    set_plot_properties(fsz, lw, alw, width, height, msz);
+    print('Temp', '-dpng', '-r300');
+
+    % Plot Density vs psi
+    figure;
+    plot(psi_norm, data.ni, 'LineStyle', '-', 'Color', [0 0 1], 'LineWidth', lw); hold on;
+    plot(psi_norm, data.ne, 'LineStyle', '--', 'Color', [1 0 0], 'LineWidth', lw); hold off;
+    title('Density');
+    xlabel('$\psi$', 'Interpreter', 'latex', 'FontSize', fsz);
+    ylabel('$n$', 'Interpreter', 'latex', 'FontSize', fsz);
+    legend('$n_i$', '$n_e$', 'Interpreter', 'latex', 'LineWidth', 1, 'location', 'northwest');
+    set_plot_properties(fsz, lw, alw, width, height, msz);
+    print('Density', '-dpng', '-r300');
+
+
+    % Plot dTe/dpsi_t
+    changetoev = 1.6022e-9 * (4 * pi * 1e14) / (1e4^2); % Constants for conversion
+    plot_generic(psi_norm, dtebydpsit * changetoev * 2*pi, '$\psi$', '$dT_e/d\psi_t$', '$dT_e/d\psi_t$', 'dtebydpsit', width, height, fsz, lw, alw, msz);
+
+
 
 %%
 %=======================================================
@@ -601,7 +636,7 @@ end
 
 %=======================================================
 % ---------------------- Collision frequency ----------------------
-function [nu_e_star, nu_i_star, epsilon] = calculate_collision_frequencies(psi_count, psi_eval, ...
+function [nu_e_star, nu_i_star, epsilon, qR] = calculate_collision_frequencies(psi_count, psi_eval, ...
     ne_psi_avg, ni_psi_avg, Te_psi_avg, Ti_psi_avg, Zcharge, Zcharge_i, ...
     Bmax_fpsi, Bmin_fpsi, q_of_psi, R, value_psin, ...
     nphi, ntheta,  tol, UseBfore, GplusiI_fa, Bmag_inversefa, Nzp)
@@ -632,6 +667,9 @@ function [nu_e_star, nu_i_star, epsilon] = calculate_collision_frequencies(psi_c
             
             % Calculate ln_lambda_e and nu_e_star for electrons
             ln_lambda_e(m, 1) = 31.3 - log(sqrt(ne_psi_avg(m, 1)) / Te_psi_avg(m, 1));
+            Te_psi_avg(m, 1)
+            ne_psi_avg(m, 1)
+            ln_lambda_e(m, 1)
             temp = 6.921 * 10^(-18) * Zcharge * ne_psi_avg(m, 1) * ln_lambda_e(m, 1) / Te_psi_avg(m, 1)^2 / epsilon(m, 1)^(3 / 2) * qR(m, 1);
             nu_e_star(m, 1) = abs(temp);
             
@@ -717,7 +755,7 @@ function [f_t31_1D, f_t32_ee_1D, f_t32_ei_1D, f_t33_1D, f_t34_1D, alpha_nu_i_1D,
         temp = 1 + ...
                0.23 * (1 - 0.96 * ftrap(m, 1)) * sqrt(nu_e_star(m, 1)) / Zcharge_eff^0.5 + ...
                0.13 * (1 - 0.38 * ftrap(m, 1)) * nu_e_star(m, 1) / Zcharge_eff^2 * ...
-               (sqrt(1 + 2 * (Zcharge_eff - 1)^0.5) + ftrap(m, 1)^2 * sqrt((0.075 + 0.25 * (Zcharge_eff - 1)^2)) * nu_e_star(m, 1));
+               (sqrt(1 + 2 * (Zcharge_eff - 1)^0.5) + ftrap(m, 1)^2 * sqrt(((0.075 + 0.25 * (Zcharge_eff - 1)^2))* nu_e_star(m, 1)));
         f_t32_ee_1D(m, 1) = ftrap(m, 1) / temp;
 
         % Calculate f_t32_ei_1D
@@ -735,7 +773,7 @@ function [f_t31_1D, f_t32_ee_1D, f_t32_ei_1D, f_t33_1D, f_t34_1D, alpha_nu_i_1D,
         % Calculate alpha_nu_i_1D
         alpha_0 = -(0.62 + 0.055 * (Zcharge_eff - 1)) / (0.53 + 0.17 * (Zcharge_eff - 1)) * ...
                   (1 - ftrap(m, 1)) / (1 - (0.31 - 0.065 * (Zcharge_eff - 1)) * ftrap(m, 1) - 0.25 * ftrap(m, 1)^2);
-        alpha_nu_i_1D(m, 1) = ((alpha_0 + 0.7 * Zcharge_eff * ftrap(m, 1)^0.5 * sqrt(nu_e_star(m, 1))) / ...
+        alpha_nu_i_1D(m, 1) = ((alpha_0 + 0.7 * Zcharge_eff * ftrap(m, 1)^0.5 * sqrt(nu_i_star(m, 1))) / ...
                                (1 + 0.18 * sqrt(nu_i_star(m, 1))) - 0.002 * nu_i_star(m, 1)^2 * ftrap(m, 1)^6) / ...
                               (1 + 0.004 * nu_i_star(m, 1)^2 * ftrap(m, 1)^6);
 
@@ -851,13 +889,28 @@ end
 
 %=======================================================
 % ---------------------- Writing Profiles ----------------------
-function write_profile_files(imap_te, psi_count, L31_1D, L32_1D, L34_1D, ...
+function write_profile_files(ibootstrap, psi_count, L31_1D, L32_1D, L34_1D, ...
     alpha_nu_i_1D, dtebydpsit, Gbar_by_iminusN, ftrap, ...
-    Bmax_fpsi, B2fa, Bxfa, Byfa, Bzfa, psi_eval, ne_psi_avg, ni_psi_avg, Te_psi_avg, Ti_psi_avg)
+    Bmax_fpsi, B2fa, Bxfa, Byfa, Bzfa, psi_eval, ne_psi_avg, ni_psi_avg, Te_psi_avg, Ti_psi_avg, qR, epsilon,temax)
 
     % Write the first file: ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G
     
-    if imap_te == 1
+    if ibootstrap == 1
+        fileID = fopen('ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G', 'w');
+        if fileID == -1
+            error('Could not open ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G for writing');
+        end
+        fprintf(fileID, '%9s %9s %9s %9s %9s %9s %9s %9s\n', ...
+                'Psi', 'L31', 'L32', 'L34', 'alpha', '1/<B^2>', 'dtebydpsit*2*pi', 'Gbar/(i-N)');
+        
+        for i = 2:psi_count   
+            fprintf(fileID, '%6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f\n', ...
+                    psi_eval(i, 1), L31_1D(i, 1), L32_1D(i, 1), L34_1D(i, 1), ...
+                    alpha_nu_i_1D(i, 1), 1/B2fa(i, 1), dtebydpsit(i, 1) * 2 * pi, Gbar_by_iminusN(i, 1));
+        end
+        fclose(fileID);
+        
+    elseif (ibootstrap==2) 
         fileID = fopen('ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G', 'w');
         if fileID == -1
             error('Could not open ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G for writing');
@@ -871,18 +924,19 @@ function write_profile_files(imap_te, psi_count, L31_1D, L32_1D, L34_1D, ...
                     alpha_nu_i_1D(i, 1), 1/B2fa(i, 1), dtebydpsit(i, 1) * 2 * pi, Gbar_by_iminusN(i, 1));
         end
         fclose(fileID);
-    else
-        fileID = fopen('ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G', 'w');
+    elseif (ibootstrap==3) 
+        fileID = fopen('ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax', 'w');
         if fileID == -1
             error('Could not open ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G for writing');
         end
-        fprintf(fileID, '%9s %9s %9s %9s %9s %9s %9s %9s\n', ...
-                'Psi', 'L31', 'L32', 'L34', 'alpha', '1/<B^2>', 'dtebydpsit*2*pi', 'Gbar/(i-N)');
+        fprintf(fileID, '%9s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n', ...
+                'Psi', 'L31', 'L32', 'L34', 'alpha', '1/<B^2>', 'dtnormdpsit*2*pi (multiply by -temax)', 'Gbar/(i-N)', 'ftrap', 'qR', 'epsilon','temax');
         
         for i = 2:psi_count   
-            fprintf(fileID, '%6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f\n', ...
+            fprintf(fileID, '%6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f %6.8f\n', ...
                     psi_eval(i, 1), L31_1D(i, 1), L32_1D(i, 1), L34_1D(i, 1), ...
-                    alpha_nu_i_1D(i, 1), 1/B2fa(i, 1), dtebydpsit(i, 1) * 2 * pi, Gbar_by_iminusN(i, 1));
+                    alpha_nu_i_1D(i, 1), 1/B2fa(i, 1), dtebydpsit(i, 1) * 2 * pi, Gbar_by_iminusN(i, 1),...
+                    ftrap(i, 1), qR(i, 1), epsilon(i, 1),temax/1000);
         end
         fclose(fileID);
     end

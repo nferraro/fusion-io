@@ -1,3 +1,4 @@
+
 % *********************************************************************
 % MATLAB Script for Calculating Bootstrap Current Coefficients
 % *********************************************************************
@@ -11,6 +12,7 @@
 % 
 % 1. ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G
 % 2. ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G
+% 3. ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax
 % 
 % The output files contain the following 8 columns:
 % 
@@ -22,6 +24,14 @@
 % Column 6: 1/<B²>            - Inverse of Flux surface average magnetic field squared.
 % Column 7: dTe/dPsi_t * 2π   - 
 % Column 8: Gbar/(i-N)        - Landreman et al (2022)'s isomorphism parameter
+
+% In File 3, there are additional outputs for in M3D-C1 calculation of
+% bootstrap parameters
+% Column 9:  ftrap             - trapped fraction
+% Column 10: qR 
+% Column 11: epsilon           - Inverse aspect ratio 
+% Column 12: Temax             - For initial time step interpolation of dTe_norm/dPsi_t * 2π
+
 %
 % These coefficients are calculated offline using the 'neo_input.nc' file as input.
 % The script also plots these coefficients, uncomment this part below to
@@ -40,8 +50,9 @@
 % In order to use the bootstrap current coefficients in M3D-C1, the 
 % following parameters must be set in the M3D-C1 input file:
 %
-% - ibootstrap = 2            ! 1 when using profiles as a function of psi
-%                             ! 2 when using dTe/dPsi_t for bootstrap 
+% - ibootstrap = 3            ! 1 when using psi: profiles as a function of psi
+%                             ! 2 when using Te: da/dpsit=da/dte dte/dpsit 
+%                             ! 3 when using tenorm: da/dpsit=da/dte dte/dpsit=-temax da/dte dtenorm/dpsit'
 % - ibootstrap_model = 4      ! Choose the bootstrap model:
 %                             !  1 = Sauter (with eqsubtract = 0/1)
 %                             !  2 = Redl   (with eqsubtract = 0/1)
@@ -49,10 +60,6 @@
 %                             !  4 = Redl   (with eqsubtract = 0)
 % - bootstrap_alpha = 1       ! Amplification factor for the bootstrap current.
 %                             !  Set to 1 for no amplification.
-% - ibootstrap_map_te = 1     ! 1 to map bootstrap coefficients with 
-%                             !  respect to Te (used for stellarator cases).
-%                             !  This setting is to be used with 
-%                             !  ibootstrap = 2, ibootstrap_model = 3/4.
 % - ibootstrap_regular = 1e-8 ! default 1e-8
 %                             ! regularization term for the expression = ((del_p, del_Te)) / (grad_Te_magnitude**2 + adaptive_regularization)
 % - iwrite_aux_vars = 1       ! required to generate the bootstrap outputs in M3D-C1
@@ -68,7 +75,9 @@
 % - UseSauter0Redl1 = 1       ! Choose bootstrap current model:
 %                             !  0 = Sauter Calculations
 %                             !  1 = Redl Calculations
-% - imap_te = 1               !  1: mapping of the bootstrap coefficients w.r.t Te,
+% - ibootstrap = 2            !  1: mapping of the bootstrap coefficients w.r.t psi,
+%                             !  2: mapping of the bootstrap coefficients w.r.t Te,
+%                             !  3: mapping of the bootstrap coefficients w.r.t Tenorm= 1-Te/Temax,
 % - N = 0                     !  N from Landreman's formula: 
 %                             !   Gbar/(i-N) = (G + NI) / (i - N), where N is the number of grid points.
 % - UseBfore = 1              % 1: epsilon = (Bmax - Bmin) / (Bmax + Bmin);
