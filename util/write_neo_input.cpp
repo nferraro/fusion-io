@@ -12,6 +12,7 @@ int nr = 10;      // number of radial points for surfaces
 int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 int ibootstrap;
+int ivecpot;
 double dl_tor = 0.01;     // step size when finding surfaces
 double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
@@ -24,7 +25,7 @@ double te_start = -1;
 double te_end = -1;
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature;
-fio_compound_field current_density;
+fio_compound_field current_density, vector_potential;
 fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
 fio_compound_field JpdotB_L31, JpdotB_L32, JpdotB_L34, JpdotB_alpha;
 double axis[3];
@@ -109,6 +110,13 @@ int main(int argc, char* argv[])
   currden[1] = new double[nr*nphi*ntheta];
   currden[2] = new double[nr*nphi*ntheta];
 
+  double** vecpot = new double*[3];
+  vecpot[0] = new double[nr*nphi*ntheta];
+  vecpot[1] = new double[nr*nphi*ntheta];
+  vecpot[2] = new double[nr*nphi*ntheta];
+  
+  
+
   double** telec = new double*[1];
   double** tion = new double*[1];
   double** nelec= new double*[1];
@@ -120,6 +128,7 @@ int main(int argc, char* argv[])
   nelec[0] = new double[nr*nphi*ntheta];
   nion[0] = new double[nr*nphi*ntheta];
   jdotb[0]= new double[nr*nphi*ntheta];
+  
 
   double* q = new double[nr];
   double* psi_surf = new double[nr];
@@ -293,11 +302,20 @@ int main(int argc, char* argv[])
     std::cerr << "Error finding B" << std::endl;
   }
 
-  // calculate B at each point
+  // calculate J at each point
   std::cerr << "Calculating J on the surfaces..." << std::endl;
   result = fio_eval_on_path(&current_density, nr*nphi*ntheta, path, currden, h);
   if(result != FIO_SUCCESS) {
     std::cerr << "Error finding J" << std::endl;
+  }
+
+  if(ivecpot==1){
+    // calculate vector potential at each point
+    std::cerr << "Calculating vector potential on the surfaces..." << std::endl;
+    result = fio_eval_on_path(&vector_potential, nr*nphi*ntheta, path, vecpot, h);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding vecpot" << std::endl;
+    }
   }
 
   // calculate Te at each point
@@ -451,24 +469,33 @@ int main(int argc, char* argv[])
   double* Ne_3d = new double[nr*nphi*ntheta];
   double* Ni_3d = new double[nr*nphi*ntheta];
   double* JpdotB_3d = new double[nr*nphi*ntheta];
+  double* VecPot_R = new double[nr*nphi*ntheta];
+  double* VecPot_Phi = new double[nr*nphi*ntheta];
+  double* VecPot_Z = new double[nr*nphi*ntheta];
+  
 
 
   for(int i=0; i<nr; i++) {
     for(int j=0; j<nphi; j++) {
       for(int k=0; k<ntheta; k++) {
-	Jac[i + j*nr + k*nr*nphi] = jac[k + j*ntheta + i*ntheta*nphi];
-	R[i + j*nr + k*nr*nphi] = path[0][k + j*ntheta + i*ntheta*nphi];
-	Z[i + j*nr + k*nr*nphi] = path[2][k + j*ntheta + i*ntheta*nphi];
-	BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
-	BPhi[i + j*nr + k*nr*nphi] = b[1][k + j*ntheta + i*ntheta*nphi];
-	BZ  [i + j*nr + k*nr*nphi] = b[2][k + j*ntheta + i*ntheta*nphi];
-  Te_3d  [i + j*nr + k*nr*nphi] = telec[0][k + j*ntheta + i*ntheta*nphi];
-	Ti_3d  [i + j*nr + k*nr*nphi] = tion[0][k + j*ntheta + i*ntheta*nphi];
-	Ne_3d  [i + j*nr + k*nr*nphi] = nelec[0][k + j*ntheta + i*ntheta*nphi];
-  Ni_3d  [i + j*nr + k*nr*nphi] = nion[0][k + j*ntheta + i*ntheta*nphi];
-  if (ibootstrap==1 || ibootstrap==2 || ibootstrap==3){
-  JpdotB_3d  [i + j*nr + k*nr*nphi] = jdotb[0][k + j*ntheta + i*ntheta*nphi];
-  }
+        Jac[i + j*nr + k*nr*nphi] = jac[k + j*ntheta + i*ntheta*nphi];
+        R[i + j*nr + k*nr*nphi] = path[0][k + j*ntheta + i*ntheta*nphi];
+        Z[i + j*nr + k*nr*nphi] = path[2][k + j*ntheta + i*ntheta*nphi];
+        BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
+        BPhi[i + j*nr + k*nr*nphi] = b[1][k + j*ntheta + i*ntheta*nphi];
+        BZ  [i + j*nr + k*nr*nphi] = b[2][k + j*ntheta + i*ntheta*nphi];
+        Te_3d  [i + j*nr + k*nr*nphi] = telec[0][k + j*ntheta + i*ntheta*nphi];
+        Ti_3d  [i + j*nr + k*nr*nphi] = tion[0][k + j*ntheta + i*ntheta*nphi];
+        Ne_3d  [i + j*nr + k*nr*nphi] = nelec[0][k + j*ntheta + i*ntheta*nphi];
+        Ni_3d  [i + j*nr + k*nr*nphi] = nion[0][k + j*ntheta + i*ntheta*nphi];
+        if(ivecpot==1){
+          VecPot_R[i + j*nr + k*nr*nphi] = vecpot[0][k + j*ntheta + i*ntheta*nphi];
+          VecPot_Phi[i + j*nr + k*nr*nphi] = vecpot[1][k + j*ntheta + i*ntheta*nphi];
+          VecPot_Z[i + j*nr + k*nr*nphi] = vecpot[2][k + j*ntheta + i*ntheta*nphi];
+        }
+        if (ibootstrap==1 || ibootstrap==2 || ibootstrap==3){
+          JpdotB_3d  [i + j*nr + k*nr*nphi] = jdotb[0][k + j*ntheta + i*ntheta*nphi];
+        }
       }
     }
   }
@@ -731,7 +758,7 @@ int main(int argc, char* argv[])
   }
   nc_def_var(ncid, "temax",  NC_FLOAT, 0, &single_value_dimid, &temax_id); 
 
-  int r_id, z_id, jac_id, br_id, bphi_id, bz_id;
+  int r_id, z_id, jac_id, br_id, bphi_id, bz_id,vecpot_r_id,vecpot_phi_id,vecpot_z_id;
   int dims[3];
   dims[2] = nr_dimid;
   dims[1] = nt_dimid;
@@ -742,6 +769,11 @@ int main(int argc, char* argv[])
   nc_def_var(ncid, "B_R",   NC_FLOAT, 3, dims, &br_id);   // added in version 3
   nc_def_var(ncid, "B_Phi", NC_FLOAT, 3, dims, &bphi_id); // added in version 3
   nc_def_var(ncid, "B_Z",   NC_FLOAT, 3, dims, &bz_id);   // added in version 3
+  if(ivecpot==1){  
+    nc_def_var(ncid, "VecPot_R",   NC_FLOAT, 3, dims, &vecpot_r_id);   // added in version 3
+    nc_def_var(ncid, "VecPot_Phi", NC_FLOAT, 3, dims, &vecpot_phi_id); // added in version 3
+    nc_def_var(ncid, "VecPot_Z",   NC_FLOAT, 3, dims, &vecpot_z_id);   // added in version 3
+  }
   
   int te3d_id, ti3d_id, ne3d_id, ni3d_id, JpdotB3d_id;
   nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id);   // added in version 3
@@ -773,16 +805,16 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, jy_fa_id, jy_fa);
   nc_put_var_double(ncid, jz_fa_id, jz_fa);
   if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
-  nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
-  nc_put_var_double(ncid, JpdotB_dndpsi_fluxavg_id, JpdotB_dndpsi_fluxavg);
-  nc_put_var_double(ncid, JpdotB_dtedpsi_fluxavg_id, JpdotB_dtedpsi_fluxavg);
-  nc_put_var_double(ncid, JpdotB_dtidpsi_fluxavg_id, JpdotB_dtidpsi_fluxavg);
+    nc_put_var_double(ncid, JpdotB_fluxavg_id, JpdotB_fluxavg);
+    nc_put_var_double(ncid, JpdotB_dndpsi_fluxavg_id, JpdotB_dndpsi_fluxavg);
+    nc_put_var_double(ncid, JpdotB_dtedpsi_fluxavg_id, JpdotB_dtedpsi_fluxavg);
+    nc_put_var_double(ncid, JpdotB_dtidpsi_fluxavg_id, JpdotB_dtidpsi_fluxavg);
   }
   if (ibootstrap ==3){
-  nc_put_var_double(ncid, JpdotB_L31_fluxavg_id, JpdotB_L31_fluxavg);
-  nc_put_var_double(ncid, JpdotB_L32_fluxavg_id, JpdotB_L32_fluxavg);
-  nc_put_var_double(ncid, JpdotB_L34_fluxavg_id, JpdotB_L34_fluxavg);
-  nc_put_var_double(ncid, JpdotB_alpha_fluxavg_id, JpdotB_alpha_fluxavg);
+    nc_put_var_double(ncid, JpdotB_L31_fluxavg_id, JpdotB_L31_fluxavg);
+    nc_put_var_double(ncid, JpdotB_L32_fluxavg_id, JpdotB_L32_fluxavg);
+    nc_put_var_double(ncid, JpdotB_L34_fluxavg_id, JpdotB_L34_fluxavg);
+    nc_put_var_double(ncid, JpdotB_alpha_fluxavg_id, JpdotB_alpha_fluxavg);
   }
   nc_put_var_double(ncid, temax_id, &te_max);
   nc_put_var_double(ncid, r_id, R);
@@ -792,12 +824,18 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, bphi_id, BPhi);
   nc_put_var_double(ncid, bz_id, BZ);
 
+  if(ivecpot==1){
+    nc_put_var_double(ncid, vecpot_r_id, VecPot_R);
+    nc_put_var_double(ncid, vecpot_phi_id, VecPot_Phi);
+    nc_put_var_double(ncid, vecpot_z_id, VecPot_Z);
+  }
   nc_put_var_double(ncid, te3d_id, Te_3d);
   nc_put_var_double(ncid, ti3d_id, Ti_3d);
   nc_put_var_double(ncid, ne3d_id, Ne_3d);
   nc_put_var_double(ncid, ni3d_id, Ni_3d);
+  
   if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
-  nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
+    nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
   }
 
   nc_put_var_double(ncid, psi_t_id, psi_t);
@@ -1143,6 +1181,14 @@ bool create_source(const int type, const int argc, const std::string argv[])
     return result;
   }
   current_density.add_field(field, FIO_ADD, 1., hint);
+
+  result = src->get_field(FIO_VECTOR_POTENTIAL, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening vector potential field" << std::endl;
+    delete(src);
+    return result;
+  }
+  vector_potential.add_field(field, FIO_ADD, 1., hint);
   
   result = src->get_field(FIO_POLOIDAL_FLUX_NORM, &field, &fopt);
   if(result != FIO_SUCCESS) {
@@ -1201,9 +1247,9 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 16;
+  const int num_opts = 17;
   std::string arg_list[num_opts] = 
-    { "-dl","-dR0", "-bootstrap", "-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
+    { "-dl","-dR0", "-bootstrap", "-vecpot","-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
       "-ntheta", "-psi_end", "-psi_start", "-R0", "-te_start", "-te_end", "-tol"};
   std::string opt = "";
   std::string arg[max_args];
@@ -1267,6 +1313,9 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
               << std::endl;
     return FIO_UNSUPPORTED;
     }
+  } else if(opt=="-vecpot") {
+    if(argc==1) ivecpot = atof(argv[0].c_str());
+    else argc_err = true;    
   } else if(opt=="-m3dc1") {
     return create_source(FIO_M3DC1_SOURCE, argc, argv);
   } else if(opt=="-max_step") {
@@ -1329,7 +1378,8 @@ void print_usage()
   std::cerr << "write_neo_input"
   	  << " -dl <dl>"
 	    << " -dR0 <dR0>"
-      << " -bootstrap <0/1>"
+      << " -bootstrap <0/1/2/3>"
+      << " -vecpot <0/1>"
 	    << " -m3dc1 <m3dc1_source> <time> <scale> <phase>"
 	    << " -nphi <nphi>"
 	    << " -nr <nr>"
@@ -1342,6 +1392,7 @@ void print_usage()
     << "<dl>:           poloidal step size when tracing isosurface\n"
     << "<dR0>:          offset to major radius\n"
     << "<bootstrap 0/1>:flag to output <j.B> if the bootstrap model is on (1) in M3D-C1\n"
+    << "<vecpot 0/1>:flag to output Vector Potential\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
     << "<nphi>:         number of toroidal points per surface\n"
     << "<nr>:           number of surfaces\n"
