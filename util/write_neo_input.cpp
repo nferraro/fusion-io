@@ -24,7 +24,7 @@ double psi_end = -1;
 double te_start = -1;
 double te_end = -1;
 std::deque<fio_source*> sources;
-fio_compound_field electron_density, electron_temperature;
+fio_compound_field electron_density, electron_temperature, pressure;
 fio_compound_field current_density, vector_potential;
 fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
 fio_compound_field JpdotB_L31, JpdotB_L32, JpdotB_L34, JpdotB_alpha;
@@ -121,12 +121,14 @@ int main(int argc, char* argv[])
   double** tion = new double*[1];
   double** nelec= new double*[1];
   double** nion = new double*[1];
+  double** press = new double*[1];
   double** jdotb = new double*[1];
 
   telec[0] = new double[nr*nphi*ntheta];
   tion[0] = new double[nr*nphi*ntheta];
   nelec[0] = new double[nr*nphi*ntheta];
   nion[0] = new double[nr*nphi*ntheta];
+  press[0] = new double[nr*nphi*ntheta];
   jdotb[0]= new double[nr*nphi*ntheta];
   
 
@@ -346,6 +348,13 @@ int main(int argc, char* argv[])
     std::cerr << "Error finding ni" << std::endl;
   }
 
+  // calculate ni at each point
+  std::cerr << "Calculating P on the surfaces..." << std::endl;
+  result = fio_eval_on_path(&pressure, nr*nphi*ntheta, path, press, h);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error finding p" << std::endl;
+  }
+
   // calculate jdotb at each point
   if (ibootstrap==1 || ibootstrap ==2 || ibootstrap ==3){
   std::cerr << "Calculating JpdotB on the surfaces..." << std::endl;
@@ -353,40 +362,8 @@ int main(int argc, char* argv[])
   if(result != FIO_SUCCESS) {
     std::cerr << "Error finding J.B" << std::endl;
   }
-  result = fio_eval_on_path(&JpdotB_dndpsi, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_dndpsi" << std::endl;
   }
-  result = fio_eval_on_path(&JpdotB_dtedpsi, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_dtedpsi" << std::endl;
-  }
-  result = fio_eval_on_path(&JpdotB_dtidpsi, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_dtidpsi" << std::endl;
-  }
-  }
-  if (ibootstrap ==3 ){
-  std::cerr << "Calculating JpdotB Coeffs on the surfaces..." << std::endl;
- 
-  result = fio_eval_on_path(&JpdotB_L31, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_L31" << std::endl;
-  }
-  result = fio_eval_on_path(&JpdotB_L32, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_L32" << std::endl;
-  }
-  result = fio_eval_on_path(&JpdotB_L34, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_L34" << std::endl;
-  }
-  result = fio_eval_on_path(&JpdotB_alpha, nr*nphi*ntheta, path, jdotb, h);
-  if(result != FIO_SUCCESS) {
-    std::cerr << "Error finding JpdotB_alpha" << std::endl;
-  }
-
-  }
+  
   // Calculate flux surface averages for profiles
   std::cerr << "Calculating flux surface averages..." << std::endl;  
   result = fio_surface_average(&electron_density, nr, nphi, ntheta, path,
@@ -468,6 +445,7 @@ int main(int argc, char* argv[])
   double* Ti_3d = new double[nr*nphi*ntheta];
   double* Ne_3d = new double[nr*nphi*ntheta];
   double* Ni_3d = new double[nr*nphi*ntheta];
+  double* P_3d = new double[nr*nphi*ntheta];
   double* JpdotB_3d = new double[nr*nphi*ntheta];
   double* VecPot_R = new double[nr*nphi*ntheta];
   double* VecPot_Phi = new double[nr*nphi*ntheta];
@@ -488,6 +466,7 @@ int main(int argc, char* argv[])
         Ti_3d  [i + j*nr + k*nr*nphi] = tion[0][k + j*ntheta + i*ntheta*nphi];
         Ne_3d  [i + j*nr + k*nr*nphi] = nelec[0][k + j*ntheta + i*ntheta*nphi];
         Ni_3d  [i + j*nr + k*nr*nphi] = nion[0][k + j*ntheta + i*ntheta*nphi];
+        P_3d  [i + j*nr + k*nr*nphi] = press[0][k + j*ntheta + i*ntheta*nphi];
         if(ivecpot==1){
           VecPot_R[i + j*nr + k*nr*nphi] = vecpot[0][k + j*ntheta + i*ntheta*nphi];
           VecPot_Phi[i + j*nr + k*nr*nphi] = vecpot[1][k + j*ntheta + i*ntheta*nphi];
@@ -775,11 +754,12 @@ int main(int argc, char* argv[])
     nc_def_var(ncid, "VecPot_Z",   NC_FLOAT, 3, dims, &vecpot_z_id);   // added in version 3
   }
   
-  int te3d_id, ti3d_id, ne3d_id, ni3d_id, JpdotB3d_id;
+  int te3d_id, ti3d_id, ne3d_id, ni3d_id, JpdotB3d_id, p3d_id;
   nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id);   // added in version 3
   nc_def_var(ncid, "ti_3d", NC_FLOAT, 3, dims, &ti3d_id); // added in version 3
   nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id);   // added in version 3
   nc_def_var(ncid, "ni_3d", NC_FLOAT, 3, dims, &ni3d_id); // added in version 3
+  nc_def_var(ncid, "p_3d", NC_FLOAT, 3, dims, &p3d_id);
   if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
   nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id); // added in version 3
   }
@@ -833,7 +813,7 @@ int main(int argc, char* argv[])
   nc_put_var_double(ncid, ti3d_id, Ti_3d);
   nc_put_var_double(ncid, ne3d_id, Ne_3d);
   nc_put_var_double(ncid, ni3d_id, Ni_3d);
-  
+  nc_put_var_double(ncid, p3d_id, P_3d);
   if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
     nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
   }
@@ -1233,6 +1213,14 @@ bool create_source(const int type, const int argc, const std::string argv[])
     return result;
   }
   ion_temperature.add_field(field, FIO_ADD, 1., hint);  
+
+  result = src->get_field(FIO_TOTAL_PRESSURE, &field, &fopt);
+  if(result != FIO_SUCCESS) {
+    std::cerr << "Error opening pressure field" << std::endl;
+    delete(src);
+    return result;
+  }
+  ion_temperature.add_field(field, FIO_ADD, 1., hint);
 
   // Add source to list
   sources.push_back(src);
