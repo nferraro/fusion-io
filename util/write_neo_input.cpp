@@ -1220,7 +1220,7 @@ bool create_source(const int type, const int argc, const std::string argv[])
     delete(src);
     return result;
   }
-  ion_temperature.add_field(field, FIO_ADD, 1., hint);
+  pressure.add_field(field, FIO_ADD, 1., hint);
 
   // Add source to list
   sources.push_back(src);
