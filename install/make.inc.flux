@@ -1,9 +1,11 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -march=znver4 -fPIC -std=c++11
+#CFLAGS = -O3 -march=znver4 -fPIC -std=c++11
+CFLAGS = -O3 -axCORE-AVX512 -fPIC -std=c++11
  
 F90 = mpif90
-F90FLAGS = -O3 -march=znver4 -fdefault-real-8 -fPIC
+#F90FLAGS = -O3 -march=znver4 -fdefault-real-8 -fPIC
+F90FLAGS = -O3 -march=znver4 -r8 -fPIC
  
 LD = $(CXX)
 LDFLAGS = 
@@ -13,7 +15,7 @@ LDD = $(CXX) --shared
  
 PYTHON = python3
  
-LAPACK = -L/opt/pppl/spack-pkgs/linux-rocky9-zen4/gcc-13.2.0/netlib-lapack-3.11.0-gkyvagash63totdzrfcbdtfaqfpynuel/lib64 -llapack
+LAPACK = -L$(LAPACK_HOME)/lib64 -llapack
 
 HDF5_LIBS = -L$(HDF5_HOME)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
 HDF5_INCLUDE = -I$(HDF5_HOME)/include
