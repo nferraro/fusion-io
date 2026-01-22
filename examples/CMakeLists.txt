@@ -3,6 +3,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data
 
 add_custom_target(unZip ALL
     COMMAND tar xvfz data/mars/mars_data.tar.gz -C data/mars
+    COMMAND tar xvfz data/gpec/gpec_data.tar.gz -C data/gpec
     COMMAND gunzip -c data/gato/diagnostics.dat.gz > data/gato/diagnostics.dat
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
@@ -19,6 +20,19 @@ target_link_libraries(example_fortran PRIVATE fusionio::fusionio)
 add_executable(example_push example_push.f90)
 target_link_libraries(example_push PRIVATE fusionio::push)
 
+if (FUSIONIO_ENABLE_PCMS)
+    add_executable(example_pcms example_pcms.cpp)
+    target_link_libraries(example_pcms PRIVATE fusionio::fusionio pcms::core)
+    configure_file(runMultiple.sh runMultiple.sh COPYONLY)
+
+    function(add_pcms_test type)
+        add_test(pcms_example_${type} runMultiple.sh ${type})
+    endfunction()
+
+    add_pcms_test(m3dc1)
+    add_pcms_test(geqdsk)
+    add_pcms_test(gpec)
+endif()
 
 add_test(cpp_example_m3dc1 ./example m3dc1)
 add_test(cpp_example_geqdsk ./example geqdsk)
