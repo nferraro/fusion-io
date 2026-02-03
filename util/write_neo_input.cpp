@@ -832,6 +832,7 @@ int main(int argc, char* argv[])
         dpsids[i+k*nr] = 0.;
         dpsix[i+k*nr] = 0.;
         dAds[i+k*nr] = 0.;
+        dVds[i+k*nr] = 0.0;
 
         // Do integral over phi
         for(int j=0; j<nphi; j++) {
