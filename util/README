@@ -1,0 +1,101 @@
+
+% *********************************************************************
+% Script for Calculating Bootstrap Current Coefficients
+% *********************************************************************
+%
+% This write_neo_input.cpp script creates a neo_input.nc file 
+% and computes the bootstrap current coefficients based on Landreman et al. (2021)
+% 
+% The neo_input.nc file contains the 3D plasma fields on a 
+% nr X nphi X ntheta grid & flux surface average quantities of certain fields
+% 
+%
+% *********************************************************************
+% Example command to run the write_neo_input code
+% srun -n 1 ~/src/fusion-io/util/_stellar/write_neo_input 
+%           -bootstrap 3                 #bootstrap method
+%           -vecpot 0                    #flag to output vector potential
+%           -m3dc1 ../C1.h5 0            #filename and time step 
+%           -te_start 11150 -te_end 500  #Te of inner most surface and outer most surface 
+%           -nr 80 -nphi 360 -ntheta 400 #Resolution
+%           -tol 1 -R0 9                 #Tolerance for finding Te isosurface (in eV)
+%           -hybrid 1                    #Method of finding surface (0 default, 1 hybrid for surfaces closer to LCFS)  
+% *********************************************************************
+%
+% - ibootstrap = 3            !  1: mapping of the bootstrap coefficients w.r.t psi,
+%                             !  2: mapping of the bootstrap coefficients w.r.t Te,
+%                             !  3: mapping of the bootstrap coefficients w.r.t Tenorm= 1-Te/Temax,
+
+% Output Files:
+% ---------------------------------------------------------------------
+% The script generates one of the following output file names:
+% 1. neo_input.nc 
+% AND one of the following (default is 2c)
+% 2.a ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G
+% 2.b ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G
+% 2.c ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax
+%  ---------------------------------------------------------------------
+%  ---------------------------------------------------------------------
+% 2c The output files contain the following 12 columns:
+% 
+% Column 1: Te or Psi         
+% Column 2: L31               - Bootstrap current coefficient L31.
+% Column 3: L32               - Bootstrap current coefficient L32.
+% Column 4: L34               - Bootstrap current coefficient L34.
+% Column 5: alpha             - Amplification factor for the bootstrap current.
+% Column 6: 1/<B²>            - Inverse of Flux surface average magnetic field squared.
+% Column 7: dTe/dPsi_t * 2 pi   - 
+% Column 8: Gbar/(i-N)        - Landreman et al (2022)'s isomorphism parameter
+
+% In File 3, there are additional outputs for in M3D-C1 calculation of
+% bootstrap parameters
+% Column 9:  ftrap             - trapped fraction
+% Column 10: qR 
+% Column 11: epsilon           - Inverse aspect ratio 
+% Column 12: Temax             - For initial time step interpolation of dTe_norm/dPsi_t * 2pi
+%-------------------------------------------------------------------------------------
+%
+% File Placement:
+% -----------------
+% The ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax file must be placed in the M3D-C1 working case directory 
+% for for bootstrap calculations within M3D-C1 simulations.
+%
+% *********************************************************************
+%
+% M3D-C1 Input File Settings:
+% ------------------------------
+% In order to use the bootstrap current coefficients in M3D-C1, the 
+% following parameters must be set in the M3D-C1 input file:
+%
+% - ibootstrap = 3            ! 1 when using psi: profiles as a function of psi
+%                             ! 2 when using Te: da/dpsit=da/dte dte/dpsit 
+%                             ! 3 when using tenorm: da/dpsit=da/dte dte/dpsit=-temax da/dte dtenorm/dpsit'
+% - ibootstrap_model = 4      ! Choose the bootstrap model:
+%                             !  1 = Sauter (with eqsubtract = 0/1)
+%                             !  2 = Redl   (with eqsubtract = 0/1)
+%                             !  3 = Sauter (with eqsubtract = 0)
+%                             !  4 = Redl   (with eqsubtract = 0)
+% - bootstrap_alpha = 1       ! Amplification factor for the bootstrap current.
+%                             !  Set to 1 for no amplification.
+% - ibootstrap_regular = 1e-5 ! default 1e-8
+%                             ! regularization term for the expression = ((del_p, del_Te)) / (grad_Te_magnitude**2 + adaptive_regularization)
+% - iwrite_aux_vars = 1       ! required to generate the bootstrap outputs in M3D-C1
+% *********************************************************************
+
+
+
+%%
+%========================================================
+% The following flags in the write_neo_input script have 
+% been hard coded for bootstrap calculations
+%========================================================
+%
+% - UseSauter0Redl1 = 1       ! Choose bootstrap current model:
+%                             !  0 = Sauter Calculations
+%                             !  1 = Redl Calculations
+% - Nzp = 0                   !  N from Landreman's formula: 
+%                             !   Gbar/(i-N) = (G + NI) / (i - N), where N is the number of grid points.
+% - UseBfore = 1              % 1: epsilon = (Bmax - Bmin) / (Bmax + Bmin);
+%                               0: epsilon = Rmin/Rc %Rc =(R_+ + R_-)/2 see IIIA of Hager & Chang (2016)
+%                               where R_+ and R_- are major radii at the outer and inner-most points of a flux surface         
+% *********************************************************************

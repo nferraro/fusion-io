@@ -939,6 +939,161 @@ int fio_gridify_surface(const int m0, double** path0, const double* axis,
 }
 
 
+// fio_gridded_isosurface
+// ~~~~~~~~~~~~~~~~~~~~~~
+// finds an isosurface in field f and returns path on uniform theta, phi grid
+// where theta is the fractional distance around the surface
+//
+// inputs: 
+//    val: value of isosurface (i.e. find surface where f = val)
+//    guess: initial guess for first point on isosurface
+//    axis[3]:  R, phi, Z coordinates of poloidal axis
+//    dl: initial approximate spacing between points when finding surface
+//    tol: max acceptable different between f and val on isosurface
+//    nphi: number of toroidal points
+//    ntheta: number ot poloidal points
+//
+// outputs:
+//    path[3][ntheta*nphi]: R, phi, Z coordinates of points on path
+//    phi[nphi]: values of phi
+//    theta
+//    h: hint for last point on path
+//
+int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
+			   double** axis, const double dl_tor, const double dl_pol,
+			   const double tol, const double max_step,
+			   const int nphi, const int ntheta, 
+			   double* phi, double* theta,
+			   double** path, const char* label, fio_hint h=0)
+{
+  int result;
+  int n;
+
+  std::ofstream file;
+  std::string filename;
+
+  double norm[3];
+  norm[0] = 0.;
+  norm[1] = 1.;
+  norm[2] = 0.;
+
+  if(label) {
+    filename = "pol_loop_raw_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+  }
+
+  double t[3];
+  double x[3];
+  x[0] = guess[0];
+
+  double a[3];
+  a[0] = axis[0][0];
+  a[1] = axis[1][0];
+  a[2] = axis[2][0];
+
+  // Loop over each toroidal point and calculate poloidal path
+  for(int i=0; i<nphi; i++) {
+    double** path_pol0;
+
+    phi[i] = 2.*M_PI*i/nphi;
+
+    // find axis in phi = phi[i] plane
+    double te_max;
+    t[0] = 0.;
+    t[1] = 1.;
+    t[2] = 0.;
+    a[1] = phi[i];
+    
+    result = fio_find_max(f, &te_max, a, tol, max_step, 2, t, h);
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding magnetic axis at phi = "
+		<< phi[i] << std::endl;
+      return result;
+    }
+    axis[0][i] = a[0];
+    axis[1][i] = a[1];
+    axis[2][i] = a[2];
+
+    // find initial point in horizontal line from axis
+    t[0] = 1.;
+    t[1] = 0.;
+    t[2] = 0.;
+    x[1] = phi[i];
+    x[2] = a[2];
+    result = fio_find_val(f, val, x, tol, max_step, 1, t, h);
+
+    if(result == FIO_OUT_OF_BOUNDS) {
+      std::cerr << "Error finding initial point" << std::endl;
+      break;
+    }
+    /*
+    std::cerr << "Poloidal loop " << i << " at Te = " << val
+	      << " phi = " << x[1] << std::endl;
+    */
+
+    double ax[3];
+    ax[0] = axis[0][i];
+    ax[1] = axis[1][i];
+    ax[2] = axis[2][i];
+    result = fio_isosurface_2d(f, val, x, ax, norm, 0, dl_pol, tol, max_step,
+			       &n, &path_pol0, h);
+
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error finding poloidal loop at phi = " << phi[i]
+		<< std::endl;
+      break;
+    }
+    x[0] = path_pol0[0][n-1];
+    x[1] = path_pol0[1][n-1];
+    x[2] = path_pol0[2][n-1];
+
+    if(label) {
+      for(int j=0; j<n; j++) {
+	file << std::setprecision(10) << std::setw(16) << path_pol0[1][j] 
+	     << std::setprecision(10) << std::setw(16) << path_pol0[0][j] 
+	     << std::setprecision(10) << std::setw(16) << path_pol0[2][j] 
+	     << std::endl;
+      }
+    }
+
+    double* path_pol[3];
+    path_pol[0] = &(path[0][i*ntheta]);
+    path_pol[1] = &(path[1][i*ntheta]);
+    path_pol[2] = &(path[2][i*ntheta]);
+
+    result = fio_gridify_loop(n, path_pol0, 0, ntheta, path_pol, theta, 0);
+    
+    if(result != FIO_SUCCESS) {
+      std::cerr << "Error gridifying poloidal path " << std::endl;
+      break;
+    }
+  }
+
+  //  std::cerr << "Writing final path data" << std::endl;
+  if(label) {
+    file.close();
+
+    filename = "surface_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+
+    int k=0;
+    for(int i=0; i<nphi; i++) {
+      for(int j=0; j<ntheta; j++) {
+	file << std::setprecision(10) << std::setw(16) << path[1][k] 
+	     << std::setprecision(10) << std::setw(16) << path[0][k] 
+	     << std::setprecision(10) << std::setw(16) << path[2][k] 
+	     << std::endl;
+	k++;
+      }
+      file << std::endl;
+    }
+    file.close();
+  }
+
+  return result;
+}
+
+
 int fio_q_at_plane(fio_field* f, const int n, double** x, double* q,
 		   double* bpol, double** bout, fio_hint h=0)
 {
@@ -1214,16 +1369,16 @@ int fio_eval_on_surface(fio_field* f, const int n, double** x, double** a,
 // -----------------------------------------------------------
 // NEW HELPER: Robust Hybrid Solver (Newton + Bisection)
 // -----------------------------------------------------------
-// CHANGED: Added ct (cos theta) and st (sin theta) as arguments to avoid re-calculating them
 int fio_find_rho_hybrid(fio_field* f, const double target_val, 
                         double& rho, const double ct, const double st, 
                         const double phi, const double* axis, 
                         const double tol, fio_hint h) 
 {
     double x[3], grad[3], val;
-
+    int max_itr=10;
+    int max_itr_bi= (target_val < 50.0) ? 15 : 30; 
     // 1. Newton Method 
-    for(int i=0; i<10; i++) {
+    for(int i=0; i<max_itr; i++) {
         x[0] = axis[0] + rho * ct; 
         x[1] = phi;
         x[2] = axis[2] + rho * st; 
@@ -1238,27 +1393,28 @@ int fio_find_rho_hybrid(fio_field* f, const double target_val,
 
         if(f->eval_deriv(x, grad, h) != FIO_SUCCESS) break;
 
-        // REPLACED: Simplified directional derivative using pre-calc trig
+        //Simplified directional derivative using pre-calc trig
         double df_dr = grad[0] * ct + grad[2] * st;
         
         if(fabs(df_dr) < 1e-12) break; 
 
         double step = error / df_dr;
         
-        // NEW: Step Damping (Safety Brake)
+        // Step Damping (Safety Brake)
         if(fabs(step) > 0.05) step = (step > 0) ? 0.05 : -0.05;
 
         rho -= step;
         if(rho < 0) { rho = 0.01; break; }
     }
 
-    // 2. Bisection (The "Safety Net")
+    // 2. Bisection
     double r_low = 0.0;
     double r_high = rho * 1.5 + 0.1; 
 
-    for(int i=0; i < 30; i++) {
+    for(int i=0; i < max_itr_bi; i++) {
         double r_mid = 0.5 * (r_low + r_high);
         x[0] = axis[0] + r_mid * ct;
+        //x[1] = phi;
         x[2] = axis[2] + r_mid * st;
 
         if(f->eval(x, &val, h) == FIO_OUT_OF_BOUNDS) {
@@ -1272,17 +1428,16 @@ int fio_find_rho_hybrid(fio_field* f, const double target_val,
         }
         
         if(val > target_val) r_low = r_mid; else r_high = r_mid;
+       
     }
 
     return FIO_SUCCESS;
 }
 
-
-
 // -----------------------------------------------------------
 // Optimized & Updated
 // -----------------------------------------------------------
-int fio_gridded_isosurface(fio_field* f, const double val, const double* guess,
+int fio_gridded_isosurface_hybrid(fio_field* f, const double val, const double* guess,
           double** axis, const double dl_tor, const double dl_pol,
           const double tol, const double max_step,
           const int nphi, const int ntheta, 

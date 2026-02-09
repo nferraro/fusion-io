@@ -21,6 +21,7 @@ int ntheta = 400; // number of poloidal points
 int nphi = 32;    // number of toroidal points
 int ibootstrap;
 int ivecpot;
+int hybrid = 0;       // 0: use regular gridded isosurface, 1: use hybrid method (for surfaces closer to LCFS))
 double dl_tor = 0.01;     // step size when finding surfaces
 double dl_pol = 0.01;     // step size when finding surfaces
 double max_step = 0.02;   // Maximum step size for Newton iterations
@@ -31,6 +32,7 @@ double psi_start = -1;
 double psi_end = -1;
 double te_start = -1;
 double te_end = -1;
+
 std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature, pressure;
 fio_compound_field current_density, vector_potential;
@@ -409,13 +411,29 @@ int main(int argc, char* argv[])
     axis_3d[0][0] = axis[0];
     axis_3d[1][0] = 0;
     axis_3d[2][0] = axis[2];
-
-    result = fio_gridded_isosurface(&electron_temperature, target_val_for_solver, x,
+    if(hybrid == 0) {
+      result = fio_gridded_isosurface(&electron_temperature, target_val_for_solver, x,
                     axis_3d, dl_tor, dl_pol, tol, max_step,
                     nphi, ntheta, 
                     phi, theta,
                     path_surf, label, h);
-
+      if(world_rank == 0) {
+            std::cerr << "Using regular gridded isosurface" << std::endl;
+      }
+    } else if (hybrid == 1) {
+      result = fio_gridded_isosurface_hybrid(&electron_temperature, target_val_for_solver, x,
+                    axis_3d, dl_tor, dl_pol, tol, max_step,
+                    nphi, ntheta, 
+                    phi, theta,
+                    path_surf, label, h);
+      if(world_rank == 0) {
+            std::cerr << "Using hybrid version of gridded isosurface" << std::endl;
+      }
+    } else {
+      std::cerr << "Error: Invalid value for -hybrid option. Use 0 for regular gridded isosurface, 1 for hybrid method." << std::endl;
+      MPI_Finalize();
+      return 1;
+    }
     te[s] = target_val_for_solver;
     psi_surf[s] = psi_norm[s]*(psi1 - psi0) + psi0;
   }
@@ -1262,7 +1280,7 @@ int main(int argc, char* argv[])
 
           
           outfile << std::fixed << std::setprecision(8);
-          for (int i = 0; i < nr; i++) {
+          for (int i = 1; i < nr; i++) {
               
               outfile << psi_norm_new[i] << " " 
                       << bootstrap_coeffs.L31[i] << " " 
@@ -1686,10 +1704,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
 int process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 17;
+  const int num_opts = 18;
   std::string arg_list[num_opts] = 
     { "-dl","-dR0", "-bootstrap", "-vecpot","-m3dc1", "-max_step", "-nphi", "-nphi", "-npsi", "-nr",
-      "-ntheta", "-psi_end", "-psi_start", "-R0", "-te_start", "-te_end", "-tol"};
+      "-ntheta", "-psi_end", "-psi_start", "-R0", "-te_start", "-te_end", "-tol", "-hybrid"};
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -1787,6 +1805,9 @@ int process_line(const std::string& opt, const int argc, const std::string argv[
   } else if(opt=="-tol") {
     if(argc==1) tol = atof(argv[0].c_str());
     else argc_err = true;
+  } else if(opt=="-hybrid") {
+    if(argc==1) hybrid = atof(argv[0].c_str());
+    else argc_err = true;
   } else if(opt=="-npsi") {
     std::cerr << "Error: option -npsi is deprecated\n"
 	      << " profiles are now only calculated at surface locations"
@@ -1825,13 +1846,15 @@ void print_usage()
 	    << " -ntheta <ntheta>"
 	    << " -psi_end <psi_end>"
 	    << " -psi_start <psi_start>"	    
+      << " -te_end <te_end>"
+	    << " -te_start <te_start>"	
 	    << std::endl;
 
   std::cerr
     << "<dl>:           poloidal step size when tracing isosurface\n"
     << "<dR0>:          offset to major radius\n"
-    << "<bootstrap 0/1>:flag to output <j.B> if the bootstrap model is on (1) in M3D-C1\n"
-    << "<vecpot 0/1>:flag to output Vector Potential\n"
+    << "<bootstrap 0/1/2/3>:flag to output <j.B> if the bootstrap model is on (1) in M3D-C1\n"
+    << "<vecpot 0/1>:   flag to output Vector Potential\n"
     << "<m3dc1_source>: filename of M3D-C1 source file\n"
     << "<nphi>:         number of toroidal points per surface\n"
     << "<nr>:           number of surfaces\n"
@@ -1841,7 +1864,8 @@ void print_usage()
     << "<psi_start>:    psi_norm of innermost surface\n"
     << "<scale>:        scale factor to apply to linear perturbation\n"
     << "<time>:         timeslice of fields to read\n"
-    << "<tol>:          tolerance for finding Te isourface (in eV)\n";    
+    << "<tol>:          tolerance for finding Te isourface (in eV)\n"
+    << "<hybrid>:       hybrid <0/1>\n";
 }
 
 void delete_sources()
