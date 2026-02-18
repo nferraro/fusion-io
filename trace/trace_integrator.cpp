@@ -4,14 +4,117 @@
 #include <iomanip>
 #include <math.h>
 
+// Dormand-Prince Coefficients
+static const double c2=1.0/5.0, c3=3.0/10.0, c4=4.0/5.0, c5=8.0/9.0, c6=1.0, c7=1.0;
+static const double a21=1.0/5.0;
+static const double a31=3.0/40.0, a32=9.0/40.0;
+static const double a41=44.0/45.0, a42=-56.0/15.0, a43=32.0/9.0;
+static const double a51=19372.0/6561.0, a52=-25360.0/2187.0, a53=64448.0/6561.0, a54=-212.0/729.0;
+static const double a61=9017.0/3168.0, a62=-355.0/33.0, a63=46732.0/5247.0, a64=49.0/176.0, a65=-5103.0/18656.0;
+static const double b1=35.0/384.0, b3=500.0/1113.0, b4=125.0/192.0, b5=-2187.0/6784.0, b6=11.0/84.0;
+static const double e1=71.0/57600.0, e3=-71.0/16695.0, e4=71.0/1920.0, e5=-17253.0/339200.0, e6=22.0/525.0, e7=-1.0/40.0;
+
+
+
+
 trace_integrator::trace_integrator()
-{
+{ 
+  use_adaptive = false;
   reverse = false;
   toroidal = true;
   period = 2.*M_PI;
   plane = 0.;
   nplanes = 1;
   tpts = 1;
+}
+
+bool trace_integrator::integrate_adaptive(int transits, int steps_per_transit, integrator_data* data)
+{
+    double h = (reverse ? -period : period) / (double)steps_per_transit;
+    double tol = 1e-8; 
+    double R0_mag, Z0_mag;
+    center(&R0_mag, &Z0_mag);
+
+    int transits_count = 0;
+    double phi_start = Phi;
+    double next_puncture = plane;
+
+    while (transits_count < transits) {
+        double dist_to_plane = next_puncture - Phi;
+        bool landing_on_plane = false;
+        double h_actual = h;
+        
+        // Exact landing logic for high-fidelity Poincare plots
+        if ((!reverse && h >= dist_to_plane) || (reverse && h <= dist_to_plane)) {
+            h_actual = dist_to_plane;
+            landing_on_plane = true;
+        }
+
+        if (!step_rk54(h_actual, tol)) return false;
+
+        if (landing_on_plane) {
+            save_puncture(next_puncture, R, Z, Z0_mag, R0_mag);
+            next_puncture += (reverse ? -period : period) / (double)nplanes;
+            
+            if (std::abs(Phi - phi_start) >= std::abs(period)) {
+                transits_count++;
+                phi_start = Phi;
+                if (data) data->toroidal_transits++;
+            }
+        } else {
+            h = h_actual; // Update suggested h for next adaptive step
+        }
+    }
+    return true;
+}
+
+bool trace_integrator::step_rk54(double& h, double tol)
+{
+    double br, bphi, bz;
+    double k1r, k1z, k2r, k2z, k3r, k3z, k4r, k4z, k5r, k5z, k6r, k6z;
+
+    auto get_deriv = [&](double r_in, double phi_in, double z_in, double& dr_out, double& dz_out) {
+        if (!eval(r_in, phi_in, z_in, &br, &bphi, &bz)) return false;
+        double factor = (toroidal ? r_in : 1.0) / bphi;
+        dr_out = br * factor;
+        dz_out = bz * factor;
+        return true;
+    };
+
+    if (!get_deriv(R, Phi, Z, k1r, k1z)) return false;
+    if (!get_deriv(R + h*a21*k1r, Phi + h*c2, Z + h*a21*k1z, k2r, k2z)) return false;
+    if (!get_deriv(R + h*(a31*k1r + a32*k2r), Phi + h*c3, Z + h*(a31*k1z + a32*k2z), k3r, k3z)) return false;
+    if (!get_deriv(R + h*(a41*k1r + a42*k2r + a43*k3r), Phi + h*c4, Z + h*(a41*k1z + a42*k2z + a43*k3z), k4r, k4z)) return false;
+    if (!get_deriv(R + h*(a51*k1r + a52*k2r + a53*k3r + a54*k4r), Phi + h*c5, Z + h*(a51*k1z + a52*k2z + a53*k3z + a54*k4z), k5r, k5z)) return false;
+    if (!get_deriv(R + h*(a61*k1r + a62*k2r + a63*k3r + a64*k4r + a65*k5r), Phi + h*c6, Z + h*(a61*k1z + a62*k2z + a63*k3z + a64*k4z + a65*k5z), k6r, k6z)) return false;
+
+    double R_next = R + h*(b1*k1r + b3*k3r + b4*k4r + b5*k5r + b6*k6r);
+    double Z_next = Z + h*(b1*k1z + b3*k3z + b4*k4z + b5*k5z + b6*k6z);
+
+    double k7r, k7z;
+    if (!get_deriv(R_next, Phi + h, Z_next, k7r, k7z)) return false;
+    double err_r = std::abs(h*(e1*k1r + e3*k3r + e4*k4r + e5*k5r + e6*k6r + e7*k7r));
+    double err_z = std::abs(h*(e1*k1z + e3*k3z + e4*k4z + e5*k5z + e6*k6z + e7*k7z));
+    double total_err = std::max(err_r, err_z);
+
+    if (total_err <= tol || std::abs(h) < 1e-10) {
+        R = R_next; Z = Z_next; Phi += h;
+        h *= std::min(5.0, std::max(0.1, 0.9 * std::pow(tol / total_err, 0.2)));
+        return true;
+    } else {
+        h *= 0.9 * std::pow(tol / total_err, 0.25);
+        return step_rk54(h, tol); 
+    }
+}
+
+void trace_integrator::save_puncture(double pl, double R_p, double Z_p, double Z0, double R0) {
+    double theta_plot = std::atan2(Z_p - Z0, R_p - R0) * 180.0 / M_PI;
+    double psi_plot;
+    if (!eval_psi(R_p, pl, Z_p, &psi_plot)) psi_plot = 0;
+
+    file << std::setiosflags(std::ios::scientific) << std::setw(20) << std::setprecision(12) 
+         << pl * 180.0 / M_PI << std::setw(20) << R_p << std::setw(20) << Z_p 
+         << std::setw(20) << theta_plot << std::setw(20) << psi_plot << std::endl;
 }
 
 trace_integrator::~trace_integrator()

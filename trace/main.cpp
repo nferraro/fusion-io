@@ -234,7 +234,11 @@ int main(int argc, char* argv[])
       tracer.set_pos(rr[k],Phi,zz[k]);
 
       // perform integration
-      result = tracer.integrate(transits, steps_per_transit, &data);
+      if (tracer.use_adaptive) {
+        result = tracer.integrate_adaptive(transits, steps_per_transit, &data);
+      } else {
+        result = tracer.integrate(transits, steps_per_transit, &data);
+      }
       if(!result) {
 	double RR, PP, ZZ;
 	tracer.get_pos(&RR, &PP, &ZZ);
@@ -368,13 +372,13 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 21;
+  const int num_opts = 22;
   std::string arg_list[num_opts] = 
     { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0","-R0","-Z0",
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
-      "-reverse", "-tavg" };
+      "-reverse", "-tavg", "-adaptive" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -636,6 +640,8 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
   } else if(opt=="-t") {
     if(argc==1) transits = atoi(argv[0].c_str());
     else argc_err = true;
+  } else if(opt=="-adaptive") {
+    tracer.use_adaptive = true;
   } else if(opt=="-tavg") {
     if(argc==1) tpts = atoi(argv[0].c_str());
     else argc_err = true;
