@@ -1367,7 +1367,7 @@ int fio_eval_on_surface(fio_field* f, const int n, double** x, double** a,
 }
 
 // -----------------------------------------------------------
-// NEW HELPER: Robust Hybrid Solver (Newton + Bisection)
+// NEW: Hybrid Solver (Newton + Bisection)
 // -----------------------------------------------------------
 int fio_find_rho_hybrid(fio_field* f, const double target_val, 
                         double& rho, const double ct, const double st, 
@@ -1381,7 +1381,7 @@ int fio_find_rho_hybrid(fio_field* f, const double target_val,
     // Safety: prevent negative or zero radius start
     if (rho < 1e-4) rho = 0.01;
 
-    // 1. Newton Method 
+    // A. Newton Method 
     for(int i=0; i<max_itr; i++) {
         x[0] = axis[0] + rho * ct; 
         x[1] = phi;
@@ -1419,7 +1419,7 @@ int fio_find_rho_hybrid(fio_field* f, const double target_val,
         if(rho < 1e-5) { rho = 1e-4; break; }
     }
 
-    // 2. Bisection
+    // B. Bisection
     double r_low = rho * 0.5; // Start with a wider initial bracket
     double r_high = rho * 1.2;
     double v_low, v_high;
