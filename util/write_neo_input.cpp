@@ -63,7 +63,7 @@ int process_line(const std::string& opt, const int argc,
 		  const std::string argv[]);
 void delete_sources();
 
-// 1. Data Structures
+// Data Structures
 
 struct CurrentIntegrals {
     std::vector<double> Izp_sumj;
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
   if(psi_start <= 0.) psi_start = (psi_end-psi_start)/nr;
   if(psi_end==1.) psi_end = 1. - (psi_end-psi_start)/nr;
 
-   // 2. Rank 0 Setup and Prints
+   // Rank 0 Setup and Prints
   if(world_rank == 0) {
 
     std::cerr << "Input parameters\n=======================\n";
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
   double x[3];
 
   // -------------------------------------------------------------------------
-  // 4. FIND MAGNETIC AXIS (Rank 0 only)
+  // FIND MAGNETIC AXIS (Rank 0 only)
   // ---------------------
     if(world_rank == 0) {
       axis[1] = 0.;
@@ -355,7 +355,7 @@ int main(int argc, char* argv[])
       psi_norm[s] = (te_max - te0) / te_max;
 
       // Optimization: Only try "Fast Search" if we are NOT at the edge.
-        // T_e=0 is numerically unstable for Newton, so skip straight to Robust.
+      // T_e=0 is numerically unstable for Newton, so skip straight to Robust.
       if (te0 > 50.0) { 
              result = fio_find_val(&electron_temperature, te0, x, tol, max_step, 1, axis, h);
              if (result == FIO_SUCCESS) seed_found = true;
@@ -1901,7 +1901,7 @@ CurrentIntegrals calculate_current_integrals(
             for (int k = 0; k < ntheta; ++k) {
                 int ijk = i + j * nr + k * nr * nphi;
 
-                // --- 1. Finite Difference along phi (j) ---
+                // Finite Difference along phi (j) ---
                 double dRdj, dZdj;
                 if (j == 0) {
                     dRdj = R[i + (j + 1) * nr + k * nr * nphi] - R[ijk];
@@ -1914,7 +1914,7 @@ CurrentIntegrals calculate_current_integrals(
                     dZdj = 0.5 * (Z[i + (j + 1) * nr + k * nr * nphi] - Z[i + (j - 1) * nr + k * nr * nphi]);
                 }
 
-                // --- 2. Finite Difference along theta (k) ---
+                // Finite Difference along theta (k) ---
                 double dRdk, dZdk;
                 if (k == 0) {
                     dRdk = R[i + j * nr + (k + 1) * nr * nphi] - R[ijk];
@@ -1927,7 +1927,6 @@ CurrentIntegrals calculate_current_integrals(
                     dZdk = 0.5 * (Z[i + j * nr + (k + 1) * nr * nphi] - Z[i + j * nr + (k - 1) * nr * nphi]);
                 }
 
-                // --- 3. Accumulate Terms (Matching Python's np.sum) ---
                 // Izp term summed over k
                 double term_zp = (R[ijk] * BPhi[ijk] * dphidj) + (BR[ijk] * dRdj) + (BZ[ijk] * dZdj);
                 Izp_accumulator += term_zp;
@@ -1938,14 +1937,12 @@ CurrentIntegrals calculate_current_integrals(
             }
         }
 
-        // --- 4. Normalize 
         //  Izt_sumk = Izt_sum / nphi / (2*np.pi)
         res.Izt_sumk[i] = Izt_accumulator / (double)nphi / (2.0 * M_PI);
         
         // Izp_sumj = Izp_sum / ntheta / (2*np.pi)
         res.Izp_sumj[i] = Izp_accumulator / (double)ntheta / (2.0 * M_PI);
 
-        // --- 5. Derived Quantities ---
         res.GplusiI_fa[i] = res.Izp_sumj[i] + (res.Izt_sumk[i] / q[i]);
         res.Gbar_by_iminusN[i] = (res.Izp_sumj[i] + Nzp * res.Izt_sumk[i]) / (1.0 / q[i] - Nzp);
     }
@@ -1968,7 +1965,7 @@ std::vector<double> calc_ftrap(
     const double weight[5]   = {0.23693, 0.47863, 0.56889, 0.47863, 0.23693};
 
     for (int i = 0; i < nr; ++i) {
-        // 1.  lambda grid mapping
+   
         //  dl = (1.0/Bmax - 0)/lambda_count; lam0 = 0 + dl/2
         double dl = (1.0 / Bmax_fpsi[i]) / (double)lambda_count;
         double a_python = dl / 2.0;
@@ -1977,7 +1974,7 @@ std::vector<double> calc_ftrap(
         double current_psi = psi_eval[i];
         double integral_sum = 0.0;
 
-        // 2. Gauss-Legendre Loop
+        //  Gauss-Legendre Loop
         for (int n = 0; n < 5; ++n) {
             
             double lam_gauss = 0.5 * (b_python - a_python) * abcissae[n] + 0.5 * (b_python + a_python);
@@ -1985,7 +1982,7 @@ std::vector<double> calc_ftrap(
             double dV = 0.0;
             double acc = 0.0;
 
-            // 3. Flux surface integral 
+            // Flux surface integral 
             for (int j = 0; j < nphi; ++j) {
                 for (int k = 0; k < ntheta; ++k) {
                     int idx = i + j * nr + k * nr * nphi;
@@ -2008,7 +2005,7 @@ std::vector<double> calc_ftrap(
             }
         }
 
-        // 4. Final integration and ftrap formula
+
         double integral_gauss = 0.5 * (b_python - a_python) * integral_sum;
         ftrap_out[i] = 1.0 - 0.75 * B2_fa[i] * integral_gauss;
     }
@@ -2077,16 +2074,16 @@ CollisionResults calculate_collision_frequencies(
             res.qR[i] = q[i] * Rc_geom;
         }
 
-        // ln_lambda calculations (Same in both)
+        // ln_lambda calculations
         double ln_lam_e = 31.3 - std::log(std::sqrt(ne_fa[i]) / Te_fa[i]);
         double ln_lam_i = 30.0 - std::log((std::pow(Zi, 3) * std::sqrt(ni_fa[i])) / std::pow(Ti_fa[i], 1.5));
 
-        // nu_star_e: matching Python nu_e_star calculation
+     
         // Formula: 6.921e-18 * Ze * ne * ln_lam / (Te^2 * eps^1.5) * qR
         res.nu_e_star[i] = std::abs(6.921e-18 * Ze * ne_fa[i] * ln_lam_e / 
                            (std::pow(Te_fa[i], 2) * std::pow(res.epsilon[i], 1.5)) * res.qR[i]);
 
-        // nu_star_i: matching Python nu_i_star calculation
+  
         // Formula: 4.9e-18 * ni * Zi^4 * ln_lam / (Ti^2 * eps^1.5) * qR
         res.nu_i_star[i] = std::abs(4.9e-18 * ni_fa[i] * std::pow(Zi, 4) * ln_lam_i / 
                            (std::pow(Ti_fa[i], 2) * std::pow(res.epsilon[i], 1.5)) * res.qR[i]);
@@ -2113,17 +2110,17 @@ RedlResults calculate_redl_terms(int nr, double Zeff_phys,
         double ne = nue[i];
         double ni = nui[i];
 
-        // 1. f_t31
+        //  f_t31
         double ft31 = f / (1.0 + 0.67 * (1.0 - 0.7 * f) * std::sqrt(ne) / (0.56 + 0.44 * Zc) +
                       (0.52 + 0.086 * std::sqrt(ne)) * (1.0 + 0.87 * f) * ne / (1.0 + 1.13 * std::sqrt(std::max(Zc - 1.0, 0.0))));
 
-        // 2. L31 and L34 (Using the shared Z_denom)
+        //  L31 and L34 
         double Zfac = 1.0 / Z_denom;
         res.L31[i] = (1.0 + 0.15 * Zfac) * ft31 - 0.22 * Zfac * std::pow(ft31, 2) + 
                       0.01 * Zfac * std::pow(ft31, 3) + 0.06 * Zfac * std::pow(ft31, 4);
         res.L34[i] = res.L31[i];
 
-        // 3. f_t32ee and f_t32ei
+        //  f_t32ee and f_t32ei
         double ft32ee = f / (1.0 + 0.23 * (1.0 - 0.96 * f) * std::sqrt(ne) / std::sqrt(Zc) + 
                         0.13 * (1.0 - 0.38 * f) * ne / (Zc * Zc) * (std::sqrt(1.0 + 2.0 * std::sqrt(std::max(Zc - 1.0, 0.0))) + 
                          std::pow(f, 2) * std::sqrt((0.075 + 0.25 * std::pow(Zc - 1.0, 2)) * ne)));
@@ -2131,7 +2128,7 @@ RedlResults calculate_redl_terms(int nr, double Zeff_phys,
         double ft32ei = f / (1.0 + 0.87 * (1.0 + 0.39 * f) * std::sqrt(ne) / (1.0 + 2.95 * std::pow(Zc - 1.0, 2)) + 
                         1.53 * (1.0 - 0.37 * f) * ne * (2.0 + 0.375 * (Zc - 1.0)));
 
-        // 4. F32 terms
+        //  F32 terms
         double t_ee = ft32ee;
         double F32ee = (0.1 + 0.6 * Zc) / (Zc * (0.77 + 0.63 * (1.0 + std::pow(Zc - 1.0, 1.1)))) * (t_ee - std::pow(t_ee, 4)) +
                        0.7 / (1.0 + 0.2 * Zc) * (std::pow(t_ee, 2) - std::pow(t_ee, 4) - 1.2 * (std::pow(t_ee, 3) - std::pow(t_ee, 4))) +
@@ -2144,7 +2141,7 @@ RedlResults calculate_redl_terms(int nr, double Zeff_phys,
 
         res.L32[i] = F32ee + F32ei;
 
-        // 5. alpha_nu_i
+        // alpha_nu_i
         double a0 = -(0.62 + 0.055 * (Zc - 1.0)) / (0.53 + 0.17 * (Zc - 1.0)) * (1.0 - f) / (1.0 - (0.31 - 0.065 * (Zc - 1.0)) * f - 0.25 * f * f);
         res.alpha_nu_i[i] = ((a0 + 0.7 * Zc * std::sqrt(f) * std::sqrt(ni)) / (1.0 + 0.18 * std::sqrt(ni)) - 0.002 * ni * ni * std::pow(f, 6)) / (1.0 + 0.004 * ni * ni * std::pow(f, 6));
         
