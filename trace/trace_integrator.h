@@ -54,7 +54,7 @@ class trace_integrator {
   std::fstream file;
 
  public:
-
+  bool use_adaptive;
   bool toroidal;
   double period;
   int nplanes;
@@ -93,6 +93,11 @@ class trace_integrator {
   bool step_predcorr(double dphi);
   bool integrate(int transits, int steps_per_transit, 
 		 integrator_data* data=0);
+  
+  
+  bool step_rk54(double& h, double tol);
+  void save_puncture(double pl, double R_p, double Z_p, double Z0, double R0);
+  bool integrate_adaptive(int transits, int steps_per_transit, integrator_data* data=0);
 
   void plot_point();
 

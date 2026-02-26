@@ -607,4 +607,3 @@ bool m3dc1_file::extent(const int t, double* r0, double* r1,
   ts->mesh->extent(r0, r1, phi0, phi1, z0, z1); 
   return true;
 }
-

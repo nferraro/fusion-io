@@ -100,7 +100,14 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
   case(FIO_VISCOSITY):         *s = "viscosity";        break;
-  case(FIO_SCALAR_FIELD):      *s = "other scalar field"; break;
+  case(FIO_JBS):               *s = "JpdotB";           break;
+  case(FIO_JBS_dndpsi):        *s = "JpdotB_dndpsi";    break;
+  case(FIO_JBS_dtedpsi):       *s = "JpdotB_dtedpsi";   break;
+  case(FIO_JBS_dtidpsi):       *s = "JpdotB_dtidpsi";   break;
+  case(FIO_JBS_L31):           *s = "JpdotB_L31";       break;
+  case(FIO_JBS_L32):           *s = "JpdotB_L32";       break;
+  case(FIO_JBS_L34):           *s = "JpdotB_L34";       break;
+  case(FIO_JBS_alpha):         *s = "JpdotB_alpha";     break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;
