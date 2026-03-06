@@ -1293,7 +1293,7 @@ int main(int argc, char* argv[])
 
               if (ibootstrap == 3) {
                   outfile << " " << ftrap_vec[i] << " " 
-                          << coll.qR[i] << " " 
+                          << abs(coll.qR[i]) << " " 
                           << coll.epsilon[i] << " " 
                           << (te_max / 1000.0);
               }
