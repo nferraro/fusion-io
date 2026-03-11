@@ -30,4 +30,8 @@ int fio_get_field_name(field_type, std::string*);
 int fio_get_option_name(const int, std::string*);
 int fio_open_source(fio_source** src, const int type, const char* filename);
 
+#ifdef PCMS_ENABLED
+int fio_open_source(fio_source** src, const int type, const char* filename, PCMS_Library& lib);
+#endif
+
 #endif

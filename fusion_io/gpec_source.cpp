@@ -122,6 +122,10 @@ int gpec_source::read_field_data(const char* filename, gpec_field_data* d)
 
   file.close();
 
+  #ifdef PCMS_ENABLED
+  add_pcms_data(filename, d);
+  #endif
+
   return 0;
 }
 
@@ -288,3 +292,13 @@ int gpec_source::gpec_field_data::interpolate(const double r0, const double z0,
 
   return FIO_SUCCESS;
 }
+
+#ifdef PCMS_ENABLED
+void gpec_source::add_pcms_data(std::string name, gpec_field_data* data) {
+  if (lib == nullptr) return;
+  lib->app->AddField(name+"_r", FusionIOFieldAdapter(data->r, data->nr));
+  lib->app->AddField(name+"_z", FusionIOFieldAdapter(data->z, data->nz));
+  lib->app->AddField(name+"_v_real", FusionIOFieldAdapter(data->v_real, data->n_comp, data->nr, data->nz));
+  lib->app->AddField(name+"_v_imag", FusionIOFieldAdapter(data->v_imag, data->n_comp, data->nr, data->nz));
+}
+#endif //PCMS_ENABLED
