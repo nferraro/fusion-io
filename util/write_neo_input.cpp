@@ -1137,7 +1137,7 @@ int main(int argc, char* argv[])
       for (int i = 0; i < nr; i++) {
           psi_norm_new[i] = te[i];
       }
-  } else if (ibootstrap == 3) {
+  } else if (ibootstrap == 3 || ibootstrap == 0) {
       // Mode 3: x is (temax - Te)/temax
       for (int i = 0; i < nr; i++) {
           psi_norm_new[i] = (te_max - te[i]) / te_max;
@@ -1158,7 +1158,7 @@ int main(int argc, char* argv[])
           else
               dtebydpsit[i] = (te[i+1] - te[i-1]) / (psi_t[i+1] - psi_t[i-1]) / tnorm;
       } 
-      else if (ibootstrap == 3) {
+      else if (ibootstrap == 3 || ibootstrap == 0) {
           // Find d(psi_norm)/d(psi_t)
           if (i == 0)
               dtebydpsit[i] = (psi_norm_new[i+1] - psi_norm_new[i]) / (psi_t[i+1] - psi_t[i]);
@@ -1256,9 +1256,9 @@ int main(int argc, char* argv[])
   std::string fname;
   if (ibootstrap == 1) fname = "ProfileJBSCoeff_Te_L31_32_34_alpha_B2_dtedpsit_G";
   else if (ibootstrap == 2) fname = "ProfileJBSCoeff_Psi_L31_32_34_alpha_B2_dtedpsit_G";
-  else if (ibootstrap == 3) fname = "ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax";
+  else if (ibootstrap == 3 || ibootstrap == 0) fname = "ProfileJBSCoeff_Tenorm_L31_32_34_alpha_B2_dtedpsit_G_ft_qR_e_temax";
 
-  if (ibootstrap >= 1 && ibootstrap <= 3) {
+  if (ibootstrap >= 0 && ibootstrap <= 3) {
       std::ofstream outfile(fname);
       if (outfile.is_open()) {
           // Headers
@@ -1270,7 +1270,7 @@ int main(int argc, char* argv[])
               outfile << std::setw(9) << "Psi" << " " << std::setw(9) << "L31" << " " << std::setw(9) << "L32" << " "
                       << std::setw(9) << "L34" << " " << std::setw(9) << "alpha" << " " << std::setw(9) << "1/<B^2>" << " "
                       << std::setw(14) << "dtebydpsit*2*pi" << " " << std::setw(12) << "Gbar/(i-N)" << "\n";
-          } else if (ibootstrap == 3) {
+          } else if (ibootstrap == 3 || ibootstrap == 0) {
               outfile << std::setw(9) << "Psi" << " " << std::setw(9) << "L31" << " " << std::setw(9) << "L32" << " "
                       << std::setw(9) << "L34" << " " << std::setw(9) << "alpha" << " " << std::setw(9) << "1/<B^2>" << " "
                       << std::setw(37) << "dtnormdpsit*2*pi (multiply by -temax)" << " " << std::setw(12) << "Gbar/(i-N)" << " "
@@ -1291,7 +1291,7 @@ int main(int argc, char* argv[])
                       << (dtebydpsit[i] * 2.0 * M_PI) << " " 
                       << landreman.Gbar_by_iminusN[i];
 
-              if (ibootstrap == 3) {
+              if (ibootstrap == 3 || ibootstrap == 0) {
                   outfile << " " << ftrap_vec[i] << " " 
                           << abs(coll.qR[i]) << " " 
                           << coll.epsilon[i] << " " 
