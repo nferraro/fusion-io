@@ -45,6 +45,14 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
   return FIO_SUCCESS;
 }
 
+int fio_open_source(fio_source** src, const int type, const char* filename, PCMS_Library& lib)
+{
+  int result = fio_open_source(src, type, filename);
+  (*src)->lib = &lib;
+  (*src)->add_pcms_fields();
+  return result;
+}
+
 int fio_close_source(fio_source** source)
 {
   if(*source) {

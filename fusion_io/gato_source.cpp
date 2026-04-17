@@ -327,3 +327,18 @@ int gato_source::set_element_bounds()
 
   return FIO_SUCCESS;
 }
+
+#ifdef PCMS_ENABLED
+void gato_source::add_pcms_fields() {
+  lib->app->AddField("psival", FusionIOFieldAdapter(psival, jpsi+1));
+  lib->app->AddField("pressure", FusionIOFieldAdapter(pressure, jpsi+1));
+  lib->app->AddField("ftor", FusionIOFieldAdapter(ftor, jpsi+1));
+  lib->app->AddField("pprime", FusionIOFieldAdapter(pprime, jpsi+1));
+  lib->app->AddField("ffprime", FusionIOFieldAdapter(ffprime, jpsi+1));
+  lib->app->AddField("rcc", FusionIOFieldAdapter(rcc, jpsi*itht));
+  lib->app->AddField("zcc", FusionIOFieldAdapter(zcc, jpsi*itht));
+  lib->app->AddField("psimesh", FusionIOFieldAdapter(psimesh, jpsi*itht));
+  lib->app->AddField("dpsidr", FusionIOFieldAdapter(dpsidr, jpsi*itht));
+  lib->app->AddField("dpsidz", FusionIOFieldAdapter(dpsidz, jpsi*itht));
+}
+#endif //PCMS_ENABLED

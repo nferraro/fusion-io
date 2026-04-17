@@ -39,6 +39,10 @@ class geqdsk_source : public fio_source {
 
   int interpolate_psi(const double r0, const double z0, 
 		      double* psi) const;
+  
+#ifdef PCMS_ENABLED
+  void add_pcms_fields();
+#endif //PCMS_ENABLED
 };
 
 #endif

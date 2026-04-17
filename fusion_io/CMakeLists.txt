@@ -23,6 +23,7 @@ set(FUSIONIO_HEADERS
         mars_field.h
         mars_source.h
         options.h
+        pcms_lib.h
 )
 
 add_library(fusionio_fusionio
@@ -58,6 +59,12 @@ target_include_directories(fusionio_fusionio PUBLIC
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_fusionio,Fortran_MODULE_DIRECTORY>>
 )
 target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
+
+if(pcms_FOUND)
+        target_compile_definitions(fusionio_fusionio PUBLIC PCMS_ENABLED=TRUE)
+        target_link_libraries(fusionio_fusionio PUBLIC pcms::core)
+endif()
+
 target_compile_definitions(fusionio_fusionio PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::fusionio ALIAS fusionio_fusionio)
