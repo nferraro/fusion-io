@@ -12,6 +12,13 @@ option(FUSIONIO_ENABLE_PYTHON "Enable Python" ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(FUSIONIO_ENABLE_NIMROD "Enable NIMROD" OFF)
+if (FUSIONIO_ENABLE_NIMROD)
+    find_library(NIMEVAL_LIBRARY nimeval REQUIRED)
+    find_library(NIMLIB_LIBRARY nimlib)
+    find_package(FFTW3 CONFIG REQUIRED)
+endif()
+
 if (CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
     set(CMAKE_Fortran_FLAGS "-s real64")
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")

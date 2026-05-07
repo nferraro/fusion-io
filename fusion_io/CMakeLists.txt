@@ -22,6 +22,8 @@ set(FUSIONIO_HEADERS
         m3dc1_source.h
         mars_field.h
         mars_source.h
+        nimrod_field.h
+        nimrod_source.h
         options.h
 )
 
@@ -47,6 +49,8 @@ add_library(fusionio_fusionio
         fusion_io.cpp
         c_interface.cpp
         fusion_io_fortran.F90
+        nimrod_source.cpp
+        nimrod_field.cpp
         )
 
 set_target_properties(fusionio_fusionio PROPERTIES 
@@ -58,6 +62,11 @@ target_include_directories(fusionio_fusionio PUBLIC
         $<BUILD_INTERFACE:$<TARGET_PROPERTY:fusionio_fusionio,Fortran_MODULE_DIRECTORY>>
 )
 target_link_libraries(fusionio_fusionio PUBLIC fusionio_m3dc1)
+
+if (FUSIONIO_ENABLE_NIMROD)
+    target_compile_definitions(fusionio_fusionio PUBLIC FUSIONIO_ENABLE_NIMROD)
+    target_link_libraries(fusionio_fusionio PUBLIC ${NIMEVAL_LIBRARY} ${NIMLIB_LIBRARY} ${FFTW3_LIBRARIES})
+endif()
 target_compile_definitions(fusionio_fusionio PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>: FORTRAN>)
 add_library(fusionio::fusionio ALIAS fusionio_fusionio)
