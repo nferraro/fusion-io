@@ -32,6 +32,13 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
     ierr = (*src)->open(filename);
     break;
 
+#ifdef FUSIONIO_ENABLE_NIMROD
+  case(FIO_NIMROD_SOURCE):
+    *src = new nimrod_source();
+    ierr = (*src)->open(filename);
+    break;
+#endif
+
   default:
     std::cerr << "Source type " << type << " unsupported." << std::endl;
     return FIO_UNSUPPORTED;

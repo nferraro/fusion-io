@@ -122,8 +122,13 @@ class sim_data:
         """
         if filetype == 'm3dc1':
             ifiletype = fio_py.FIO_M3DC1_SOURCE
+        elif filetype == 'nimrod':
+            if getattr(fio_py, 'FIO_HAS_NIMROD', 0):
+                ifiletype = fio_py.FIO_NIMROD_SOURCE
+            else:
+                raise ValueError("fusion-io was not compiled with NIMROD support.")
         else:
-            print('Sorry, cannot do that Dave. Only supports M3DC1 for now. \n'
+            print('Sorry, cannot do that Dave. Only supports M3DC1 and NIMROD for now. \n'
                 'Please feel free to add to my functionality and add to the sim_data library!')
 
         # Dictionary contains the field abbreviation, the type of field, and the species
