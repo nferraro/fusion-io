@@ -32,6 +32,13 @@ int fio_open_source(fio_source** src, const int type, const char* filename)
     ierr = (*src)->open(filename);
     break;
 
+#ifdef FUSIONIO_ENABLE_NIMROD
+  case(FIO_NIMROD_SOURCE):
+    *src = new nimrod_source();
+    ierr = (*src)->open(filename);
+    break;
+#endif
+
   default:
     std::cerr << "Source type " << type << " unsupported." << std::endl;
     return FIO_UNSUPPORTED;
@@ -100,7 +107,14 @@ int fio_get_field_name(const field_type f, std::string* s)
   case(FIO_VECTOR_POTENTIAL):  *s = "vector potential"; break;
   case(FIO_VELOCITY):          *s = "velocity";         break; 
   case(FIO_VISCOSITY):         *s = "viscosity";        break;
-  case(FIO_SCALAR_FIELD):      *s = "other scalar field"; break;
+  case(FIO_JBS):               *s = "JpdotB";           break;
+  case(FIO_JBS_dndpsi):        *s = "JpdotB_dndpsi";    break;
+  case(FIO_JBS_dtedpsi):       *s = "JpdotB_dtedpsi";   break;
+  case(FIO_JBS_dtidpsi):       *s = "JpdotB_dtidpsi";   break;
+  case(FIO_JBS_L31):           *s = "JpdotB_L31";       break;
+  case(FIO_JBS_L32):           *s = "JpdotB_L32";       break;
+  case(FIO_JBS_L34):           *s = "JpdotB_L34";       break;
+  case(FIO_JBS_alpha):         *s = "JpdotB_alpha";     break;
   default:
     *s = "Unnamed field";
     return FIO_UNSUPPORTED;

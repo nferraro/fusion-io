@@ -1365,3 +1365,258 @@ int fio_eval_on_surface(fio_field* f, const int n, double** x, double** a,
 
   return FIO_SUCCESS;
 }
+
+// -----------------------------------------------------------
+// NEW: Hybrid Solver (Newton + Bisection)
+// -----------------------------------------------------------
+int fio_find_rho_hybrid(fio_field* f, const double target_val, 
+                        double& rho, const double ct, const double st, 
+                        const double phi, const double* axis, 
+                        const double tol, fio_hint h) 
+{
+    double x[3], grad[3], val;
+    int max_itr=10;
+    int max_itr_bi= 40; 
+
+    // Safety: prevent negative or zero radius start
+    if (rho < 1e-4) rho = 0.01;
+
+    // A. Newton Method 
+    for(int i=0; i<max_itr; i++) {
+        x[0] = axis[0] + rho * ct; 
+        x[1] = phi;
+        x[2] = axis[2] + rho * st; 
+
+        if(f->eval(x, &val, h) != FIO_SUCCESS) {
+            rho *= 0.5; // Retreat if out of bounds
+            if (rho < 1e-5) return FIO_OUT_OF_BOUNDS;
+            continue;
+        }
+
+        double error = val - target_val;
+        if(fabs(error) < tol) return FIO_SUCCESS;
+        
+        if(f->eval_deriv(x, grad, h) != FIO_SUCCESS) break;// Switch to bisection
+
+        //Simplified directional derivative using pre-calc trig
+        double df_dr = grad[0] * ct + grad[2] * st;
+        
+        // If gradient is too flat, Switch to bisection.
+        if(fabs(df_dr) < 1e-12) break; 
+
+        double step = error / df_dr;
+        
+        // Step Damping (Safety Brake)
+        double max_step = 0.2 * rho; 
+        if(fabs(step) > max_step) {
+            step = (step > 0) ? max_step : -max_step;
+        }
+
+        rho -= step;
+
+        if(fabs(step) < 1e-8) return FIO_SUCCESS;
+
+        if(rho < 1e-5) { rho = 1e-4; break; }
+    }
+
+    // B. Bisection
+    double r_low = rho * 0.5; // Start with a wider initial bracket
+    double r_high = rho * 1.2;
+    double v_low, v_high;
+
+    int hunt_iter = 0;
+    bool found_bracket = false;
+
+
+    // While both values are on the SAME side of target_val...
+    while (hunt_iter < 40) {
+        
+        x[0] = axis[0] + r_low * ct;
+        x[2] = axis[2] + r_low * st;
+        int res_l = f->eval(x, &v_low, h);
+        
+        x[0] = axis[0] + r_high * ct; 
+        x[2] = axis[2] + r_high * st;
+        int res_h = f->eval(x, &v_high, h);
+
+        if (res_h != FIO_SUCCESS) {
+            r_high *= 0.95;
+            hunt_iter++;
+            continue;
+        }
+        
+        if ((v_low - target_val) * (v_high - target_val) <= 0.0) {
+            found_bracket = true;
+            break;
+        }
+
+        if (v_high > target_val) {
+            r_high *= 1.05; // Move further out
+        } else {
+            r_low *= 0.9;   // Move further in
+        }
+        
+        hunt_iter++;
+    }
+
+    if (!found_bracket) return FIO_DIVERGED;
+
+    for(int i=0; i < max_itr_bi; i++) {
+        double r_mid = 0.5 * (r_low + r_high);
+        x[0] = axis[0] + r_mid * ct;
+        //x[1] = phi;
+        x[2] = axis[2] + r_mid * st;
+
+        if(f->eval(x, &val, h) == FIO_OUT_OF_BOUNDS) {
+            r_high = r_mid;
+            continue;
+        }
+
+        if( (r_high - r_low) < 1e-8 ) {
+            rho = r_mid;
+            return FIO_SUCCESS;
+        }
+        // If (val - target) has same sign as (v_low - target), replace low.
+        // Otherwise replace high.
+        if ( (val - target_val) * (v_low - target_val) > 0.0 ) {
+            r_low = r_mid;
+            v_low = val;
+        } else {
+            r_high = r_mid;
+            v_high = val;
+        }
+    }
+
+    // Best effort return
+    rho = 0.5 * (r_low + r_high);
+
+    if ((r_high - r_low) > 1e-4) {
+        return FIO_DIVERGED;
+    }
+
+    return FIO_SUCCESS;
+}
+
+
+int fio_gridded_isosurface_hybrid(fio_field* f, const double val, const double* guess,
+          double** axis, const double dl_tor, const double dl_pol,
+          const double tol, const double max_step,
+          const int nphi, const int ntheta, 
+          double* phi, double* theta,
+          double** path, const char* label, fio_hint h=0)
+{
+  
+  int result;
+  std::ofstream file;
+  std::string filename;
+
+  if(label) {
+    filename = "surface_" + std::string(label) + ".dat";
+    file.open(filename, std::ofstream::out|std::ofstream::trunc);
+  }
+
+  double t[3]; 
+  double a[3]; 
+  double current_rho; 
+  t[0] = 0.; t[1] = 1.; t[2] = 0.; 
+  
+  // Pre-calculating all angles 
+  std::vector<double> cos_t(ntheta), sin_t(ntheta);
+  for(int j=0; j<ntheta; j++) {
+      double tv = 2. * M_PI * j / ntheta;
+      cos_t[j] = cos(tv);
+      sin_t[j] = sin(tv);
+      theta[j] = tv; 
+  }
+
+  a[0] = axis[0][0];
+  a[1] = axis[1][0];
+  a[2] = axis[2][0];
+
+  double prev_axis[3] = {a[0], a[1], a[2]};
+  int axis_update_freq = 1; //updates axis every Nphi/freq toroidal steps to save compuational time
+
+  double dx = guess[0] - a[0];
+  double dz = guess[2] - a[2];
+  current_rho = sqrt(dx*dx + dz*dz);
+  if(current_rho < 1e-4) current_rho = 0.05; 
+  std::vector<double> rho_grid(ntheta, current_rho);
+  
+  double rho_start = current_rho;
+  for(int i=0; i<nphi; i++) {
+    
+    
+    phi[i] = 2.*M_PI*i/nphi;
+    a[1] = phi[i]; 
+    
+    
+    if(i % axis_update_freq == 0) {
+        double te_max;
+        a[0] = prev_axis[0]; a[2] = prev_axis[2];
+
+        result = fio_find_max(f, &te_max, a, tol, max_step, 2, t, h);
+        
+        if(result == FIO_SUCCESS) {
+            prev_axis[0] = a[0]; 
+            prev_axis[2] = a[2];
+        } else {
+            if(i > 0) {
+              prev_axis[0] = axis[0][i-1]; 
+              prev_axis[2] = axis[2][i-1];
+            }
+        }
+    } 
+    a[0] = prev_axis[0]; 
+    a[2] = prev_axis[2];
+        
+    
+    axis[0][i] = a[0];
+    axis[1][i] = phi[i];
+    axis[2][i] = a[2];
+
+    for(int j=0; j<ntheta; j++) {
+      // Use the radius from this same angle in the previous plane
+      double current_rho = rho_grid[j];
+      if (j > 0) {
+          // Average the toroidal guess with the previous theta result
+          current_rho = 0.5 * (current_rho + rho_grid[j-1]);
+      }
+
+      int search_status = fio_find_rho_hybrid(f, val, current_rho, cos_t[j], sin_t[j], phi[i], a, tol, h);
+
+      
+      
+      if (search_status != FIO_SUCCESS) {
+          std::cerr << "SURFACE FAIL: Phi_idx=" << i 
+                    << " Theta_idx=" << j 
+                    << " Angle=" << theta[j] 
+                    << " LastRho=" << current_rho 
+                    << " Target=" << val 
+                    << " Axis=(" << a[0] << "," << a[2] << ")"
+                    << std::endl;
+                    
+          // fallback to neighbors to prevent graph spikes
+          if(j > 0) current_rho = rho_grid[j-1];
+      }
+
+      rho_grid[j] = current_rho;
+
+      int idx = i*ntheta + j;
+      path[0][idx] = a[0] + current_rho * cos_t[j]; 
+      path[1][idx] = phi[i];                               
+      path[2][idx] = a[2] + current_rho * sin_t[j]; 
+      if(label) {
+              file << std::setprecision(10) << std::setw(16) << path[1][idx] 
+                    << std::setprecision(10) << std::setw(16) << path[0][idx] 
+                    << std::setprecision(10) << std::setw(16) << path[2][idx] 
+                    << std::endl;
+          }
+    }
+    
+    if(label) file << std::endl; 
+  }
+
+  if(label) file.close();
+
+  return FIO_SUCCESS;
+}

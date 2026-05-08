@@ -18,6 +18,10 @@
 #include "mars_field.h"
 #include "gpec_source.h"
 #include "gpec_field.h"
+#ifdef FUSIONIO_ENABLE_NIMROD
+#include "nimrod_source.h"
+#include "nimrod_field.h"
+#endif
 #include "fusion_io_c.h"
 #include "interpolate.h"
 #include "isosurface.h"

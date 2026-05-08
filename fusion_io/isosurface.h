@@ -49,4 +49,15 @@ int fio_surface_average(fio_field* f, int ns, int nphi, int ntheta,
 int fio_isosurface_jacobian(int ns, int nphi, int ntheta,
 			    double** x, double* jac);
 
+int fio_find_rho_hybrid(fio_field* f, const double target_val, 
+                        double& rho, const double ct, const double st, 
+                        const double phi, const double* axis, 
+                        const double tol, fio_hint h=0); 
+						
+int fio_gridded_isosurface_hybrid(fio_field* f, const double val, const double* guess,
+			   double** axis, const double dl_tor, const double dl_pol,
+			   const double tol, const double max_step,
+			   const int nphi, const int ntheta,
+			   double* phi, double* theta,
+			   double** path, const char* label, fio_hint h=0);										
 #endif

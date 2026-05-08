@@ -234,7 +234,11 @@ int main(int argc, char* argv[])
       tracer.set_pos(rr[k],Phi,zz[k]);
 
       // perform integration
-      result = tracer.integrate(transits, steps_per_transit, &data);
+      if (tracer.use_adaptive) {
+        result = tracer.integrate_adaptive(transits, steps_per_transit, &data);
+      } else {
+        result = tracer.integrate(transits, steps_per_transit, &data);
+      }
       if(!result) {
 	double RR, PP, ZZ;
 	tracer.get_pos(&RR, &PP, &ZZ);
@@ -368,13 +372,13 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 21;
+  const int num_opts = 22;
   std::string arg_list[num_opts] = 
     { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0","-R0","-Z0",
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
-      "-reverse", "-tavg" };
+      "-reverse", "-tavg", "-adaptive" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -636,6 +640,8 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
   } else if(opt=="-t") {
     if(argc==1) transits = atoi(argv[0].c_str());
     else argc_err = true;
+  } else if(opt=="-adaptive") {
+    tracer.use_adaptive = true;
   } else if(opt=="-tavg") {
     if(argc==1) tpts = atoi(argv[0].c_str());
     else argc_err = true;
@@ -682,7 +688,7 @@ void print_help()
     << "Usage:\n"
     << "\ttrace <sources> -dR <dR> -dZ <dZ> -dR0 <dR0> -dZ0 <dZ0> /\n"
     << "\t   -p <pts> -t <trans> -s <steps> -a <angle> -phi0 <phi0> \n"
-    << "\t   -pplot <pplot> -qplot <qplot> -n <nplanes> -tavg <tavg> \n\n"
+    << "\t   -pplot <pplot> -qplot <qplot> -n <nplanes> -tavg <tavg> -adaptive\n\n"
     << " <angle>   The toroidal angle of the plane in degrees (default = 0)\n"
     << " <dR>      R-spacing of seed points (default = major radius/(2*pts))\n"
     << " <dR0>     R-distance of first seed point from axis (default = dR)\n"
@@ -696,6 +702,7 @@ void print_help()
     << " <trans>   Toroidal transits per seed point (default = 100)\n"
     << " <tavg>    Number of toroidal planes for toroidal averaging (default = 1)\n"
     << " <nplanes> Number of toroidal planes for output (default = 1)\n"
+    << " -adaptive uses the RK(54) method with an adaptive step size instead of the default RK4 (default = 1)\n"
     << " <sources> May be one or more of the following:\n"
     << "\n  -m3dc1 <c1_file> <ts> <factor> <shift>\n"
     << "   * Loads field information from M3D-C1 data file\n"
