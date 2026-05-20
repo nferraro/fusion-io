@@ -60,10 +60,14 @@ int nimrod_source::get_field(const field_type t, fio_field** f, const fio_option
 
   int eq;
   switch(part) {
-    case FIO_TOTAL:            eq = 2; break;
-    case FIO_PERTURBED_ONLY:   eq = 0; break;
-    case FIO_EQUILIBRIUM_ONLY: eq = 1; break;
-    default:                   eq = 2; break;
+    case FIO_TOTAL:             eq = 2; break;
+    case FIO_PERTURBED_ONLY:    eq = 0; break;
+    case FIO_EQUILIBRIUM_ONLY:  eq = 1; break;
+    case FIO_AXISYMMETRIC_ONLY: eq = 3; break;
+    default:
+      std::cerr << "Error: Unsupported NIMROD FIO_PART." << std::endl;
+      return FIO_UNSUPPORTED;
+      break;
   }
 
   switch(t) {
@@ -91,6 +95,7 @@ int nimrod_source::get_field(const field_type t, fio_field** f, const fio_option
         *f = new nimrod_field("ti", 1, eq);
       break;
     default:
+      std::cerr << "Error: Unsupported NIMROD field." << std::endl;
       return FIO_UNSUPPORTED;
   }
 
