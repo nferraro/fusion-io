@@ -252,7 +252,7 @@ PyObject* fio_eval_scalar_field_deriv_py(PyObject* self, PyObject *args)
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
   if(ierr != FIO_SUCCESS)
     /* return the buildvalue of an empty string translates to python's None!*/
-    return Py_BuildValue("(2)", Py_None);
+    return Py_BuildValue("(OOO)", Py_None, Py_None, Py_None);
     /*return NULL; */
 
   hint_py = PyLong_FromVoidPtr(hint);
@@ -294,7 +294,7 @@ PyObject* fio_eval_vector_field_py(PyObject* self, PyObject *args)
   int ierr = fio_eval_field(ifield, x, v, hint);
   if(ierr != FIO_SUCCESS)
     /* return a 3-tuple of nulls if it couldn't read*/
-    return Py_BuildValue("(2)", Py_None);
+    return Py_BuildValue("(OOO)", Py_None, Py_None, Py_None);
 
   hint_py = PyLong_FromVoidPtr(hint);
 
@@ -317,7 +317,7 @@ PyObject* fio_eval_vector_field_deriv_py(PyObject* self, PyObject *args)
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
   if(ierr != FIO_SUCCESS)
     /* return a 9-tuple of nulls if it couldn't read*/
-    return Py_BuildValue("(8)", Py_None);
+    return Py_BuildValue("(OOOOOOOOO)", Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None);
 
   hint_py = PyLong_FromVoidPtr(hint);
 
@@ -340,7 +340,7 @@ PyObject* fio_eval_tensor_field_py(PyObject* self, PyObject *args)
   int ierr = fio_eval_field(ifield, x, v, hint);
   if(ierr != FIO_SUCCESS)
     /* return a 9-tuple of nulls if it couldn't read*/
-    return Py_BuildValue("(8)", Py_None);
+    return Py_BuildValue("(OOOOOOOOO)", Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None);
 
   hint_py = PyLong_FromVoidPtr(hint);
 
