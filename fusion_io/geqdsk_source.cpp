@@ -15,7 +15,7 @@ static double pow(double x, int p)
 
 
 geqdsk_source::geqdsk_source()
-  : psi(0), psirz(0), fpol(0), ffprime(0), press(0)
+  : psi(0), psirz(0), fpol(0), ffprime(0), press(0), nlim(0), xlim(0), ylim(0)
 {
 }
 
@@ -69,8 +69,7 @@ int geqdsk_source::open(const char* filename)
   for(int i=0; i<nh; i++)
     for(int j=0; j<nw; j++)
       gfile >> std::setw(16) >> psirz[i][j];
-
-  gfile.close();
+  for(int i=0; i<nw; i++) gfile >> std::setw(16) >> dum;      // qpsi
 
   // calculate spacing of grid points
   dx = rdim/(double)(nw - 1);
@@ -80,6 +79,33 @@ int geqdsk_source::open(const char* filename)
   psi = new double[nw];
   for(int i=0; i<nw; i++) 
     psi[i] = (sibry - simag)*(double)i/(double)(nw - 1) + simag;
+
+  // Read boundary and limiters, if present
+  int nbdry;
+  if(!(gfile >> std::setw(16) >> nbdry)) {
+    gfile.close();
+    return FIO_SUCCESS;
+  }
+  if(!(gfile >> std::setw(16) >> nlim)) {
+    gfile.close();
+    return FIO_SUCCESS;
+  }
+  std::cout << "nlim = " << nlim << std::endl;
+
+  for(int i=0; i<nbdry; i++) {
+    double dumr, dumz;
+    gfile >> std::setw(16) >> dumr >> dumz;
+  }
+
+  if(nlim > 0) {
+    xlim = new double[nlim];
+    ylim = new double[nlim];
+    for(int i=0; i<nlim; i++) {
+      gfile >> std::setw(16) >> xlim[i] >> ylim[i];
+    }
+  }
+
+  gfile.close();
 
   return FIO_SUCCESS;
 }
@@ -95,12 +121,17 @@ int geqdsk_source::close()
   if(ffprime) delete[] ffprime;
   if(press) delete[] press;
   if(psi) delete[] psi;
+  if(xlim) delete[] xlim;
+  if(ylim) delete[] ylim;
 
   psirz = 0;
   fpol = 0;
   ffprime = 0;
   press = 0;
   psi = 0;
+  xlim = 0;
+  ylim = 0;
+  nlim = 0;
 
   return FIO_SUCCESS;
 }
@@ -174,6 +205,17 @@ int geqdsk_source::get_field(const field_type t,fio_field** f,
   return FIO_SUCCESS;
 }
 
+int geqdsk_source::get_int_parameter(const int t, int* p) const
+{
+  switch(t) {
+  case(FIO_GEQDSK_NLIM):
+    *p = nlim;
+    return FIO_SUCCESS;
+  default:
+    return FIO_UNSUPPORTED;
+  }
+}
+
 int geqdsk_source::get_series(const series_type t,fio_series** s)
 {
   switch(t) {
@@ -191,6 +233,14 @@ int geqdsk_source::get_series(const series_type t,fio_series** s)
 
   case(FIO_MAGAXIS_Z):
     *s = new fio_scalar_series(zmaxis);
+    break;
+
+  case(FIO_GEQDSK_XLIM):
+    *s = new fio_array_series(nlim, xlim);
+    break;
+
+  case(FIO_GEQDSK_YLIM):
+    *s = new fio_array_series(nlim, ylim);
     break;
 
   default:
