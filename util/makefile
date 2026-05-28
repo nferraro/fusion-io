@@ -40,7 +40,7 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io -I$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) \
     $(NETCDF_C_INCLUDE) \
     $(INCLUDE)
 
-all : write_neo_input write_lp_input
+all : write_neo_input write_lp_input write_neo_input_3D_Eulerian
 
 # Added $(LDFLAGS) to ensure -fopenmp is used during the linking stage
 write_neo_input : write_neo_input.o
@@ -49,11 +49,16 @@ write_neo_input : write_neo_input.o
 write_lp_input : write_lp_input.o
 	$(F90) $(LDFLAGS) -o $@ $< $(FLIBS) $(F90FLAGS)
 
-install : write_neo_input write_lp_input
+write_neo_input_3D_Eulerian : write_neo_input_3D_Eulerian.o
+	$(CXX) $(LDFLAGS) -o $@ $< $(CLIBS) $(CFLAGS)
+
+
+install : write_neo_input write_lp_input write_neo_input_3D_Eulerian
 	mkdir -p $(FIO_INSTALL_DIR)/bin
 	cp write_neo_input $(FIO_INSTALL_DIR)/bin/
 	cp write_lp_input $(FIO_INSTALL_DIR)/bin/
-
+	cp write_neo_input_3D_Eulerian $(FIO_INSTALL_DIR)/bin/
+    
 include $(FIO_ROOT)/install/common_footer.mk
 
 endif
