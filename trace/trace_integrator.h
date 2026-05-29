@@ -101,7 +101,6 @@ class trace_integrator {
   bool step_rk54(double& h, double tol);
   void save_puncture(double pl, double R_p, double Z_p, double Z0, double R0, double lyap = NAN);
   bool integrate_adaptive(int transits, int steps_per_transit, integrator_data* data=0);
-  bool integrate_lyapunov(int transits, int steps_per_transit, double& megno_val);
 
 
   void plot_point();

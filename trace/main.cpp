@@ -35,7 +35,6 @@ int nplanes = 1;
 
 bool R0_set = false;
 bool Z0_set = false;
-bool calc_lyap = false;
 
 void print_help();
 void print_parameters();
@@ -240,10 +239,7 @@ int main(int argc, char* argv[])
       tracer.set_pos(rr[k],Phi,zz[k]);
 
       // perform integration
-      if (calc_lyap) {
-        double final_lyap = 0.0;
-        result = tracer.integrate_lyapunov(transits, steps_per_transit, final_lyap);
-      } else if (tracer.use_adaptive) {
+      if (tracer.use_adaptive) {
         result = tracer.integrate_adaptive(transits, steps_per_transit, &data);
       } else {
         result = tracer.integrate(transits, steps_per_transit, &data);
@@ -382,13 +378,13 @@ void delete_sources()
 bool process_command_line(int argc, char* argv[])
 {
   const int max_args = 4;
-  const int num_opts = 23;
+  const int num_opts = 22;
   std::string arg_list[num_opts] = 
     { "-gpec", "-geqdsk", "-m3dc1", "-diiid-i",
       "-dR", "-dZ", "-dR0", "-dZ0","-R0","-Z0",
       "-ds", "-p", "-t", "-s", "-a",
       "-pout", "-qout", "-phi0", "-n", 
-      "-reverse", "-tavg", "-adaptive", "-lyap" };
+      "-reverse", "-tavg", "-adaptive" };
   std::string opt = "";
   std::string arg[max_args];
   int args = 0;
@@ -668,8 +664,6 @@ bool process_line(const std::string& opt, const int argc, const std::string argv
   } else if(opt=="-n") {
     if(argc==1) nplanes = atoi(argv[0].c_str());
     else argc_err = true;
-  } else if(opt=="-lyap") {
-    calc_lyap = true;
   } else if(opt=="-pout") {
     if(argc==1) pout = (atoi(argv[0].c_str()) == 1);
     else argc_err = true;
