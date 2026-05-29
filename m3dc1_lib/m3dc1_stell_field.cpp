@@ -8,6 +8,14 @@ m3dc1_stell_field::m3dc1_stell_field(m3dc1_mesh* mesh_in, m3dc1_coord_map* map_i
   map = map_in;
 }
 
+bool m3dc1_stell_field::extent(double* X0, double* X1,
+			 double* Phi0, double* Phi1,
+			 double* Z0, double* Z1) const
+{
+  return map->extent(X0, X1, Phi0, Phi1, Z0, Z1);
+}
+
+
 bool m3dc1_stell_field::eval(const double R, const double Phi, const double Z, 
 			     const m3dc1_field::m3dc1_get_op op, double* val, 
 			     int* element)

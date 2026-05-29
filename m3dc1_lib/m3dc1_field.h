@@ -58,6 +58,9 @@ class m3dc1_field {
   virtual bool eval(const double r, const double phi, const double z, 
 		    const m3dc1_field::m3dc1_get_op op, double* val, 
 		    int* element=0);
+  virtual bool extent(double* x0, double* x1,
+		      double* phi0, double* phi1,
+		      double* z0, double* z1) const;
 };
 
 class m3dc1_complex_field : public m3dc1_field {

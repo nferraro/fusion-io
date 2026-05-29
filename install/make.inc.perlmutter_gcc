@@ -1,9 +1,9 @@
 CC = cc
 CXX = CC
-CFLAGS = -O3 -fPIC -std=c++11
+CFLAGS = -O3 -fPIC -std=c++17
 
 F90 = mpif90
-F90FLAGS = -O3 -r8 -i4 -fPIC
+F90FLAGS = -O3 -Wall -fdefault-real-8 -fimplicit-none -fPIC
 
 LD = $(CXX) #-qopenmp
 LDFLAGS =

@@ -33,6 +33,10 @@ class m3dc1_coord_map {
 		    double *xi_frac, double *zi_frac, double *eta_frac, int* e) const;
   bool eval_map_deriv(const double x, const double phi, const double z,
 		      double* R, double* Z, int* e) const;
+
+  bool extent(double *X0, double* X1,
+	      double *Phi0, double* Phi1,
+	      double *Z0, double* Z1) const;
 };
 
 #endif

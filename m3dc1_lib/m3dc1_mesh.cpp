@@ -50,13 +50,13 @@ m3dc1_mesh::~m3dc1_mesh()
   clear_memory();
 }
 
-void m3dc1_mesh::extent(double* X0, double* X1,
+bool m3dc1_mesh::extent(double* X0, double* X1,
 			double* Phi0, double* Phi1,
 			double* Z0, double* Z1) const
 {
   if(nelms==0) {
     *X0 = *X1 = *Phi0 = *Phi1 = *Z0 = *Z1 = 0.;
-    return;
+    return false;
   }
 
   double R[3], Z[3];
@@ -84,6 +84,8 @@ void m3dc1_mesh::extent(double* X0, double* X1,
 
   *Phi0 = 0.;
   *Phi1 = period;
+
+  return true;
 }
 
 void m3dc1_mesh::clear_memory()

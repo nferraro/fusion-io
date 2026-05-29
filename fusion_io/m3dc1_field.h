@@ -55,6 +55,7 @@ class m3dc1_scalar_field : public m3dc1_fio_field {
   int dimension() const { return 1; }
   int eval(const double*, double*, fio_hint =0);
   int eval_deriv(const double*, double*, fio_hint =0);
+  virtual int get_bounding_box(double*, double*) const;
 };
 
 // ALPHA
