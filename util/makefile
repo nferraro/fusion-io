@@ -16,14 +16,21 @@ VPATH=$(SRCDIR)
 # include platform-specific options
 include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
-# --- ADDED FOR PARALLELIZATION ---
+# --- ADDED FOR PARALLELIZATION STELLAR ---
 # Appending OpenMP flags to existing CFLAGS and LDFLAGS
-CXX := mpiicpc
+#CXX := mpiicpc
 
-CFLAGS   += -qopenmp -O3
-CXXFLAGS += -qopenmp -O3 -xHost -fp-model fast
-LDFLAGS  += -qopenmp
-F90FLAGS += -qopenmp
+#CFLAGS   += -qopenmp -O3
+#CXXFLAGS += -qopenmp -O3 -xHost -fp-model fast
+#LDFLAGS  += -qopenmp
+#F90FLAGS += -qopenmp
+# --- ADDED FOR PARALLELIZATION PERLMUTTER---
+CXX := CC
+
+CFLAGS   += -fopenmp -O3
+CXXFLAGS += -fopenmp -O3 -ffast-math
+LDFLAGS  += -fopenmp
+F90FLAGS += -fopenmp
 # ---------------------------------
 
 CLIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
