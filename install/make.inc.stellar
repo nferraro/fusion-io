@@ -1,12 +1,12 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -fPIC -std=c++17
+CFLAGS = -O3 -fPIC -std=c++17 -fvisibility=default -frtti
 
 F90 = mpif90
 F90FLAGS = -O3 -r8 -fPIC
 
 LD = $(CC)
-LDFLAGS =
+LDFLAGS = -Wl,--export-dynamic
 
 ARCH = ar cr
 LDD = $(CC) --shared

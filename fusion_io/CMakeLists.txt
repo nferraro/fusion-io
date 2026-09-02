@@ -89,8 +89,99 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/fio_push.mod TYPE INCLUDE)
 
 if (FUSIONIO_ENABLE_PYTHON)
         find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-        add_library(fio_py SHARED python_interface.cpp)
-        target_link_libraries(fio_py PUBLIC fusionio::fusionio Python3::Python)
+
+        # Build fio_py.so by compiling all sources directly into the shared
+        # library rather than linking against static archives.  This ensures
+        # that RTTI typeinfo and vtable symbols (e.g. for m3dc1_numpy_source,
+        # needed by dynamic_cast in python_interface.cpp) are present in
+        # fio_py.so at runtime.
+
+        # Collect sources from fusionio_fusionio.
+        get_target_property(_fusionio_sources fusionio_fusionio SOURCES)
+        get_target_property(_fusionio_src_dir fusionio_fusionio SOURCE_DIR)
+
+        # Collect sources from fusionio_m3dc1 (m3dc1_lib).
+        get_target_property(_m3dc1_sources fusionio_m3dc1 SOURCES)
+        get_target_property(_m3dc1_src_dir fusionio_m3dc1 SOURCE_DIR)
+
+        # Resolve relative source paths to absolute paths.
+        set(_fio_py_sources python_interface.cpp)
+
+        foreach(_src ${_fusionio_sources})
+            if(IS_ABSOLUTE "${_src}")
+                list(APPEND _fio_py_sources "${_src}")
+            else()
+                list(APPEND _fio_py_sources "${_fusionio_src_dir}/${_src}")
+            endif()
+        endforeach()
+
+        foreach(_src ${_m3dc1_sources})
+            if(IS_ABSOLUTE "${_src}")
+                list(APPEND _fio_py_sources "${_src}")
+            else()
+                list(APPEND _fio_py_sources "${_m3dc1_src_dir}/${_src}")
+            endif()
+        endforeach()
+
+        # Remove Fortran sources — they cannot be compiled into a Python .so.
+        list(FILTER _fio_py_sources EXCLUDE REGEX "\\.F90$|\\.f90$|\\.f$|\\.F$")
+
+        # Deduplicate (m3dc1_field.cpp etc. may appear in both lists).
+        list(REMOVE_DUPLICATES _fio_py_sources)
+
+        add_library(fio_py SHARED ${_fio_py_sources})
+
+        # Inherit include directories from both upstream targets.
+        target_include_directories(fio_py PRIVATE
+            $<TARGET_PROPERTY:fusionio_fusionio,INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:fusionio_m3dc1,INCLUDE_DIRECTORIES>
+        )
+
+        # Inherit compile definitions from fusionio_fusionio.
+        target_compile_definitions(fio_py PRIVATE
+            $<TARGET_PROPERTY:fusionio_fusionio,COMPILE_DEFINITIONS>
+        )
+
+        # With Intel oneAPI (icpx), RTTI typeinfo symbols can be hidden even
+        # when sources are compiled directly into the .so.  Force default
+        # symbol visibility, enable RTTI explicitly, export all symbols to the
+        # dynamic symbol table, and link libstdc++ explicitly so that the C++
+        # runtime type_info infrastructure is fully resolved at load time.
+        # These flags are harmless no-ops on GCC/Clang but are required on
+        # Intel oneAPI to avoid "undefined symbol: _ZTI..." errors at import.
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Intel" OR
+           CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+            target_compile_options(fio_py PRIVATE
+                $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=default>
+                $<$<COMPILE_LANGUAGE:CXX>:-frtti>
+            )
+            target_link_options(fio_py PRIVATE
+                -Wl,--export-dynamic
+            )
+            target_link_libraries(fio_py PRIVATE stdc++)
+        endif()
+
+        # Collect the transitive link libraries needed by fusionio_m3dc1
+        # (e.g. HDF5) so fio_py.so can resolve those symbols.  We do NOT
+        # link against fusionio_fusionio or fusionio_m3dc1 themselves because
+        # their sources are compiled directly into fio_py above.
+        get_target_property(_m3dc1_link_libs fusionio_m3dc1 LINK_LIBRARIES)
+
+        # Also collect any extra link libraries from fusionio_fusionio
+        # (e.g. NIMROD libraries) that are not already covered.
+        get_target_property(_fusionio_link_libs fusionio_fusionio LINK_LIBRARIES)
+
+        # Filter out the fusionio targets themselves from the link list to
+        # avoid circular / duplicate symbol issues.
+        set(_fio_py_link_libs)
+        foreach(_lib ${_m3dc1_link_libs} ${_fusionio_link_libs})
+            if(NOT "${_lib}" MATCHES "fusionio_fusionio|fusionio_m3dc1|fusionio::fusionio|fusionio::m3dc1")
+                list(APPEND _fio_py_link_libs "${_lib}")
+            endif()
+        endforeach()
+        list(REMOVE_DUPLICATES _fio_py_link_libs)
+
+        target_link_libraries(fio_py PRIVATE ${_fio_py_link_libs} Python3::Python)
 
         set_target_properties(fio_py PROPERTIES PREFIX "" SUFFIX ".so")
 
