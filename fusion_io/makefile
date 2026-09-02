@@ -34,6 +34,7 @@ OBJS = 	interpolate.o \
 	isosurface.o \
 	m3dc1_source.o \
 	m3dc1_field.o \
+	m3dc1_numpy_source.o \
 	mars_source.o \
 	mars_field.o \
 	geqdsk_source.o \
@@ -51,6 +52,16 @@ PUSH_OBJS = push_interface.o
 
 F90FLAGS := $(F90FLAGS) -DFORTRAN
 
+# PYLIBS: libraries needed to link fio_py.so.
+# libfusionio.a must come first (it contains m3dc1_numpy_source), then
+# libm3dc1.a, then HDF5 and other system libraries.
+# Both static archives are wrapped with --whole-archive so that the linker
+# includes every object file (and therefore all RTTI typeinfo/vtable symbols)
+# rather than only those that resolve undefined references.
+PYLIBS := -L$(SRCDIR)/_$(FIO_ARCH) -lfusionio \
+	-L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
+	$(HDF5_LIBS) $(LIBS)
+
 all : $(LIB)
 
 shared : $(DLIB)
@@ -66,11 +77,12 @@ $(LIB) : $(OBJS)
 $(PUSH_LIB) : $(PUSH_OBJS)
 	$(ARCH) $@ $(PUSH_OBJS)
 
-python : fio_setup.py python_interface.cpp
+python : $(LIB) fio_setup.py python_interface.cpp
 	cp $(SRCDIR)/fpy.py $(SRCDIR)/_$(FIO_ARCH)
-	ARCHFLAGS='$(LIBS)' CXX='$(CXX)' CC='$(CXX)' \
-	CFLAGS='$(CFLAGS) $(INCLUDE) $(LIBS)' \
-	$(PYTHON) $< build $(PYFLAGS)
+	ARCHFLAGS='$(PYLIBS)' CXX='$(CXX)' CC='$(CXX)' \
+	CFLAGS='$(CFLAGS) $(INCLUDE)' \
+	LDFLAGS='$(LDFLAGS)' \
+	$(PYTHON) $(SRCDIR)/fio_setup.py build $(PYFLAGS)
 
 .PHONY: install
 install :
@@ -88,11 +100,12 @@ install :
 	sed -i 's|FIO_INSTALL_DIR|${FIO_INSTALL_DIR}|g' $(FIO_INSTALL_DIR)/modules/fusion-io
 
 .PHONY: conda_install
-conda_install : fio_setup.py python_interface.cpp
+conda_install : $(LIB) fio_setup.py python_interface.cpp
 	cp $(SRCDIR)/fpy.py $(SRCDIR)/_$(FIO_ARCH)
-	ARCHFLAGS='$(LIBS)' CXX='$(CXX)' CC='$(CXX)' \
-	CFLAGS='$(CFLAGS) $(INCLUDE) $(LIBS)' \
-	$(PYTHON) $< install $(PYFLAGS) --user
+	ARCHFLAGS='$(PYLIBS)' CXX='$(CXX)' CC='$(CXX)' \
+	CFLAGS='$(CFLAGS) $(INCLUDE)' \
+	LDFLAGS='$(LDFLAGS)' \
+	$(PYTHON) $(SRCDIR)/fio_setup.py install $(PYFLAGS) --user
 
 include $(FIO_ROOT)/install/common_footer.mk
 
