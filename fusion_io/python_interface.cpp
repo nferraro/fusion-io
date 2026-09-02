@@ -520,16 +520,28 @@ PyObject* fio_open_numpy_source_py(PyObject* self, PyObject* args)
  *                      ion_mass, z_ion, itor, numvar, version,
  *                      n0, L0, B0) -> None
  *
- * n0, L0, B0 are in CGS as stored in the M3D-C1 HDF5 file.
- * All derived normalization constants are computed here, mirroring
- * m3dc1_source::open() exactly.
+ * Total: 13 arguments (handle + 12 parameters).
+ * Format string: "iddiiddiiiddd"
+ *   i  = handle
+ *   d  = bzero
+ *   d  = rzero
+ *   i  = ntime
+ *   i  = ntor
+ *   d  = ion_mass
+ *   d  = z_ion
+ *   i  = itor
+ *   i  = numvar
+ *   i  = version
+ *   d  = n0
+ *   d  = L0
+ *   d  = B0
  */
 PyObject* fio_set_numpy_parameters_py(PyObject* self, PyObject* args)
 {
     int handle, ntime, ntor, itor, numvar, version;
     double bzero, rzero, ion_mass, z_ion, n0, L0, B0;
 
-    if(!PyArg_ParseTuple(args, "iddiiiddiiiddd",
+    if(!PyArg_ParseTuple(args, "iddiiddiiiddd",
                          &handle,
                          &bzero, &rzero,
                          &ntime, &ntor,
@@ -592,10 +604,6 @@ PyObject* fio_set_numpy_parameters_py(PyObject* self, PyObject* args)
  * set_numpy_mesh(handle, nelms,
  *                a, b, c, co, sn, x, z, bound, region,
  *                nplanes, period, toroidal) -> None
- *
- * All float64 arrays are passed as raw bytes objects (use arr.tobytes()).
- * bound and region are int32 arrays passed as raw bytes.
- * co and sn must already be cos/sin of the element angle.
  */
 PyObject* fio_set_numpy_mesh_py(PyObject* self, PyObject* args)
 {
@@ -673,10 +681,6 @@ PyObject* fio_set_numpy_mesh_py(PyObject* self, PyObject* args)
 /*
  * set_numpy_field(handle, timeslice, field_name,
  *                 data_real, data_imag_or_None, ntor) -> None
- *
- * data_real: bytes of float64, length nelms * 20.
- * data_imag: bytes of float64, same length, or None for real fields.
- * ntor:      toroidal mode number (0 if not complex).
  */
 PyObject* fio_set_numpy_field_py(PyObject* self, PyObject* args)
 {
@@ -723,8 +727,6 @@ PyObject* fio_set_numpy_field_py(PyObject* self, PyObject* args)
 
 /*
  * set_numpy_scalar(handle, scalar_name, values_bytes) -> None
- *
- * values_bytes: bytes of float64.
  */
 PyObject* fio_set_numpy_scalar_py(PyObject* self, PyObject* args)
 {
