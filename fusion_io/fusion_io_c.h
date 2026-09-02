@@ -32,4 +32,14 @@ int fio_sizeof_search_hint(const int);
 }
 #endif
 
+/*
+ * C++ only: source handle table access for the numpy-injection path.
+ * Not exposed to C or Fortran callers.
+ */
+#ifdef __cplusplus
+class fio_source;
+int fio_register_source(fio_source* src, int* handle);
+int fio_get_source(int handle, fio_source** src);
+#endif
+
 #endif

@@ -10,7 +10,41 @@ static std::deque<fio_series*> series_list;
 static fio_option_list options;
 static fio_source::fio_field_list fields;
 
-int fio_add_field(const int icfield, const int ifield, 
+/*
+ * fio_register_source
+ * ~~~~~~~~~~~~~~~~~~~
+ * Register an already-constructed fio_source* in the handle table and
+ * return its integer handle. Used by the numpy-injection path so that
+ * sources created entirely in C++ (without going through fio_open_source)
+ * are still accessible via the normal integer-handle API.
+ */
+int fio_register_source(fio_source* src, int* handle)
+{
+  if(!src) return FIO_FILE_ERROR;
+  *handle = (int)source_list.size();
+  source_list.push_back(src);
+  return FIO_SUCCESS;
+}
+
+/*
+ * fio_get_source
+ * ~~~~~~~~~~~~~~
+ * Retrieve the fio_source* for a given integer handle.
+ * Returns FIO_SUCCESS and sets *src on success.
+ * Returns FIO_OUT_OF_BOUNDS if the handle is invalid or the slot is null.
+ */
+int fio_get_source(int handle, fio_source** src)
+{
+  if(handle < 0 || handle >= (int)source_list.size()) {
+    *src = nullptr;
+    return FIO_OUT_OF_BOUNDS;
+  }
+  *src = source_list[handle];
+  if(!(*src)) return FIO_OUT_OF_BOUNDS;
+  return FIO_SUCCESS;
+}
+
+int fio_add_field(const int icfield, const int ifield,
 		const int op, const double fac)
 {
   fio_field* f = field_list[icfield];
@@ -63,15 +97,11 @@ int fio_create_compound_field(int* ifield)
 
 int fio_deallocate_search_hint(const int isrc, void** s)
 {
-  //  std::cerr << "Deallocating hint at " << *s << std::endl;
-
   return source_list[isrc]->deallocate_search_hint(s);
 }
 
 int fio_eval_field(const int ifield, const double* x, double* v, void* s)
 {
-  //  std::cerr << "Referencing hint at " << s << std::endl;
-
   return field_list[ifield]->eval(x, v, s);
 }
 
@@ -158,7 +188,7 @@ int fio_open_source(const int itype, const char* filename, int* handle)
 
   ierr = fio_open_source(&src, itype, filename);
   if(ierr != FIO_SUCCESS) return ierr;
-  
+
   *handle = source_list.size();
   source_list.push_back(src);
   return FIO_SUCCESS;

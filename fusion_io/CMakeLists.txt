@@ -19,6 +19,7 @@ set(FUSIONIO_HEADERS
         interpolate.h
         isosurface.h
         m3dc1_field.h
+        m3dc1_numpy_source.h
         m3dc1_source.h
         mars_field.h
         mars_source.h
@@ -38,6 +39,7 @@ add_library(fusionio_fusionio
         isosurface.cpp
         m3dc1_source.cpp
         m3dc1_field.cpp
+        m3dc1_numpy_source.cpp
         mars_source.cpp
         mars_field.cpp
         geqdsk_source.cpp
@@ -90,8 +92,6 @@ if (FUSIONIO_ENABLE_PYTHON)
         add_library(fio_py SHARED python_interface.cpp)
         target_link_libraries(fio_py PUBLIC fusionio::fusionio Python3::Python)
 
-        # note this will fail on windows. If building on windows is a priority
-        # we can configure a setup.py and use add_custom_target to build the module
         set_target_properties(fio_py PROPERTIES PREFIX "" SUFFIX ".so")
 
         install(FILES fpy.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
