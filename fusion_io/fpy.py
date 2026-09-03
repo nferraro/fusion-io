@@ -21,6 +21,7 @@ import shlex
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import zlib
 
 try:
@@ -73,8 +74,110 @@ sys.stdout.buffer.write(buf.getvalue())
 sys.stdout.buffer.flush()
 """
 
-_NPY_MAGIC = b"\x93NUMPY"
-_TIME_RE = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
+# Reads ALL datasets under a given HDF5 group and writes them as a single
+# .npz archive (one array per dataset name) to stdout.
+_REMOTE_READ_GROUP_SCRIPT = r"""
+import io, sys
+import h5py, numpy as np
+path, group = sys.argv[1], sys.argv[2]
+arrays = {}
+with h5py.File(path, "r") as f:
+    if group in f:
+        grp = f[group]
+        for name in grp.keys():
+            try:
+                arrays[name] = np.asarray(grp[name])
+            except Exception:
+                pass
+buf = io.BytesIO()
+np.savez(buf, **arrays)
+sys.stdout.buffer.write(buf.getvalue())
+sys.stdout.buffer.flush()
+"""
+
+_NPY_MAGIC  = b"\x93NUMPY"
+_NPZ_MAGIC  = b"PK"          # zip/npz files start with PK
+_TIME_RE    = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
+
+
+class _SshMux:
+    """
+    Manages a single persistent SSH ControlMaster connection so that all
+    subsequent SSH calls reuse the same authenticated session.  This avoids
+    repeated password prompts and the per-connection TLS/key-exchange overhead.
+
+    Usage::
+
+        with _SshMux(login) as mux:
+            cmd = mux.wrap(['ssh', login, 'echo', 'hi'])
+            subprocess.run(cmd, ...)
+
+    If *login* is empty the mux is a no-op and commands are returned unchanged.
+    """
+
+    def __init__(self, login, remote_setup=''):
+        self._login = login
+        self._remote_setup = remote_setup
+        self._socket = None
+        self._proc   = None
+        self._tmpdir = None
+
+    def __enter__(self):
+        if not self._login:
+            return self
+        self._tmpdir = tempfile.mkdtemp(prefix='fpy_ssh_mux_')
+        self._socket = os.path.join(self._tmpdir, 'ctl')
+        # Start a background ControlMaster that stays alive until we close it.
+        cmd = [
+            'ssh',
+            '-o', 'ControlMaster=yes',
+            '-o', 'ControlPath={}'.format(self._socket),
+            '-o', 'ControlPersist=yes',
+            '-o', 'BatchMode=no',       # allow initial interactive auth
+            '-N',                        # no remote command
+            self._login,
+        ]
+        self._proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        # Give SSH a moment to establish the master connection.
+        import time as _time
+        for _ in range(60):
+            if os.path.exists(self._socket):
+                break
+            _time.sleep(0.5)
+        return self
+
+    def __exit__(self, *_):
+        if self._socket and os.path.exists(self._socket):
+            subprocess.run(
+                ['ssh',
+                 '-o', 'ControlPath={}'.format(self._socket),
+                 '-O', 'exit',
+                 self._login],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        if self._proc is not None:
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        if self._tmpdir:
+            import shutil
+            shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def ssh_opts(self):
+        """Return extra SSH options to reuse the master connection."""
+        if self._socket:
+            return [
+                '-o', 'ControlMaster=no',
+                '-o', 'ControlPath={}'.format(self._socket),
+            ]
+        return []
 
 
 class _AcaBackend:
@@ -93,9 +196,13 @@ class _AcaBackend:
     - Metadata and small datasets: read from the embedded HDF5 skeleton
       (local, no network access).
     - File-root attributes: fetched from the remote host via SSH + h5py on
-      first access, then cached in memory.
+      first access (one SSH call for all attributes), then cached in memory.
     - Large arrays (time traces, mesh data, field coefficients): streamed
       from the remote host via SSH + h5py and cached locally as .npy files.
+    - Scalar groups: all scalars under a group are fetched in a single SSH
+      call using np.savez, avoiding one-connection-per-scalar overhead.
+    - SSH connection reuse: a ControlMaster socket is established once at
+      construction time; all subsequent SSH calls reuse it.
     - Field evaluation: field coefficient arrays and mesh arrays are streamed
       per-field per-timeslice and injected into a fio_py numpy source via
       fio_py.set_numpy_field() and fio_py.set_numpy_mesh(). The C++ fusion-io
@@ -163,6 +270,11 @@ class _AcaBackend:
         self._skeletons = {}          # ds['name'] -> local skeleton path
         self._root_attrs_cache = {}   # file basename -> dict of attrs
         self._mesh_injected = False   # whether mesh has been injected yet
+
+        # Establish a persistent SSH ControlMaster connection up front so that
+        # all subsequent SSH calls reuse the same authenticated session.
+        self._mux = _SshMux(login, remote_setup)
+        self._mux.__enter__()
 
     # ------------------------------------------------------------------
     # SQLite helpers
@@ -286,7 +398,9 @@ class _AcaBackend:
                 python=self._remote_python,
                 args=' '.join(shlex.quote(a) for a in argv)))
         if self._login:
-            cmd = ['ssh', self._login, 'bash', '-lc', shlex.quote(inner)]
+            cmd = (['ssh']
+                   + self._mux.ssh_opts()
+                   + [self._login, 'bash', '-lc', shlex.quote(inner)])
         else:
             cmd = ['bash', '-c', inner]
         proc = subprocess.run(
@@ -304,6 +418,13 @@ class _AcaBackend:
                 ds['uuid'], rep_mt, variable, slc or '').encode()
         ).hexdigest()[:16]
         return os.path.join(self._cache_dir, 'vars', '{}.npy'.format(key))
+
+    def _group_cache_path(self, ds, group):
+        rep_mt = max((r['id'] for r in ds['replicas']), default=0)
+        key = hashlib.sha1(
+            '{}:{}:group:{}'.format(ds['uuid'], rep_mt, group).encode()
+        ).hexdigest()[:16]
+        return os.path.join(self._cache_dir, 'vars', '{}.npz'.format(key))
 
     def _log(self, msg):
         if self._verbose:
@@ -362,14 +483,91 @@ class _AcaBackend:
         np.save(cache_file, data, allow_pickle=False)
         return data
 
+    def read_group(self, group, basename=None):
+        """
+        Fetch all datasets under *group* in a single SSH call and return them
+        as a dict {name: ndarray}.  Results are cached as a .npz file.
+        """
+        ds = self._get_dataset(basename or self._default_file)
+
+        # Check disk cache first.
+        cache_file = self._group_cache_path(ds, group)
+        if os.path.isfile(cache_file):
+            self._log('group {}: from cache {}'.format(group, cache_file))
+            npz = np.load(cache_file, allow_pickle=False)
+            return dict(npz)
+
+        # Try embedded skeleton for small groups.
+        if _have_h5py:
+            try:
+                with h5py.File(self._skeleton(basename), 'r') as f:
+                    if group in f:
+                        grp = f[group]
+                        result = {}
+                        all_small = True
+                        for name in grp.keys():
+                            obj = grp[name]
+                            if isinstance(obj, h5py.Dataset) and obj.size <= 128:
+                                result[name] = obj[()]
+                            else:
+                                all_small = False
+                                break
+                        if all_small and result:
+                            self._log(
+                                'group {}: all from skeleton'.format(group))
+                            return result
+            except Exception:
+                pass
+
+        # Stream the whole group in one SSH call.
+        rep = self._live_replica(ds)
+        self._log('group {}: streaming from {}:{}'.format(
+            group, rep['hostname'], rep['remote_path']))
+        out = self._remote_run(
+            _REMOTE_READ_GROUP_SCRIPT,
+            [rep['remote_path'], group],
+            "group read of '{}' from {}".format(group, rep['remote_path']))
+
+        pos = out.find(_NPZ_MAGIC)
+        if pos < 0:
+            raise RuntimeError(
+                "No npz data returned for group '{}'".format(group))
+        npz = np.load(io.BytesIO(out[pos:]), allow_pickle=False)
+        result = dict(npz)
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        np.savez(cache_file, **result)
+        return result
+
     # ------------------------------------------------------------------
     # Attribute reading
     # ------------------------------------------------------------------
 
     def _fetch_root_attrs(self, basename=None):
+        """Fetch ALL root attributes in a single SSH call and cache them."""
         import json
         key = basename or self._default_file
         if key not in self._root_attrs_cache:
+            # Try skeleton first (no SSH needed).
+            if _have_h5py:
+                try:
+                    with h5py.File(self._skeleton(basename), 'r') as f:
+                        def plain(v):
+                            try:
+                                return (v.item()
+                                        if getattr(v, 'shape', None) == ()
+                                        else v.tolist())
+                            except AttributeError:
+                                return (v.decode()
+                                        if isinstance(v, bytes) else v)
+                        self._root_attrs_cache[key] = {
+                            k: plain(v) for k, v in f.attrs.items()}
+                        self._log(
+                            'root attrs for {}: from skeleton'.format(key))
+                        return self._root_attrs_cache[key]
+                except Exception:
+                    pass
+
+            # One SSH call for all root attributes.
             ds = self._get_dataset(key)
             rep = self._live_replica(ds)
             out = self._remote_run(
@@ -386,14 +584,6 @@ class _AcaBackend:
 
     def get_root_attr(self, name, basename=None):
         """Read a scalar attribute from the file root."""
-        if _have_h5py:
-            try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
-                    if name in f.attrs:
-                        v = f.attrs[name]
-                        return v.item() if hasattr(v, 'item') else v
-            except Exception:
-                pass
         return self._fetch_root_attrs(basename).get(name)
 
     def get_group_attr(self, group, name, basename=None):
@@ -464,13 +654,18 @@ class _AcaBackend:
         """
         Read physical normalization parameters from the remote C1.h5 root
         attributes and inject them into the fio_py numpy source.
+
+        All attributes are fetched in a single call to _fetch_root_attrs().
         """
+        # Fetch all root attributes at once (one SSH call or skeleton read).
+        attrs = self._fetch_root_attrs()
+
         def _f(name, default=0.0):
-            v = self.get_root_attr(name)
+            v = attrs.get(name)
             return float(v) if v is not None else default
 
         def _i(name, default=0):
-            v = self.get_root_attr(name)
+            v = attrs.get(name)
             return int(v) if v is not None else default
 
         fio_py.set_numpy_parameters(
@@ -581,11 +776,19 @@ class _AcaBackend:
         """
         Stream all scalar time series from the remote C1.h5 and inject them
         into the fio_py numpy source. Also injects 'slice_times'.
+
+        All scalars are fetched in a single SSH call using read_group(),
+        avoiding one-connection-per-scalar overhead.
         """
-        scalar_names = self.list_group('scalars')
-        for name in scalar_names:
+        self._log('Fetching all scalars in one SSH call')
+        try:
+            scalar_arrays = self.read_group('scalars')
+        except Exception as e:
+            self._log('Could not batch-read scalars: {}'.format(e))
+            scalar_arrays = {}
+
+        for name, arr in scalar_arrays.items():
             try:
-                arr = self.read('scalars/{}'.format(name))
                 fio_py.set_numpy_scalar(
                     isrc, name,
                     np.ascontiguousarray(arr, dtype=np.float64).tobytes())
@@ -606,9 +809,14 @@ class _AcaBackend:
                 np.ascontiguousarray(arr).tobytes())
 
     def close(self):
+        self._mux.__exit__(None, None, None)
         self._con.close()
 
     def __del__(self):
+        try:
+            self._mux.__exit__(None, None, None)
+        except Exception:
+            pass
         try:
             self._con.close()
         except Exception:
@@ -823,6 +1031,9 @@ class sim_data:
                       '"{}" in {}'.format(campaign_simulation, self.filename))
 
             # Open a numpy source and inject parameters + scalars.
+            # inject_parameters uses a single SSH call (or skeleton read) for
+            # all root attributes.  inject_scalars uses a single SSH call for
+            # all scalar arrays.
             self._isrc = fio_py.open_numpy_source()
             self._aca.inject_parameters(self._isrc)
             self._aca.inject_scalars(self._isrc)
