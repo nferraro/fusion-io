@@ -82,6 +82,7 @@ public:
 /*
  * fio_field wrapper that owns an m3dc1_field* created from injected numpy
  * data and evaluates it using the standard m3dc1_field::eval().
+ * Used for simple scalar fields (psi, ne, te, ti, P, Pe, den, ...).
  */
 class m3dc1_numpy_fio_field : public fio_field {
 public:
@@ -97,6 +98,219 @@ public:
     virtual int dimension() const { return dim; }
     virtual int eval(const double* x, double* v, fio_hint hint = 0);
     virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0);
+};
+
+/*
+ * Composite fio_field for the vector potential A.
+ * Assembles A from injected 'psi' and 'f' component fields, using the
+ * same formulas as m3dc1_vector_potential::eval() in m3dc1_field.cpp:
+ *
+ *   A_R   =  R * (df/dZ)
+ *   A_Z   = -R * (df/dR)
+ *   A_Phi =  psi / R
+ *
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_vector_potential : public fio_field {
+public:
+    m3dc1_field* psi;   // owned
+    m3dc1_field* f;     // owned, may be nullptr
+    double scale;       // B0 * L0
+    int itor;           // 1 for cylindrical
+
+    m3dc1_numpy_vector_potential(m3dc1_field* psi_, m3dc1_field* f_,
+                                  double sc, int itor_)
+        : psi(psi_), f(f_), scale(sc), itor(itor_) {}
+    virtual ~m3dc1_numpy_vector_potential()
+    {
+        delete psi;
+        delete f;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 3; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
+};
+
+/*
+ * Composite fio_field for the magnetic field B.
+ * Assembles B from injected 'psi', 'I', and 'f'/'fp' component fields,
+ * using the same formulas as m3dc1_magnetic_field::eval():
+ *
+ *   B_R   = -(dpsi/dZ) / R
+ *   B_Z   =  (dpsi/dR) / R
+ *   B_Phi =  I / R
+ *
+ * (The f/fp correction terms apply only for 3D/complex runs.)
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_magnetic_field : public fio_field {
+public:
+    m3dc1_field* psi;   // owned
+    m3dc1_field* I;     // owned
+    m3dc1_field* f;     // owned, may be nullptr
+    double scale;       // B0
+    int itor;
+    int ifprime;        // 0 -> use f, 1 -> use fp
+    bool use_f;         // true if f is available
+
+    m3dc1_numpy_magnetic_field(m3dc1_field* psi_, m3dc1_field* I_,
+                                m3dc1_field* f_, double sc, int itor_,
+                                int ifprime_, bool use_f_)
+        : psi(psi_), I(I_), f(f_), scale(sc), itor(itor_),
+          ifprime(ifprime_), use_f(use_f_) {}
+    virtual ~m3dc1_numpy_magnetic_field()
+    {
+        delete psi;
+        delete I;
+        delete f;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 3; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
+};
+
+/*
+ * Composite fio_field for the current density J.
+ * Assembles J from injected 'psi', 'I', and 'f'/'fp' component fields,
+ * using the same formulas as m3dc1_current_density::eval().
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_current_density : public fio_field {
+public:
+    m3dc1_field* psi;
+    m3dc1_field* I;
+    m3dc1_field* f;
+    double scale;       // J0
+    int itor;
+    int ifprime;
+    bool use_f;
+
+    m3dc1_numpy_current_density(m3dc1_field* psi_, m3dc1_field* I_,
+                                 m3dc1_field* f_, double sc, int itor_,
+                                 int ifprime_, bool use_f_)
+        : psi(psi_), I(I_), f(f_), scale(sc), itor(itor_),
+          ifprime(ifprime_), use_f(use_f_) {}
+    virtual ~m3dc1_numpy_current_density()
+    {
+        delete psi;
+        delete I;
+        delete f;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 3; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
+};
+
+/*
+ * Composite fio_field for the fluid velocity v.
+ * Assembles v from injected 'phi', 'V', 'chi' component fields,
+ * using the same formulas as m3dc1_fluid_velocity::eval():
+ *
+ *   V_R   = -(dphi/dZ)*R + dchi/dR / R^2
+ *   V_Z   =  (dphi/dR)*R + dchi/dZ / R^2
+ *   V_Phi =  V * R
+ *
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_fluid_velocity : public fio_field {
+public:
+    m3dc1_field* phi;
+    m3dc1_field* V;
+    m3dc1_field* chi;
+    double scale;       // v0
+    int itor;
+
+    m3dc1_numpy_fluid_velocity(m3dc1_field* phi_, m3dc1_field* V_,
+                                m3dc1_field* chi_, double sc, int itor_)
+        : phi(phi_), V(V_), chi(chi_), scale(sc), itor(itor_) {}
+    virtual ~m3dc1_numpy_fluid_velocity()
+    {
+        delete phi;
+        delete V;
+        delete chi;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 3; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
+};
+
+/*
+ * Composite fio_field for the electric field E.
+ * Assembles E from injected 'E_R', 'E_PHI', 'E_Z' component fields,
+ * using the same formulas as m3dc1_electric_field::eval().
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_electric_field : public fio_field {
+public:
+    m3dc1_field* E_R;
+    m3dc1_field* E_PHI;
+    m3dc1_field* E_Z;
+    double scale;       // Phi0 / L0
+
+    m3dc1_numpy_electric_field(m3dc1_field* er, m3dc1_field* ep,
+                                m3dc1_field* ez, double sc)
+        : E_R(er), E_PHI(ep), E_Z(ez), scale(sc) {}
+    virtual ~m3dc1_numpy_electric_field()
+    {
+        delete E_R;
+        delete E_PHI;
+        delete E_Z;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 3; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
+};
+
+/*
+ * Composite fio_field for ion pressure pi = P - Pe.
+ * Owns the component m3dc1_field* objects.
+ */
+class m3dc1_numpy_ion_pressure : public fio_field {
+public:
+    m3dc1_field* P;
+    m3dc1_field* Pe;
+    double scale;       // p0
+
+    m3dc1_numpy_ion_pressure(m3dc1_field* P_, m3dc1_field* Pe_, double sc)
+        : P(P_), Pe(Pe_), scale(sc) {}
+    virtual ~m3dc1_numpy_ion_pressure()
+    {
+        delete P;
+        delete Pe;
+    }
+
+    virtual fio_field* clone() const { return nullptr; }
+    virtual int dimension() const { return 1; }
+    virtual int eval(const double* x, double* v, fio_hint hint = 0);
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
+    {
+        return FIO_UNSUPPORTED;
+    }
 };
 
 class m3dc1_numpy_source : public fio_source {
