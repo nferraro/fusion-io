@@ -221,22 +221,11 @@ _HDF5_FIELD_FALLBACKS = {
 
 # ---------------------------------------------------------------------------
 # Mapping from fpy field name to the fio_py field-type constant.
-# This is used in adios2 mode to look up the correct FIO_* integer type
-# for fio_py.get_field(), bypassing the _available_fields dict which may
-# not be fully populated for the numpy source.
-#
-# The numpy source's get_available_fields() only returns fields that have
-# already been injected, so we cannot rely on it to find the FIO_* type
-# for composite fields like FIO_VECTOR_POTENTIAL.  Instead we look up the
-# type constant directly by name here.
 # ---------------------------------------------------------------------------
 def _get_fio_field_type(field_name):
     """
     Return the fio_py integer field-type constant for *field_name*, or None
     if the name is not a known composite field type.
-
-    This is needed because the numpy source's get_available_fields() may not
-    contain all field types, so we look them up by name directly.
     """
     _map = {
         'magnetic field'       : 'FIO_MAGNETIC_FIELD',
@@ -273,8 +262,7 @@ def _is_real_error(stderr_text):
 def _safe_get_field_name(nr):
     """
     Wrapper around fio_py.get_field_name that returns None instead of
-    raising/crashing when the field integer ID is not recognised by the
-    current source (e.g. a numpy source that only knows a subset of IDs).
+    raising/crashing when the field integer ID is not recognised.
     """
     try:
         return fio_py.get_field_name(nr)
@@ -290,18 +278,12 @@ def _split_ts_prefix(path):
     of the path with the prefix stripped.
 
     If *path* has no such prefix, return (None, path).
-
-    Examples
-    --------
-    'equilibrium/mesh/elements' -> ('equilibrium.h5', 'mesh/elements')
-    'time_002/fields/psi'       -> ('time_002.h5',    'fields/psi')
-    'scalars/time'              -> (None,              'scalars/time')
     """
     m = _TS_PREFIX_RE.match(path)
     if m is None:
         return None, path
-    prefix = m.group(1)          # 'equilibrium' or 'time_002'
-    remainder = path[m.end():]   # everything after the prefix (and slash)
+    prefix = m.group(1)
+    remainder = path[m.end():]
     ts_basename = prefix + '.h5'
     return ts_basename, remainder
 
@@ -381,52 +363,24 @@ class _AcaBackend:
     Backend for reading M3D-C1 data from a remote cluster via an HPC campaign
     archive (.aca file).
 
-    Actual .aca SQLite schema
-    -------------------------
-    info      (id TEXT, name TEXT, version TEXT, modtime INT)
-    host      (hostname TEXT PK, longhostname TEXT, modtime INT, deltime INT,
-               default_protocol TEXT)
-               -- replica.hostid references host.rowid  (implicit integer rowid)
-    directory (hostid INT, name TEXT, modtime INT, deltime INT,
-               PK (hostid, name))
-               -- replica.dirid references directory.rowid
-    dataset   (name TEXT PK, uuid TEXT, modtime INT, deltime INT,
-               fileformat TEXT, tsid INT, tsorder INT)
-               -- replica.datasetid references dataset.rowid
-    replica   (datasetid INT, hostid INT, dirid INT, archiveid INT,
-               name TEXT, modtime INT, deltime INT, keyid INT, size INT,
-               PK (datasetid, hostid, dirid, archiveid, name))
-               -- repfiles.replicaid references replica.rowid
-    file      (fileid INTEGER PK, name TEXT, compression INT, lenorig INT,
-               lencompressed INT, modtime INT, checksum TEXT, data BLOB)
-    repfiles  (replicaid INT, fileid INT, PK (replicaid, fileid))
-
-    Timeslice / filename convention
-    --------------------------------
-      timeslice == -1  ->  equilibrium.h5   (data at file root)
-      timeslice ==  0  ->  time_000.h5      (data at file root)
-      timeslice ==  N  ->  time_NNN.h5      (data at file root)
-      'last'           ->  resolved upstream to ntime-1
-
-    Path routing
-    ------------
-    Paths that start with 'equilibrium/' or 'time_NNN/' are automatically
-    routed to the corresponding timeslice file with the prefix stripped, so
-    callers (including sim_data.mesh.read_mesh) can use the same
-    'group/subpath' convention regardless of whether data lives in C1.h5 or
-    in per-timeslice files.
-
     Local skeleton symlinks
     -----------------------
-    The embedded skeleton HDF5 files (which contain all attributes and small
-    datasets but not the large field arrays) are extracted to the cache
-    directory AND also symlinked/copied into the current working directory
-    under their bare basename (e.g. 'equilibrium.h5', 'time_002.h5').
+    The embedded skeleton HDF5 files are extracted to the cache directory AND
+    also symlinked/copied into the current working directory under their bare
+    basename (e.g. 'equilibrium.h5', 'time_002.h5').
 
     This allows third-party code in the m3dc1 repo (e.g. read_h5.py) that
     opens timeslice files by bare filename to find the skeleton and read
-    attributes like 'ntimestep', 'time', 'version', etc. without needing
-    to know about the campaign archive backend.
+    attributes like 'ntimestep', 'time', 'version', etc.
+
+    Skeleton selection
+    ------------------
+    Each dataset in the .aca archive may have multiple embedded files.  We
+    select the embedded file whose basename matches the dataset basename
+    (e.g. 'equilibrium.h5').  If no such file is found we fall back to any
+    embedded .h5 file, then to the first embedded file.  This ensures we
+    pick the actual HDF5 skeleton (which contains root attributes like
+    'ntimestep') rather than any auxiliary embedded files.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -447,7 +401,6 @@ class _AcaBackend:
             'file:{}?mode=ro'.format(aca_filename), uri=True)
         cur = self._con.cursor()
 
-        # 'id' is TEXT in this schema.
         row = cur.execute(
             'SELECT id, name, version FROM info').fetchone()
         if row is None:
@@ -498,34 +451,18 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _load_datasets(self):
-        """
-        Load all dataset/replica/file metadata from the .aca SQLite database.
-
-        Key points about the schema:
-        - host, directory, dataset, and replica all use SQLite's implicit
-          integer rowid as the foreign-key target, even though their declared
-          PRIMARY KEY columns are text/composite.  We must SELECT rowid
-          explicitly to get those integer ids.
-        - repfiles.replicaid references replica.rowid.
-        - replica.datasetid references dataset.rowid.
-        - replica.hostid    references host.rowid.
-        - replica.dirid     references directory.rowid.
-        """
         cur = self._con.cursor()
 
-        # host: rowid -> (hostname, longhostname)
         hosts = {
             r[0]: (r[1], r[2])
             for r in cur.execute(
                 'SELECT rowid, hostname, longhostname FROM host')}
 
-        # directory: rowid -> (hostid, name)
         dirs = {
             r[0]: (r[1], r[2])
             for r in cur.execute(
                 'SELECT rowid, hostid, name FROM directory')}
 
-        # dataset: rowid -> dict  (name is the TEXT primary key)
         datasets = {}
         for row in cur.execute(
                 'SELECT rowid, name, uuid, fileformat, deltime FROM dataset'):
@@ -537,11 +474,7 @@ class _AcaBackend:
                 'fileformat': fmt or '', 'replicas': [],
                 'embedded_files': []}
 
-        # replica: rowid -> dataset entry
-        # replica.datasetid -> dataset.rowid
-        # replica.hostid    -> host.rowid
-        # replica.dirid     -> directory.rowid
-        replica_rowids = {}   # replica.rowid -> dataset dict (for repfiles)
+        replica_rowids = {}
         for row in cur.execute(
                 'SELECT rowid, datasetid, hostid, dirid, name, '
                 'deltime, size FROM replica'):
@@ -562,7 +495,6 @@ class _AcaBackend:
             ds['replicas'].append(rep_entry)
             replica_rowids[rid] = ds
 
-        # repfiles: replicaid -> fileid  (replicaid = replica.rowid)
         for row in cur.execute(
                 'SELECT rf.replicaid, f.fileid, f.name, f.lenorig, '
                 'f.lencompressed '
@@ -597,41 +529,85 @@ class _AcaBackend:
     # Embedded skeleton extraction
     # ------------------------------------------------------------------
 
+    def _pick_skeleton_embedded_file(self, ds, basename):
+        """
+        Choose the best embedded file to use as the skeleton for *basename*.
+
+        Strategy:
+        1. Prefer an embedded file whose basename (lowercased) matches the
+           dataset basename (lowercased) — i.e. the file named 'equilibrium.h5'
+           inside the embedded files for the 'equilibrium.h5' dataset.
+        2. Fall back to any embedded file whose name ends in '.h5'.
+        3. Fall back to the first embedded file.
+
+        This ensures we pick the actual HDF5 skeleton file (which contains
+        root attributes like 'ntimestep', 'version', etc.) rather than any
+        auxiliary embedded files that may also be present.
+        """
+        ef_list = ds['embedded_files']
+        if not ef_list:
+            return None
+
+        target = basename.lower()
+
+        # Pass 1: exact basename match
+        for ef in ef_list:
+            if os.path.basename(ef['name']).lower() == target:
+                return ef
+
+        # Pass 2: any .h5 file
+        for ef in ef_list:
+            if ef['name'].lower().endswith('.h5'):
+                return ef
+
+        # Pass 3: first file
+        return ef_list[0]
+
     def _skeleton(self, basename=None):
         """
         Extract the embedded skeleton HDF5 file for *basename* to the cache
-        directory and also ensure a copy exists in the current working
-        directory under the bare basename name.
+        directory and also ensure a copy/symlink exists in the CWD.
 
-        The CWD copy allows third-party code (e.g. read_h5.py in the m3dc1
-        repo) that opens timeslice files by bare filename to find the skeleton
-        and read attributes like 'ntimestep', 'time', 'version', etc.
+        The CWD copy allows third-party code (e.g. read_h5.py) that opens
+        timeslice files by bare filename to find the skeleton and read
+        attributes like 'ntimestep', 'time', 'version', etc.
+
+        The skeleton is always written to the cache under the dataset's bare
+        basename (e.g. 'equilibrium.h5') so that the file opened by
+        readParameter contains the correct root attributes.
         """
         basename = basename or self._default_file
         ds = self._get_dataset(basename)
         if ds['name'] not in self._skeletons:
             cur = self._con.cursor()
-            written = []
-            for ef in ds['embedded_files']:
-                fid = ef['id']
-                row = cur.execute(
-                    'SELECT data, compression FROM file '
-                    'WHERE fileid = ?', (fid,)).fetchone()
-                if row is None or row[0] is None:
-                    continue
-                blob, compression = row
-                data = zlib.decompress(blob) if compression else bytes(blob)
-                dest = os.path.join(
-                    self._cache_dir, 'skeletons', ds['name'],
-                    os.path.basename(ef['name']))
-                os.makedirs(os.path.dirname(dest), exist_ok=True)
-                with open(dest, 'wb') as fh:
-                    fh.write(data)
-                written.append(dest)
-            if not written:
+
+            # Pick the best embedded file to use as the skeleton.
+            ef = self._pick_skeleton_embedded_file(ds, basename)
+            if ef is None:
                 raise RuntimeError(
                     'No embedded metadata in .aca for {}'.format(ds['name']))
-            self._skeletons[ds['name']] = written[0]
+
+            fid = ef['id']
+            row = cur.execute(
+                'SELECT data, compression FROM file '
+                'WHERE fileid = ?', (fid,)).fetchone()
+            if row is None or row[0] is None:
+                raise RuntimeError(
+                    'No embedded data for fileid {} in {}'.format(
+                        fid, ds['name']))
+
+            blob, compression = row
+            data = zlib.decompress(blob) if compression else bytes(blob)
+
+            # Write to cache using the dataset's bare basename as filename
+            # so the skeleton is always named e.g. 'equilibrium.h5'.
+            dest = os.path.join(
+                self._cache_dir, 'skeletons', ds['name'], basename)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, 'wb') as fh:
+                fh.write(data)
+
+            self._skeletons[ds['name']] = dest
 
         skeleton_path = self._skeletons[ds['name']]
 
@@ -641,7 +617,6 @@ class _AcaBackend:
         cwd_path = os.path.join(os.getcwd(), basename)
         if not os.path.exists(cwd_path):
             try:
-                # Try a symlink first (cheap); fall back to copy.
                 os.symlink(os.path.abspath(skeleton_path), cwd_path)
                 self._log(
                     'skeleton symlink: {} -> {}'.format(
@@ -663,9 +638,8 @@ class _AcaBackend:
         """
         Run *script* on the remote host via SSH, passing *argv* as arguments.
 
-        Prints a connection message when verbose=True.
         Lmod/module-system noise in stderr is ignored; only genuine errors
-        (Python tracebacks, h5py errors, etc.) cause a RuntimeError.
+        cause a RuntimeError.
         """
         parts = []
         if self._remote_setup:
@@ -727,19 +701,12 @@ class _AcaBackend:
         Resolve a logical HDF5 path to (effective_basename, hdf5_path).
 
         If *path* starts with 'equilibrium/' or 'time_NNN/', the prefix is
-        stripped and the corresponding timeslice file is used as the basename,
-        regardless of what *basename* was passed in.
-
-        If the resolved timeslice file is not registered in the archive, fall
-        back to the default file and keep the full path (for C1.h5 layouts
-        where timeslice data is stored under group names).
+        stripped and the corresponding timeslice file is used as the basename.
         """
         ts_basename, remainder = _split_ts_prefix(path.lstrip('/'))
         if ts_basename is not None:
-            # Check whether the timeslice file is actually registered.
             if ts_basename in self._files:
                 return ts_basename, remainder or '.'
-            # Fall back: use whatever basename was requested (or default).
             return basename or self._default_file, path.lstrip('/')
         return basename or self._default_file, path.lstrip('/')
 
@@ -751,16 +718,12 @@ class _AcaBackend:
         """
         Return the set of dataset names present under the 'fields/' group in
         the given timeslice file.  Results are cached in memory.
-
-        This is used by inject_field to discover the actual name of a field
-        when the canonical name is not found in the file.
         """
         if basename in self._fields_cache:
             return self._fields_cache[basename]
 
         names = set()
 
-        # Try the embedded skeleton first (no SSH needed).
         if _have_h5py:
             try:
                 with h5py.File(self._skeleton(basename), 'r') as f:
@@ -774,7 +737,6 @@ class _AcaBackend:
             except Exception:
                 pass
 
-        # Fall back to a remote listing.
         ds = self._get_dataset(basename)
         rep = self._live_replica(ds)
         out = self._remote_run(
@@ -795,10 +757,6 @@ class _AcaBackend:
     def read(self, variable, basename=None, slc=None):
         """
         Return one HDF5 variable as a numpy array.
-
-        If *variable* starts with 'equilibrium/' or 'time_NNN/', the path is
-        automatically routed to the correct timeslice file with the prefix
-        stripped.
 
         Resolution order:
         1. Embedded value in the skeleton (small datasets, full reads only).
@@ -859,7 +817,6 @@ class _AcaBackend:
             npz = np.load(cache_file, allow_pickle=False)
             return dict(npz)
 
-        # Try embedded skeleton for small groups.
         if _have_h5py:
             try:
                 with h5py.File(self._skeleton(eff_basename), 'r') as f:
@@ -881,7 +838,6 @@ class _AcaBackend:
             except Exception:
                 pass
 
-        # Stream the whole group in one SSH call.
         rep = self._live_replica(ds)
         self._log('group {}: streaming from {}:{}'.format(
             group, rep['hostname'], rep['remote_path']))
@@ -911,7 +867,7 @@ class _AcaBackend:
         if key not in self._root_attrs_cache:
             if _have_h5py:
                 try:
-                    with h5py.File(self._skeleton(basename), 'r') as f:
+                    with h5py.File(self._skeleton(key), 'r') as f:
                         def plain(v):
                             try:
                                 return (v.item()
@@ -1002,9 +958,6 @@ class _AcaBackend:
         """
         Return the local path to the skeleton HDF5 file for *basename*,
         extracting it from the .aca archive if necessary.
-
-        This is used by sim_data to set self._all_attrs to the skeleton
-        so that third-party code accessing sim._all_attrs works in adios2 mode.
         """
         return self._skeleton(basename)
 
@@ -1040,10 +993,6 @@ class _AcaBackend:
           timeslice == -1  ->  equilibrium.h5
           timeslice ==  0  ->  time_000.h5
           timeslice ==  N  ->  time_NNN.h5
-
-        Data always lives at the file root inside timeslice files.
-        Falls back to the last known timeslice file if the expected file is
-        not registered in the archive.
         """
         if timeslice == -1:
             ts_file = 'equilibrium.h5'
@@ -1062,7 +1011,6 @@ class _AcaBackend:
         """
         Read physical normalization parameters from the C1.h5 root attributes
         and inject them into the fio_py numpy source.
-        All attributes are fetched in a single call to _fetch_root_attrs().
         """
         attrs = self._fetch_root_attrs()
 
@@ -1142,27 +1090,12 @@ class _AcaBackend:
         Stream one HDF5 field coefficient array and inject it into the
         fio_py numpy source under the name *hdf5_name*.
 
-        *hdf5_name* is the name of a single HDF5 dataset inside the
-        'fields/' group of the timeslice file (e.g. 'psi', 'I', 'f', 'phi',
-        'V', 'chi', 'E_R', 'E_PHI', 'E_Z', 'Pe', 'P', 'ne', 'den', 'te',
-        'ti', ...).
-
-        The C++ numpy source backend looks up injected fields by the name
-        passed to set_numpy_field(), which must match the name the C++ field
-        load() method uses when calling source->file.load_field().  These
-        names are the HDF5 dataset names (e.g. 'psi', 'I', 'f', not 'A',
-        'B', etc.).
-
         Injection is skipped if the same (ts_file, hdf5_name) pair has
-        already been injected in this session.
-
-        If the field is not present in this timeslice file (e.g. 'chi' is
-        only in equilibrium.h5), injection is skipped gracefully with a
-        warning.  The C++ layer handles missing optional fields.
+        already been injected in this session, or if the field is not
+        present in the timeslice file.
         """
         ts_file, _ = self._ts_file_and_group(timeslice)
 
-        # Skip if already injected for this timeslice file.
         injection_key = (ts_file, hdf5_name)
         if injection_key in self._injected_fields:
             self._log(
@@ -1172,9 +1105,6 @@ class _AcaBackend:
 
         fallbacks = _HDF5_FIELD_FALLBACKS.get(hdf5_name, ())
 
-        # If the field is not present in this timeslice file (e.g. 'chi' is
-        # only in equilibrium.h5), skip gracefully with a warning rather than
-        # raising an error.  The C++ layer will handle missing optional fields.
         available = self.list_fields(ts_file)
         actual_name = None
         for candidate in (hdf5_name,) + tuple(fallbacks):
@@ -1214,8 +1144,6 @@ class _AcaBackend:
 
         ntor = int(self.get_root_attr('ntor') or 0)
 
-        # Inject under hdf5_name so the C++ layer can find it by the name
-        # it uses in load_field() calls (e.g. 'psi', 'I', 'f', 'phi', etc.)
         fio_py.set_numpy_field(
             isrc, timeslice, hdf5_name,
             real_flat.tobytes(),
@@ -1245,7 +1173,6 @@ class _AcaBackend:
                 self._log(
                     'Could not inject scalar {}: {}'.format(name, e))
 
-        # Inject slice_times for series evaluation.
         ntime = int(self.get_root_attr('ntime') or 0)
         slice_times = []
         for t in range(ntime):
@@ -1290,13 +1217,6 @@ class sim_data:
     This field can in turn be evaluated using
     magnetic_field.evaluate((R,phi,Z)).
     !! Fields are given in SI units !!
-    **Technical info**
-    A list of all strings allowed to call on fields can be
-    found in sim.available_fields. This dictionary is made so that
-    one string contains all information on the type of field
-    (scalar/vector), and the species. The fields make use of
-    the sim_data library to interpolate fields in a consistent
-    way.
 
     -- Time traces--
     Time trace objects can be created by, for example,
@@ -1304,48 +1224,10 @@ class sim_data:
     The object dt then has two attributes:
     dt.time, this is an array of all the times where dt is evaluated
     dt.values, this is an array of all values of dt.
-    To plot some arbitrary time trace plt.plot(dt.time,dt.values) is enough.
-    A list of all callable traces can be found by invoking
-    sim.available_traces.
-    !! Time series are given in M3D-C1 units !!
-    **Technical info**
-    The time traces are read directly from the C1.h5 file for local mode.
-    For campaign archive mode they are streamed from the remote host.
 
     --Mesh--
     Mesh object can be created by, for example
     mesh = sim.get_mesh(time=1).
-    This object has a few attributes:
-    mesh.nplanes shows how many toroidal planes were used
-    mesh.elements contains info on the actual locations. The specifics
-    of this are explained in S. Jardin's 2004 paper. But useful info is:
-    mesh.elements[:,4] are the R locations of the mesh-points
-    mesh.elements[:,5] are the Z locations of the mesh-points
-    **Technical info**
-    The mesh is read directly from the time_xxx.h5 files.
-
-    --Diagnostics--
-    The diagnostic object can be created by, for example
-    diagnostic = sim.get_diagnostics(diagnostic)
-    The diagnostic object is meant for non-physical parameters such as
-    number of iterations, timings for each solve, and time_slice - time
-    correspondensies.
-    The diagnostic object has two attributes:
-    !! Diagnostic are given in M3D-C1 units !!
-    diagnostic.diagnostic - contains the value of the diagnostic. Can be a
-                            simple array (i.e. for 'time slices', or several
-                            objects i.e. to see a breakdown for timings)
-    diagnostic.x_axis     - contains the values of the x-axis of the
-                            diagnostic. This is alfven times for 'time slices'
-                            and iteration number for 'timings'
-    To see all available diagnostics, check sim.available_diagnostics
-
-    --Constants--
-    On subclass containing the constants can be created by,
-    for example,
-    constants = sim.get_constants()
-    In this subclass, stuff like gamma, R0, and the version
-    number of the M3DC1 simulation are stored.
 
     --Campaign Archive Mode (.aca files)--
     To stream M3D-C1 data from a remote cluster via an HPC campaign
@@ -1365,12 +1247,6 @@ class sim_data:
     time=0      -> time_000.h5
     time=N      -> time_NNN.h5   (N > 0)
     time='last' -> highest available timeslice
-
-    Field coefficient arrays and mesh data are streamed on demand from the
-    remote host via SSH + h5py and injected directly into the fusion-io C++
-    finite element evaluation machinery. No ADIOS2 installation is required.
-    Only the data actually needed for the requested field and time slice is
-    transferred.
     """
 
     def __init__(self, filename='C1.h5', filetype='m3dc1', verbose=False,
@@ -1378,60 +1254,6 @@ class sim_data:
                  login='', cache_dir='.cache/aca',
                  remote_python='python3',
                  remote_setup='module load python >/dev/null 2>&1 || true'):
-        """
-        Initializes the fusion-io bindings to a file.
-
-        Keyworded arguments:
-
-        **filename**
-            the name of the file which is to be read. Can include path.
-            For filetype='adios2', this should be the path to the .aca
-            campaign archive file.
-
-        **filetype**
-            the type of file. One of:
-            - 'm3dc1'  : local M3D-C1 HDF5 file (default)
-            - 'nimrod' : local NIMROD file
-            - 'adios2' : M3D-C1 data accessed via an HPC campaign archive
-                         (.aca file). Field coefficients and mesh arrays are
-                         streamed via SSH + h5py and injected into the C++
-                         fusion-io finite element evaluator. No ADIOS2
-                         installation is required despite the name.
-
-        **verbose**
-            if true, gives extra info on file read. In campaign archive mode,
-            also prints a message each time a connection to the remote host
-            is established.
-
-        **time**
-            sets the time variable during initialization.
-            -1        -> equilibrium.h5
-             0        -> time_000.h5
-             N        -> time_NNN.h5
-            'last'    -> highest available timeslice
-
-        **fast**
-            Workaround to keep mesh connectivity in memory.
-
-        **campaign_simulation**
-            Only used when filetype='adios2'. Identifies which simulation
-            within the campaign archive to stream.
-
-        **login**
-            Only used when filetype='adios2'. SSH login string for the remote
-            host, e.g. 'user@perlmutter.nersc.gov'.
-
-        **cache_dir**
-            Directory for extracted skeleton files and cached .npy arrays.
-
-        **remote_python**
-            Python interpreter to invoke on the remote host.
-
-        **remote_setup**
-            Shell command run before the remote Python script. Module-load
-            errors in this command are automatically ignored so that HPC
-            systems that print Lmod warnings do not cause failures.
-        """
         self._isrc = None
         self.fields = []
         self.seriess = []
@@ -1612,10 +1434,6 @@ class sim_data:
     def _get_attr(self, group, name):
         """
         Read a scalar attribute, dispatching to h5py or _AcaBackend.
-
-        In campaign archive mode, paths starting with 'equilibrium' or
-        'time_NNN' are automatically routed to the correct timeslice file
-        via _AcaBackend.get_group_attr (which calls _route internally).
         """
         if self._filetype == 'adios2':
             if group:
@@ -1629,13 +1447,7 @@ class sim_data:
                 return self._all_attrs.attrs[name]
 
     def _get_dataset(self, path):
-        """
-        Read a dataset as a numpy array.
-
-        In campaign archive mode, paths starting with 'equilibrium/' or
-        'time_NNN/' are automatically routed to the correct timeslice file
-        via _AcaBackend.read (which calls _route internally).
-        """
+        """Read a dataset as a numpy array."""
         if self._filetype == 'adios2':
             return self._aca.read(path)
         else:
@@ -1661,15 +1473,6 @@ class sim_data:
         *field_name* have been injected into the fio_py numpy source.
 
         For local files this is a no-op.
-
-        For campaign archive mode, the dependency list in _FIELD_HDF5_DEPS
-        is consulted.  Each required HDF5 dataset is injected individually
-        via _AcaBackend.inject_field, which skips datasets that have already
-        been injected or that are not present in the timeslice file.
-
-        *field_name* is the human-readable fpy name (e.g. 'magnetic field',
-        'fluid velocity', 'psi', 'density').
-        *species* is 'electron', 'main ion', or None.
         """
         if self._filetype != 'adios2':
             return
@@ -1680,7 +1483,6 @@ class sim_data:
                 self._aca.inject_field(self._isrc, timeslice, dep)
         else:
             # Simple scalar field: inject by its direct HDF5 name.
-            # Species-dependent fields:
             if field_name == 'density':
                 hdf5_name = 'ne' if species == 'electron' else 'den'
             elif field_name == 'temperature':
@@ -1688,8 +1490,6 @@ class sim_data:
             elif field_name == 'psi':
                 hdf5_name = 'psi'
             else:
-                # Use the _SIMPLE_FIELD_HDF5_NAME map, falling back to the
-                # field name itself (works for 'psi', 'ne', 'te', 'ti', etc.)
                 hdf5_name = _SIMPLE_FIELD_HDF5_NAME.get(field_name, field_name)
             self._aca.inject_field(self._isrc, timeslice, hdf5_name)
 
@@ -1729,20 +1529,12 @@ class sim_data:
 
             if sim_data._filetype == 'adios2':
                 # Inject all HDF5 datasets needed to evaluate this field.
-                # The dependency mapping is in _FIELD_HDF5_DEPS and is derived
-                # directly from the load() methods in fusion_io/m3dc1_field.cpp.
                 sim_data._ensure_fields_injected(
                     field, species, sim_data.timeslice)
 
             # Determine the fio_py field type integer.
-            #
-            # For the numpy source (adios2 mode), _available_fields may not
-            # contain all field types because get_available_fields() on the
-            # numpy source only returns fields that have already been injected
-            # by name, not composite types like FIO_VECTOR_POTENTIAL.
-            # We therefore try _get_fio_field_type() first for adios2 mode
-            # to get the correct FIO_* constant directly, and fall back to
-            # _available_fields / FIO_SCALAR_FIELD for unknown names.
+            # For the numpy source (adios2 mode), try _get_fio_field_type()
+            # first to get the correct FIO_* constant directly.
             itype = None
             if sim_data._filetype == 'adios2':
                 itype = _get_fio_field_type(field)
@@ -1836,8 +1628,6 @@ class sim_data:
                 group = 'time_{:03d}'.format(self.sim_data.timeslice)
 
             if self.sim_data._filetype == 'adios2':
-                # _get_dataset and _get_attr route 'equilibrium/...' and
-                # 'time_NNN/...' paths to the correct timeslice file.
                 mesh = self.sim_data._get_dataset(group + '/mesh/elements')
                 version = self.sim_data._get_attr(group, 'version')
                 if version is None:
