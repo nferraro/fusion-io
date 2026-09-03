@@ -95,9 +95,25 @@ sys.stdout.buffer.write(buf.getvalue())
 sys.stdout.buffer.flush()
 """
 
+# Lists all dataset names under a given HDF5 group and writes them as
+# newline-separated text to stdout.  Used to discover available field names.
+_REMOTE_LIST_GROUP_SCRIPT = r"""
+import sys
+import h5py
+path, group = sys.argv[1], sys.argv[2]
+with h5py.File(path, "r") as f:
+    if group in f:
+        for name in f[group].keys():
+            sys.stdout.write(name + "\n")
+"""
+
 _NPY_MAGIC = b"\x93NUMPY"
 _NPZ_MAGIC = b"PK"          # zip/npz files start with PK
 _TIME_RE   = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
+
+# Matches 'equilibrium' or 'time_NNN' as the first path component.
+_TS_PREFIX_RE = re.compile(
+    r'^(equilibrium|time_(\d+))(/|$)')
 
 # Patterns in SSH/Lmod stderr that are noise and should not cause a failure.
 _STDERR_NOISE_RES = [
@@ -135,6 +151,30 @@ def _safe_get_field_name(nr):
         return fio_py.get_field_name(nr)
     except Exception:
         return None
+
+
+def _split_ts_prefix(path):
+    """
+    If *path* starts with 'equilibrium/' or 'time_NNN/', return
+    (ts_basename, remainder) where ts_basename is the corresponding HDF5
+    filename ('equilibrium.h5' or 'time_NNN.h5') and remainder is the rest
+    of the path with the prefix stripped.
+
+    If *path* has no such prefix, return (None, path).
+
+    Examples
+    --------
+    'equilibrium/mesh/elements' -> ('equilibrium.h5', 'mesh/elements')
+    'time_002/fields/psi'       -> ('time_002.h5',    'fields/psi')
+    'scalars/time'              -> (None,              'scalars/time')
+    """
+    m = _TS_PREFIX_RE.match(path)
+    if m is None:
+        return None, path
+    prefix = m.group(1)          # 'equilibrium' or 'time_002'
+    remainder = path[m.end():]   # everything after the prefix (and slash)
+    ts_basename = prefix + '.h5'
+    return ts_basename, remainder
 
 
 class _SshMux:
@@ -234,10 +274,18 @@ class _AcaBackend:
 
     Timeslice / filename convention
     --------------------------------
-      timeslice == -1  ->  equilibrium.h5
-      timeslice ==  0  ->  time_000.h5
-      timeslice ==  N  ->  time_NNN.h5   (N > 0)
+      timeslice == -1  ->  equilibrium.h5   (data at file root)
+      timeslice ==  0  ->  time_000.h5      (data at file root)
+      timeslice ==  N  ->  time_NNN.h5      (data at file root)
       'last'           ->  resolved upstream to ntime-1
+
+    Path routing
+    ------------
+    Paths that start with 'equilibrium/' or 'time_NNN/' are automatically
+    routed to the corresponding timeslice file with the prefix stripped, so
+    callers (including sim_data.mesh.read_mesh) can use the same
+    'group/subpath' convention regardless of whether data lives in C1.h5 or
+    in per-timeslice files.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -295,6 +343,7 @@ class _AcaBackend:
 
         self._skeletons = {}          # ds['name'] -> local skeleton path
         self._root_attrs_cache = {}   # file basename -> dict of attrs
+        self._fields_cache = {}       # basename -> set of field names in 'fields/'
         self._mesh_injected = False
 
         self._mux = _SshMux(login)
@@ -496,6 +545,98 @@ class _AcaBackend:
             print('[fpy._AcaBackend] {}'.format(msg), file=sys.stderr)
 
     # ------------------------------------------------------------------
+    # Path routing
+    # ------------------------------------------------------------------
+
+    def _route(self, path, basename=None):
+        """
+        Resolve a logical HDF5 path to (effective_basename, hdf5_path).
+
+        If *path* starts with 'equilibrium/' or 'time_NNN/', the prefix is
+        stripped and the corresponding timeslice file is used as the basename,
+        regardless of what *basename* was passed in.
+
+        If the resolved timeslice file is not registered in the archive, fall
+        back to the default file and keep the full path (for C1.h5 layouts
+        where timeslice data is stored under group names).
+        """
+        ts_basename, remainder = _split_ts_prefix(path.lstrip('/'))
+        if ts_basename is not None:
+            # Check whether the timeslice file is actually registered.
+            if ts_basename in self._files:
+                return ts_basename, remainder or '.'
+            # Fall back: use whatever basename was requested (or default).
+            return basename or self._default_file, path.lstrip('/')
+        return basename or self._default_file, path.lstrip('/')
+
+    # ------------------------------------------------------------------
+    # Field name discovery
+    # ------------------------------------------------------------------
+
+    def list_fields(self, basename):
+        """
+        Return the set of dataset names present under the 'fields/' group in
+        the given timeslice file.  Results are cached in memory.
+
+        This is used by inject_field to discover the actual name of a field
+        when the canonical name (e.g. 'A') is not found in the file.
+        """
+        if basename in self._fields_cache:
+            return self._fields_cache[basename]
+
+        names = set()
+
+        # Try the embedded skeleton first (no SSH needed).
+        if _have_h5py:
+            try:
+                with h5py.File(self._skeleton(basename), 'r') as f:
+                    if 'fields' in f:
+                        names = set(f['fields'].keys())
+                        self._fields_cache[basename] = names
+                        self._log(
+                            'fields in {}: {} (from skeleton)'.format(
+                                basename, sorted(names)))
+                        return names
+            except Exception:
+                pass
+
+        # Fall back to a remote listing.
+        ds = self._get_dataset(basename)
+        rep = self._live_replica(ds)
+        out = self._remote_run(
+            _REMOTE_LIST_GROUP_SCRIPT,
+            [rep['remote_path'], 'fields'],
+            'list fields in {}'.format(basename))
+        names = {
+            line.strip() for line in out.decode(errors='replace').splitlines()
+            if line.strip()}
+        self._fields_cache[basename] = names
+        self._log('fields in {}: {}'.format(basename, sorted(names)))
+        return names
+
+    def resolve_field_name(self, hdf5_name, basename, fallbacks=()):
+        """
+        Return the actual dataset name for a field inside the 'fields/' group
+        of *basename*, trying *hdf5_name* first and then each name in
+        *fallbacks*.  Raises KeyError if none are found.
+
+        This handles cases where the canonical name used in fpy (e.g. 'A')
+        differs from the actual name in the HDF5 file (e.g. 'Aphi').
+        """
+        available = self.list_fields(basename)
+        for candidate in (hdf5_name,) + tuple(fallbacks):
+            if candidate in available:
+                if candidate != hdf5_name:
+                    self._log(
+                        "field '{}' not found in {}; using '{}' instead".format(
+                            hdf5_name, basename, candidate))
+                return candidate
+        raise KeyError(
+            "Field '{}' (and fallbacks {}) not found in 'fields/' of {}. "
+            "Available: {}".format(
+                hdf5_name, fallbacks, basename, sorted(available)))
+
+    # ------------------------------------------------------------------
     # Array reading
     # ------------------------------------------------------------------
 
@@ -503,18 +644,22 @@ class _AcaBackend:
         """
         Return one HDF5 variable as a numpy array.
 
+        If *variable* starts with 'equilibrium/' or 'time_NNN/', the path is
+        automatically routed to the correct timeslice file with the prefix
+        stripped.
+
         Resolution order:
         1. Embedded value in the skeleton (small datasets, full reads only).
         2. Per-variable disk cache from a previous streamed read.
         3. Stream from the remote host via SSH + h5py.
         """
-        ds = self._get_dataset(basename or self._default_file)
-        variable = variable.lstrip('/')
+        eff_basename, variable = self._route(variable, basename)
+        ds = self._get_dataset(eff_basename)
 
         # 1. Embedded skeleton (small datasets only)
         if slc is None and _have_h5py:
             try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
+                with h5py.File(self._skeleton(eff_basename), 'r') as f:
                     if variable in f and isinstance(f[variable], h5py.Dataset):
                         obj = f[variable]
                         if obj.size <= 128:
@@ -553,7 +698,8 @@ class _AcaBackend:
         Fetch all datasets under *group* in a single SSH call and return them
         as a dict {name: ndarray}.  Results are cached as a .npz file.
         """
-        ds = self._get_dataset(basename or self._default_file)
+        eff_basename, group = self._route(group, basename)
+        ds = self._get_dataset(eff_basename)
 
         cache_file = self._group_cache_path(ds, group)
         if os.path.isfile(cache_file):
@@ -564,7 +710,7 @@ class _AcaBackend:
         # Try embedded skeleton for small groups.
         if _have_h5py:
             try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
+                with h5py.File(self._skeleton(eff_basename), 'r') as f:
                     if group in f:
                         grp = f[group]
                         result = {}
@@ -649,22 +795,28 @@ class _AcaBackend:
         return self._fetch_root_attrs(basename).get(name)
 
     def get_group_attr(self, group, name, basename=None):
-        """Read a scalar attribute from a group inside the file."""
+        """
+        Read a scalar attribute from a group inside the file.
+
+        If *group* starts with 'equilibrium/' or 'time_NNN/', the path is
+        routed to the correct timeslice file automatically.
+        """
+        eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
-                    if group in f and name in f[group].attrs:
-                        v = f[group].attrs[name]
+                with h5py.File(self._skeleton(eff_basename), 'r') as f:
+                    if eff_group in f and name in f[eff_group].attrs:
+                        v = f[eff_group].attrs[name]
                         return v.item() if hasattr(v, 'item') else v
             except Exception:
                 pass
         import json
-        ds = self._get_dataset(basename or self._default_file)
+        ds = self._get_dataset(eff_basename)
         rep = self._live_replica(ds)
         out = self._remote_run(
             _ATTRS_SCRIPT,
-            [rep['remote_path'], group],
-            'attrs of {} in {}'.format(group, ds['name']))
+            [rep['remote_path'], eff_group],
+            'attrs of {} in {}'.format(eff_group, ds['name']))
         pos = out.find(b'###JSON###')
         if pos < 0:
             return None
@@ -673,21 +825,23 @@ class _AcaBackend:
 
     def list_group(self, group, basename=None):
         """Return the names of direct children of a group in the skeleton."""
+        eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
-                    if group in f:
-                        return list(f[group].keys())
+                with h5py.File(self._skeleton(eff_basename), 'r') as f:
+                    if eff_group in f:
+                        return list(f[eff_group].keys())
             except Exception:
                 pass
         return []
 
     def group_exists(self, group, basename=None):
         """Return True if the group exists in the skeleton."""
+        eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
-                with h5py.File(self._skeleton(basename), 'r') as f:
-                    return group in f
+                with h5py.File(self._skeleton(eff_basename), 'r') as f:
+                    return eff_group in f
             except Exception:
                 pass
         return False
@@ -804,11 +958,33 @@ class _AcaBackend:
         """
         Stream the field coefficient array for one field at one timeslice
         and inject it into the fio_py numpy source.
+
+        The actual dataset name in the HDF5 file is resolved via
+        resolve_field_name(), which checks the 'fields/' group of the
+        timeslice file and tries known fallback names when the canonical
+        name is not present.  This handles cases like 'A' vs 'Aphi'.
         """
         ts_file, _ = self._ts_file_and_group(timeslice)
-        real_path = 'fields/{}'.format(hdf5_name)
-        self._log('Injecting field {} timeslice {} from {}'.format(
-            hdf5_name, timeslice, ts_file))
+
+        # Known fallback names for fields whose canonical fpy name differs
+        # from the actual HDF5 dataset name in some M3D-C1 output versions.
+        _fallbacks = {
+            'A'  : ('Aphi', 'Avec', 'vecpot'),
+            'J'  : ('Jtor', 'jtor', 'j'),
+            'den': ('ni', 'n_i', 'density'),
+            'Pe' : ('pe', 'P_e'),
+            'P'  : ('p', 'ptot'),
+        }
+        fallbacks = _fallbacks.get(hdf5_name, ())
+
+        try:
+            actual_name = self.resolve_field_name(hdf5_name, ts_file, fallbacks)
+        except KeyError as e:
+            raise RuntimeError(str(e))
+
+        real_path = 'fields/{}'.format(actual_name)
+        self._log('Injecting field {} (as {}) timeslice {} from {}'.format(
+            hdf5_name, actual_name, timeslice, ts_file))
 
         real_data = self.read(real_path, basename=ts_file)
         real_flat = np.ascontiguousarray(real_data.ravel(), dtype=np.float64)
@@ -816,7 +992,7 @@ class _AcaBackend:
         is_complex = bool(int(self.get_root_attr('icomplex') or 0))
         imag_flat = None
         if is_complex:
-            imag_path = 'fields/{}_i'.format(hdf5_name)
+            imag_path = 'fields/{}_i'.format(actual_name)
             try:
                 imag_data = self.read(imag_path, basename=ts_file)
                 imag_flat = np.ascontiguousarray(
@@ -1207,7 +1383,13 @@ class sim_data:
         return self.constants(self)
 
     def _get_attr(self, group, name):
-        """Read a scalar attribute, dispatching to h5py or _AcaBackend."""
+        """
+        Read a scalar attribute, dispatching to h5py or _AcaBackend.
+
+        In campaign archive mode, paths starting with 'equilibrium' or
+        'time_NNN' are automatically routed to the correct timeslice file
+        via _AcaBackend.get_group_attr (which calls _route internally).
+        """
         if self._filetype == 'adios2':
             if group:
                 return self._aca.get_group_attr(group, name)
@@ -1220,7 +1402,13 @@ class sim_data:
                 return self._all_attrs.attrs[name]
 
     def _get_dataset(self, path):
-        """Read a dataset as a numpy array."""
+        """
+        Read a dataset as a numpy array.
+
+        In campaign archive mode, paths starting with 'equilibrium/' or
+        'time_NNN/' are automatically routed to the correct timeslice file
+        via _AcaBackend.read (which calls _route internally).
+        """
         if self._filetype == 'adios2':
             return self._aca.read(path)
         else:
@@ -1391,6 +1579,8 @@ class sim_data:
                 group = 'time_{:03d}'.format(self.sim_data.timeslice)
 
             if self.sim_data._filetype == 'adios2':
+                # _get_dataset and _get_attr route 'equilibrium/...' and
+                # 'time_NNN/...' paths to the correct timeslice file.
                 mesh = self.sim_data._get_dataset(group + '/mesh/elements')
                 version = self.sim_data._get_attr(group, 'version')
                 if version is None:
