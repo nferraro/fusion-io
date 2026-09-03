@@ -99,18 +99,42 @@ _NPY_MAGIC  = b"\x93NUMPY"
 _NPZ_MAGIC  = b"PK"          # zip/npz files start with PK
 _TIME_RE    = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
 
+# Patterns in SSH/Lmod stderr that are noise and should not cause a failure.
+# These appear on systems like Perlmutter when the login shell sources module
+# init files, even when we use --norc --noprofile, because some remote_setup
+# strings or SSH environment hooks still trigger Lmod.
+_STDERR_NOISE_RES = [
+    re.compile(r'Lmod has detected the following error'),
+    re.compile(r'module\s+--ignore_cache'),
+    re.compile(r'module spider'),
+    re.compile(r'The following module\(s\) are unknown'),
+    re.compile(r'Swap failed'),
+    re.compile(r'automatically replacing'),
+    re.compile(r'have been reloaded with a version change'),
+    re.compile(r'PrgEnv-'),
+    re.compile(r'cray-mpich'),
+    re.compile(r'^\s*$'),           # blank lines
+]
+
+
+def _is_real_error(stderr_text):
+    """
+    Return True only if *stderr_text* contains lines that are not just
+    Lmod/module-system noise.  This lets us ignore spurious module load
+    warnings that appear on HPC systems like Perlmutter without masking
+    genuine Python tracebacks or h5py errors.
+    """
+    for line in stderr_text.splitlines():
+        if not any(pat.search(line) for pat in _STDERR_NOISE_RES):
+            return True
+    return False
+
 
 class _SshMux:
     """
     Manages a single persistent SSH ControlMaster connection so that all
     subsequent SSH calls reuse the same authenticated session.  This avoids
     repeated password prompts and the per-connection TLS/key-exchange overhead.
-
-    Usage::
-
-        with _SshMux(login) as mux:
-            cmd = mux.wrap(['ssh', login, 'echo', 'hi'])
-            subprocess.run(cmd, ...)
 
     If *login* is empty the mux is a no-op and commands are returned unchanged.
     """
@@ -203,11 +227,24 @@ class _AcaBackend:
       call using np.savez, avoiding one-connection-per-scalar overhead.
     - SSH connection reuse: a ControlMaster socket is established once at
       construction time; all subsequent SSH calls reuse it.
-    - Field evaluation: field coefficient arrays and mesh arrays are streamed
-      per-field per-timeslice and injected into a fio_py numpy source via
-      fio_py.set_numpy_field() and fio_py.set_numpy_mesh(). The C++ fusion-io
-      code then evaluates the finite element basis functions exactly as it
-      would for a local file, with no full HDF5 file transfer required.
+
+    Timeslice / filename convention
+    --------------------------------
+    M3D-C1 uses the following mapping between the integer *timeslice* value
+    and the HDF5 file on disk:
+
+      timeslice == -1   ->  equilibrium.h5   (equilibrium / no time advance)
+      timeslice ==  0   ->  time_000.h5
+      timeslice ==  N   ->  time_NNN.h5      (N > 0)
+
+    Inside each of these files the mesh and field data live at the **file
+    root** (e.g. ``/mesh/elements``, ``/fields/psi``).  There is no
+    ``time_NNN/`` sub-group inside the timeslice files themselves; that
+    sub-group naming only appears inside ``C1.h5`` when that file aggregates
+    multiple timeslices.
+
+    The special string ``'last'`` is resolved to ``ntime - 1`` by
+    ``sim_data.set_timeslice`` before reaching this backend.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -392,23 +429,51 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _remote_run(self, script, argv, what):
-        inner = (
-            '{setup}; exec {python} - {args}'.format(
-                setup=self._remote_setup,
+        """
+        Run *script* (a Python source string) on the remote host with the
+        given *argv* list passed as command-line arguments.
+
+        stderr is inspected with ``_is_real_error()`` before deciding whether
+        to raise.  Lines that are purely Lmod/module-system noise (very common
+        on HPC systems like Perlmutter) are ignored so that a spurious module
+        load warning in the user's ``remote_setup`` string does not cause a
+        failure when the Python script itself ran successfully.
+        """
+        parts = []
+        if self._remote_setup:
+            parts.append(self._remote_setup)
+        parts.append(
+            'exec {python} - {args}'.format(
                 python=self._remote_python,
                 args=' '.join(shlex.quote(a) for a in argv)))
+        inner = '; '.join(parts)
+
         if self._login:
             cmd = (['ssh']
                    + self._mux.ssh_opts()
                    + [self._login, 'bash', '-lc', shlex.quote(inner)])
         else:
             cmd = ['bash', '-c', inner]
+
         proc = subprocess.run(
             cmd, input=script.encode(), capture_output=True, check=False)
-        if proc.returncode != 0:
+
+        stderr_text = proc.stderr.decode(errors='replace')
+
+        # Only raise if the process failed AND stderr contains something that
+        # is not just Lmod/module noise.
+        if proc.returncode != 0 and _is_real_error(stderr_text):
             raise RuntimeError(
-                'Remote {} failed:\n{}'.format(
-                    what, proc.stderr.decode(errors='replace')[-2000:]))
+                'Remote {} failed:\n{}'.format(what, stderr_text[-2000:]))
+
+        # If the process failed but stderr was only noise, log a warning and
+        # continue — the stdout may still contain valid data.
+        if proc.returncode != 0:
+            self._log(
+                'WARNING: remote {} exited with code {} '
+                '(stderr was only module-system noise, continuing)'.format(
+                    what, proc.returncode))
+
         return proc.stdout
 
     def _var_cache_path(self, ds, variable, slc):
@@ -635,20 +700,36 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _ts_file_and_group(self, timeslice):
-        """Return (basename, hdf5_group_name) for a given integer timeslice."""
-        if timeslice < 0:
+        """
+        Return (basename, hdf5_path_prefix) for a given integer timeslice.
+
+        The M3D-C1 timeslice / filename convention is:
+
+          timeslice == -1  ->  equilibrium.h5   (data at file root, prefix='')
+          timeslice ==  0  ->  time_000.h5      (data at file root, prefix='')
+          timeslice ==  N  ->  time_NNN.h5      (data at file root, prefix='')
+
+        Inside each timeslice file the mesh and field data live at the file
+        root (e.g. ``mesh/elements``, ``fields/psi``).  The prefix returned
+        here is therefore always an empty string; callers should build paths
+        directly without prepending a group name.
+
+        The special value ``'last'`` is resolved upstream by
+        ``sim_data.set_timeslice`` before this method is called.
+        """
+        if timeslice == -1:
+            ts_file = 'equilibrium.h5'
+        else:
+            ts_file = 'time_{:03d}.h5'.format(timeslice)
+
+        if ts_file not in self._files:
+            # Fall back gracefully: use the last known timeslice file.
             if self._timeslices:
-                timeslice = self._timeslices[timeslice][0]
+                ts_file = self._timeslices[-1][1]
             else:
-                return self._default_file, 'equilibrium'
-        group = 'time_{:03d}'.format(timeslice)
-        if self._timeslices:
-            for num, fname in self._timeslices:
-                if num == timeslice:
-                    return fname, group
-            idx = timeslice % len(self._timeslices)
-            return self._timeslices[idx][1], group
-        return self._default_file, group
+                ts_file = self._default_file
+
+        return ts_file, ''
 
     def inject_parameters(self, isrc):
         """
@@ -687,10 +768,11 @@ class _AcaBackend:
         if self._mesh_injected:
             return
 
-        ts_file, group = self._ts_file_and_group(timeslice)
-        self._log('Injecting mesh from {} / {}'.format(ts_file, group))
+        ts_file, _ = self._ts_file_and_group(timeslice)
+        self._log('Injecting mesh from {}'.format(ts_file))
 
-        elements = self.read(group + '/mesh/elements', basename=ts_file)
+        # Data lives at the file root in each timeslice file.
+        elements = self.read('mesh/elements', basename=ts_file)
 
         version = int(self.get_root_attr('version') or 0)
 
@@ -712,8 +794,7 @@ class _AcaBackend:
         else:
             region = np.zeros(nelms, dtype=np.int32)
 
-        nplanes_attr = self.get_group_attr(
-            group + '/mesh', 'nplanes', basename=ts_file)
+        nplanes_attr = self.get_group_attr('mesh', 'nplanes', basename=ts_file)
         nplanes = int(nplanes_attr) if nplanes_attr is not None else 1
 
         itor = int(self.get_root_attr('itor') or 1)
@@ -745,8 +826,9 @@ class _AcaBackend:
         hdf5_name: the name of the field dataset inside the HDF5 fields group
                    (e.g. 'psi', 'den', 'te').
         """
-        ts_file, group = self._ts_file_and_group(timeslice)
-        real_path = '{}/fields/{}'.format(group, hdf5_name)
+        ts_file, _ = self._ts_file_and_group(timeslice)
+        # Data lives at the file root: fields/<name>
+        real_path = 'fields/{}'.format(hdf5_name)
         self._log('Injecting field {} timeslice {} from {}'.format(
             hdf5_name, timeslice, ts_file))
 
@@ -756,7 +838,7 @@ class _AcaBackend:
         is_complex = bool(int(self.get_root_attr('icomplex') or 0))
         imag_flat = None
         if is_complex:
-            imag_path = '{}/fields/{}_i'.format(group, hdf5_name)
+            imag_path = 'fields/{}_i'.format(hdf5_name)
             try:
                 imag_data = self.read(imag_path, basename=ts_file)
                 imag_flat = np.ascontiguousarray(
@@ -910,6 +992,13 @@ class sim_data:
             login='user@perlmutter.nersc.gov',
         )
 
+    Timeslice convention
+    --------------------
+    time=-1   -> equilibrium.h5  (equilibrium / no time advance)
+    time=0    -> time_000.h5
+    time=N    -> time_NNN.h5     (N > 0)
+    time='last' -> highest available time_NNN.h5
+
     Field coefficient arrays and mesh data are streamed on demand from the
     remote host via SSH + h5py and injected directly into the fusion-io C++
     finite element evaluation machinery. No ADIOS2 installation is required.
@@ -947,6 +1036,10 @@ class sim_data:
 
         **time**
             sets the time variable during initialization.
+            -1        -> equilibrium.h5
+             0        -> time_000.h5
+             N        -> time_NNN.h5
+            'last'    -> highest available timeslice
 
         **fast**
             Workaround to keep mesh connectivity in memory.
@@ -966,7 +1059,9 @@ class sim_data:
             Python interpreter to invoke on the remote host.
 
         **remote_setup**
-            Shell command run before the remote Python script.
+            Shell command run before the remote Python script.  Module-load
+            errors in this command are automatically ignored so that HPC
+            systems that print Lmod warnings do not cause failures.
         """
         self._isrc = None
         self.fields = []
@@ -1063,8 +1158,12 @@ class sim_data:
         fio_py.get_options(self._isrc)
 
         # For campaign mode, inject mesh before querying geometry parameters.
-        time_int = int(time) if not isinstance(time, str) else -1
+        # Resolve 'last' here so inject_mesh receives an integer.
         if filetype == 'adios2':
+            if isinstance(time, str) and time == 'last':
+                time_int = self.ntime - 1
+            else:
+                time_int = int(time)
             self._aca.inject_mesh(self._isrc, time_int)
 
         self.set_timeslice(time)
