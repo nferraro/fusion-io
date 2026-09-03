@@ -125,6 +125,18 @@ def _is_real_error(stderr_text):
     return False
 
 
+def _safe_get_field_name(nr):
+    """
+    Wrapper around fio_py.get_field_name that returns None instead of
+    raising/crashing when the field integer ID is not recognised by the
+    current source (e.g. a numpy source that only knows a subset of IDs).
+    """
+    try:
+        return fio_py.get_field_name(nr)
+    except Exception:
+        return None
+
+
 class _SshMux:
     """
     Manages a single persistent SSH ControlMaster connection so that all
@@ -428,6 +440,7 @@ class _AcaBackend:
         """
         Run *script* on the remote host via SSH, passing *argv* as arguments.
 
+        Prints a connection message when verbose=True.
         Lmod/module-system noise in stderr is ignored; only genuine errors
         (Python tracebacks, h5py errors, etc.) cause a RuntimeError.
         """
@@ -441,6 +454,7 @@ class _AcaBackend:
         inner = '; '.join(parts)
 
         if self._login:
+            self._log('Connecting to {} for: {}'.format(self._login, what))
             cmd = (['ssh']
                    + self._mux.ssh_opts()
                    + [self._login, 'bash', '-lc', shlex.quote(inner)])
@@ -993,7 +1007,9 @@ class sim_data:
                          installation is required despite the name.
 
         **verbose**
-            if true, gives extra info on file read.
+            if true, gives extra info on file read. In campaign archive mode,
+            also prints a message each time a connection to the remote host
+            is established.
 
         **time**
             sets the time variable during initialization.
@@ -1125,9 +1141,13 @@ class sim_data:
             self.fields.append(self._imag)
         self._cs = fio_py.get_int_parameter(self._isrc, fio_py.FIO_GEOMETRY)
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
-        self._available_fields = dict(zip(
-            [fio_py.get_field_name(nr) for nr in self._iavailable_fields],
-            self._iavailable_fields))
+        # Build _available_fields dict, skipping any field IDs whose name
+        # cannot be resolved (e.g. IDs not supported by the numpy source).
+        self._available_fields = {}
+        for nr in self._iavailable_fields:
+            name = _safe_get_field_name(nr)
+            if name is not None:
+                self._available_fields[name] = nr
         self.ntor = fio_py.get_int_parameter(self._isrc, fio_py.FIO_TOROIDAL_MODE)
         self.period = fio_py.get_real_parameter(self._isrc, fio_py.FIO_PERIOD)
         self.fc = None
