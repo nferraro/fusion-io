@@ -415,6 +415,18 @@ class _AcaBackend:
     callers (including sim_data.mesh.read_mesh) can use the same
     'group/subpath' convention regardless of whether data lives in C1.h5 or
     in per-timeslice files.
+
+    Local skeleton symlinks
+    -----------------------
+    The embedded skeleton HDF5 files (which contain all attributes and small
+    datasets but not the large field arrays) are extracted to the cache
+    directory AND also symlinked/copied into the current working directory
+    under their bare basename (e.g. 'equilibrium.h5', 'time_002.h5').
+
+    This allows third-party code in the m3dc1 repo (e.g. read_h5.py) that
+    opens timeslice files by bare filename to find the skeleton and read
+    attributes like 'ntimestep', 'time', 'version', etc. without needing
+    to know about the campaign archive backend.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -586,6 +598,15 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _skeleton(self, basename=None):
+        """
+        Extract the embedded skeleton HDF5 file for *basename* to the cache
+        directory and also ensure a copy exists in the current working
+        directory under the bare basename name.
+
+        The CWD copy allows third-party code (e.g. read_h5.py in the m3dc1
+        repo) that opens timeslice files by bare filename to find the skeleton
+        and read attributes like 'ntimestep', 'time', 'version', etc.
+        """
         basename = basename or self._default_file
         ds = self._get_dataset(basename)
         if ds['name'] not in self._skeletons:
@@ -611,7 +632,28 @@ class _AcaBackend:
                 raise RuntimeError(
                     'No embedded metadata in .aca for {}'.format(ds['name']))
             self._skeletons[ds['name']] = written[0]
-        return self._skeletons[ds['name']]
+
+        skeleton_path = self._skeletons[ds['name']]
+
+        # Also make the skeleton available in the CWD under its bare basename
+        # so that code like read_h5.py that does h5py.File('equilibrium.h5')
+        # can find it without knowing about the campaign archive.
+        cwd_path = os.path.join(os.getcwd(), basename)
+        if not os.path.exists(cwd_path):
+            try:
+                # Try a symlink first (cheap); fall back to copy.
+                os.symlink(os.path.abspath(skeleton_path), cwd_path)
+                self._log(
+                    'skeleton symlink: {} -> {}'.format(
+                        cwd_path, skeleton_path))
+            except (OSError, NotImplementedError):
+                import shutil
+                shutil.copy2(skeleton_path, cwd_path)
+                self._log(
+                    'skeleton copy: {} -> {}'.format(
+                        skeleton_path, cwd_path))
+
+        return skeleton_path
 
     # ------------------------------------------------------------------
     # SSH helpers
@@ -955,6 +997,37 @@ class _AcaBackend:
             except Exception:
                 pass
         return False
+
+    def get_skeleton_path(self, basename):
+        """
+        Return the local path to the skeleton HDF5 file for *basename*,
+        extracting it from the .aca archive if necessary.
+
+        This is used by sim_data to set self._all_attrs to the skeleton
+        so that third-party code accessing sim._all_attrs works in adios2 mode.
+        """
+        return self._skeleton(basename)
+
+    def ensure_all_skeletons_in_cwd(self):
+        """
+        Ensure skeleton files for all registered timeslice HDF5 files are
+        available in the current working directory.
+
+        This is called once during sim_data initialisation so that any
+        subsequent calls to readParameter(fname='equilibrium.h5') or
+        readParameter(fname='time_NNN.h5') by third-party m3dc1 code find
+        the skeleton files locally.
+        """
+        for basename in self._files:
+            # Only extract skeletons for timeslice files (not C1.h5).
+            if basename == 'C1.h5':
+                continue
+            try:
+                self._skeleton(basename)
+            except Exception as e:
+                self._log(
+                    'WARNING: could not extract skeleton for {}: {}'.format(
+                        basename, e))
 
     # ------------------------------------------------------------------
     # Injection helpers
@@ -1427,7 +1500,18 @@ class sim_data:
             self.ntime = int(ntime_attr) if ntime_attr is not None else 0
             self.available_traces = self._aca.list_group('scalars')
             self.available_traces.extend(['bharmonics', 'keharmonics'])
-            self._all_attrs = None
+
+            # Extract skeleton files for all timeslice HDF5 files and make
+            # them available in the CWD so that third-party m3dc1 code that
+            # opens files by bare name (e.g. readParameter(fname='equilibrium.h5'))
+            # can find them and read attributes like 'ntimestep', 'time', etc.
+            self._aca.ensure_all_skeletons_in_cwd()
+
+            # Set _all_attrs to the equilibrium skeleton so that code that
+            # accesses sim._all_attrs (e.g. readParameter(sim=sim)) works.
+            eq_skeleton = self._aca.get_skeleton_path('equilibrium.h5')
+            self._all_attrs = h5py.File(eq_skeleton, 'r')
+            self._all_attrs_list = list(self._all_attrs.keys())
             self._all_traces = None
 
         else:
