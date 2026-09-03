@@ -95,14 +95,11 @@ sys.stdout.buffer.write(buf.getvalue())
 sys.stdout.buffer.flush()
 """
 
-_NPY_MAGIC  = b"\x93NUMPY"
-_NPZ_MAGIC  = b"PK"          # zip/npz files start with PK
-_TIME_RE    = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
+_NPY_MAGIC = b"\x93NUMPY"
+_NPZ_MAGIC = b"PK"          # zip/npz files start with PK
+_TIME_RE   = re.compile(r"time[_.-]?(\d+)\.h5$", re.IGNORECASE)
 
 # Patterns in SSH/Lmod stderr that are noise and should not cause a failure.
-# These appear on systems like Perlmutter when the login shell sources module
-# init files, even when we use --norc --noprofile, because some remote_setup
-# strings or SSH environment hooks still trigger Lmod.
 _STDERR_NOISE_RES = [
     re.compile(r'Lmod has detected the following error'),
     re.compile(r'module\s+--ignore_cache'),
@@ -120,9 +117,7 @@ _STDERR_NOISE_RES = [
 def _is_real_error(stderr_text):
     """
     Return True only if *stderr_text* contains lines that are not just
-    Lmod/module-system noise.  This lets us ignore spurious module load
-    warnings that appear on HPC systems like Perlmutter without masking
-    genuine Python tracebacks or h5py errors.
+    Lmod/module-system noise.
     """
     for line in stderr_text.splitlines():
         if not any(pat.search(line) for pat in _STDERR_NOISE_RES):
@@ -133,15 +128,13 @@ def _is_real_error(stderr_text):
 class _SshMux:
     """
     Manages a single persistent SSH ControlMaster connection so that all
-    subsequent SSH calls reuse the same authenticated session.  This avoids
-    repeated password prompts and the per-connection TLS/key-exchange overhead.
+    subsequent SSH calls reuse the same authenticated session.
 
-    If *login* is empty the mux is a no-op and commands are returned unchanged.
+    If *login* is empty the mux is a no-op.
     """
 
-    def __init__(self, login, remote_setup=''):
+    def __init__(self, login):
         self._login = login
-        self._remote_setup = remote_setup
         self._socket = None
         self._proc   = None
         self._tmpdir = None
@@ -151,14 +144,13 @@ class _SshMux:
             return self
         self._tmpdir = tempfile.mkdtemp(prefix='fpy_ssh_mux_')
         self._socket = os.path.join(self._tmpdir, 'ctl')
-        # Start a background ControlMaster that stays alive until we close it.
         cmd = [
             'ssh',
             '-o', 'ControlMaster=yes',
             '-o', 'ControlPath={}'.format(self._socket),
             '-o', 'ControlPersist=yes',
-            '-o', 'BatchMode=no',       # allow initial interactive auth
-            '-N',                        # no remote command
+            '-o', 'BatchMode=no',
+            '-N',
             self._login,
         ]
         self._proc = subprocess.Popen(
@@ -167,7 +159,6 @@ class _SshMux:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        # Give SSH a moment to establish the master connection.
         import time as _time
         for _ in range(60):
             if os.path.exists(self._socket):
@@ -207,44 +198,34 @@ class _SshMux:
 class _AcaBackend:
     """
     Backend for reading M3D-C1 data from a remote cluster via an HPC campaign
-    archive (.aca file), without using ADIOS2.
+    archive (.aca file).
 
-    A .aca file is a SQLite database that indexes HDF5 datasets living on one
-    or more remote hosts. For every HDF5 dataset it also embeds a
-    zlib-compressed metadata skeleton: the full HDF5 group/dataset tree, all
-    attributes, and the actual values of small datasets (<= 128 elements), but
-    no large array data.
-
-    Strategy
-    --------
-    - Metadata and small datasets: read from the embedded HDF5 skeleton
-      (local, no network access).
-    - File-root attributes: fetched from the remote host via SSH + h5py on
-      first access (one SSH call for all attributes), then cached in memory.
-    - Large arrays (time traces, mesh data, field coefficients): streamed
-      from the remote host via SSH + h5py and cached locally as .npy files.
-    - Scalar groups: all scalars under a group are fetched in a single SSH
-      call using np.savez, avoiding one-connection-per-scalar overhead.
-    - SSH connection reuse: a ControlMaster socket is established once at
-      construction time; all subsequent SSH calls reuse it.
+    Actual .aca SQLite schema
+    -------------------------
+    info      (id TEXT, name TEXT, version TEXT, modtime INT)
+    host      (hostname TEXT PK, longhostname TEXT, modtime INT, deltime INT,
+               default_protocol TEXT)
+               -- replica.hostid references host.rowid  (implicit integer rowid)
+    directory (hostid INT, name TEXT, modtime INT, deltime INT,
+               PK (hostid, name))
+               -- replica.dirid references directory.rowid
+    dataset   (name TEXT PK, uuid TEXT, modtime INT, deltime INT,
+               fileformat TEXT, tsid INT, tsorder INT)
+               -- replica.datasetid references dataset.rowid
+    replica   (datasetid INT, hostid INT, dirid INT, archiveid INT,
+               name TEXT, modtime INT, deltime INT, keyid INT, size INT,
+               PK (datasetid, hostid, dirid, archiveid, name))
+               -- repfiles.replicaid references replica.rowid
+    file      (fileid INTEGER PK, name TEXT, compression INT, lenorig INT,
+               lencompressed INT, modtime INT, checksum TEXT, data BLOB)
+    repfiles  (replicaid INT, fileid INT, PK (replicaid, fileid))
 
     Timeslice / filename convention
     --------------------------------
-    M3D-C1 uses the following mapping between the integer *timeslice* value
-    and the HDF5 file on disk:
-
-      timeslice == -1   ->  equilibrium.h5   (equilibrium / no time advance)
-      timeslice ==  0   ->  time_000.h5
-      timeslice ==  N   ->  time_NNN.h5      (N > 0)
-
-    Inside each of these files the mesh and field data live at the **file
-    root** (e.g. ``/mesh/elements``, ``/fields/psi``).  There is no
-    ``time_NNN/`` sub-group inside the timeslice files themselves; that
-    sub-group naming only appears inside ``C1.h5`` when that file aggregates
-    multiple timeslices.
-
-    The special string ``'last'`` is resolved to ``ntime - 1`` by
-    ``sim_data.set_timeslice`` before reaching this backend.
+      timeslice == -1  ->  equilibrium.h5
+      timeslice ==  0  ->  time_000.h5
+      timeslice ==  N  ->  time_NNN.h5   (N > 0)
+      'last'           ->  resolved upstream to ntime-1
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -264,18 +245,14 @@ class _AcaBackend:
         self._con = sqlite3.connect(
             'file:{}?mode=ro'.format(aca_filename), uri=True)
         cur = self._con.cursor()
+
+        # 'id' is TEXT in this schema.
         row = cur.execute(
             'SELECT id, name, version FROM info').fetchone()
-        self._archive_id, self._archive_name, self._version = row
-
-        tables = {r[0] for r in cur.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'")}
-        self._has_repfiles = 'repfiles' in tables
-        if 'replica' not in tables:
+        if row is None:
             raise RuntimeError(
-                'Unsupported archive schema (version {}). '
-                'Run: hpc_campaign manager <aca> upgrade'.format(
-                    self._version))
+                'Campaign archive info table is empty: {}'.format(aca_filename))
+        self._archive_id, self._archive_name, self._version = row
 
         self._simulation = campaign_simulation.strip('/')
         self._datasets = self._load_datasets()
@@ -306,11 +283,9 @@ class _AcaBackend:
 
         self._skeletons = {}          # ds['name'] -> local skeleton path
         self._root_attrs_cache = {}   # file basename -> dict of attrs
-        self._mesh_injected = False   # whether mesh has been injected yet
+        self._mesh_injected = False
 
-        # Establish a persistent SSH ControlMaster connection up front so that
-        # all subsequent SSH calls reuse the same authenticated session.
-        self._mux = _SshMux(login, remote_setup)
+        self._mux = _SshMux(login)
         self._mux.__enter__()
 
     # ------------------------------------------------------------------
@@ -318,56 +293,82 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _load_datasets(self):
+        """
+        Load all dataset/replica/file metadata from the .aca SQLite database.
+
+        Key points about the schema:
+        - host, directory, dataset, and replica all use SQLite's implicit
+          integer rowid as the foreign-key target, even though their declared
+          PRIMARY KEY columns are text/composite.  We must SELECT rowid
+          explicitly to get those integer ids.
+        - repfiles.replicaid references replica.rowid.
+        - replica.datasetid references dataset.rowid.
+        - replica.hostid    references host.rowid.
+        - replica.dirid     references directory.rowid.
+        """
         cur = self._con.cursor()
+
+        # host: rowid -> (hostname, longhostname)
         hosts = {
             r[0]: (r[1], r[2])
             for r in cur.execute(
                 'SELECT rowid, hostname, longhostname FROM host')}
+
+        # directory: rowid -> (hostid, name)
         dirs = {
             r[0]: (r[1], r[2])
             for r in cur.execute(
                 'SELECT rowid, hostid, name FROM directory')}
 
+        # dataset: rowid -> dict  (name is the TEXT primary key)
         datasets = {}
-        for did, uuid, name, fmt, deltime in cur.execute(
-                'SELECT rowid, uuid, name, fileformat, deltime FROM dataset'):
+        for row in cur.execute(
+                'SELECT rowid, name, uuid, fileformat, deltime FROM dataset'):
+            did, name, uuid, fmt, deltime = row
             if deltime:
                 continue
             datasets[did] = {
-                'id': did, 'uuid': uuid, 'name': name,
-                'fileformat': fmt, 'replicas': [], 'embedded_files': []}
+                'id': did, 'uuid': uuid or name, 'name': name,
+                'fileformat': fmt or '', 'replicas': [],
+                'embedded_files': []}
 
-        for rid, dsid, hostid, dirid, name, deltime, size in cur.execute(
+        # replica: rowid -> dataset entry
+        # replica.datasetid -> dataset.rowid
+        # replica.hostid    -> host.rowid
+        # replica.dirid     -> directory.rowid
+        replica_rowids = {}   # replica.rowid -> dataset dict (for repfiles)
+        for row in cur.execute(
                 'SELECT rowid, datasetid, hostid, dirid, name, '
                 'deltime, size FROM replica'):
+            rid, dsid, hostid, dirid, rname, deltime, size = row
             ds = datasets.get(dsid)
             if ds is None or deltime:
                 continue
             hostname, longhost = hosts.get(hostid, ('?', '?'))
             _, dirname = dirs.get(dirid, (None, '?'))
-            ds['replicas'].append({
-                'id': rid, 'hostname': hostname, 'longhost': longhost,
-                'directory': dirname, 'name': name, 'size': size or 0,
-                'remote_path': os.path.join(dirname, name)})
+            rep_entry = {
+                'id': rid,
+                'hostname': hostname,
+                'longhost': longhost,
+                'directory': dirname,
+                'name': rname,
+                'size': size or 0,
+                'remote_path': os.path.join(dirname or '', rname or '')}
+            ds['replicas'].append(rep_entry)
+            replica_rowids[rid] = ds
 
-        if self._has_repfiles:
-            file_q = (
-                'SELECT r.datasetid, f.fileid, f.name, f.lenorig, '
-                'f.lencompressed FROM file f '
-                'JOIN repfiles rf ON f.fileid = rf.fileid '
-                'JOIN replica r ON rf.replicaid = r.rowid')
-        else:
-            file_q = (
-                'SELECT r.datasetid, f.rowid, f.name, f.lenorig, '
-                'f.lencompressed FROM file f '
-                'JOIN replica r ON f.replicaid = r.rowid')
-        for dsid, fid, name, lenorig, lencomp in cur.execute(file_q):
-            ds = datasets.get(dsid)
+        # repfiles: replicaid -> fileid  (replicaid = replica.rowid)
+        for row in cur.execute(
+                'SELECT rf.replicaid, f.fileid, f.name, f.lenorig, '
+                'f.lencompressed '
+                'FROM repfiles rf JOIN file f ON rf.fileid = f.fileid'):
+            replicaid, fid, fname, lenorig, lencomp = row
+            ds = replica_rowids.get(replicaid)
             if ds is None:
                 continue
             if all(e['id'] != fid for e in ds['embedded_files']):
                 ds['embedded_files'].append({
-                    'id': fid, 'name': name,
+                    'id': fid, 'name': fname,
                     'len_orig': lenorig or 0,
                     'len_compressed': lencomp or 0})
 
@@ -399,14 +400,9 @@ class _AcaBackend:
             written = []
             for ef in ds['embedded_files']:
                 fid = ef['id']
-                if self._has_repfiles:
-                    row = cur.execute(
-                        'SELECT data, compression FROM file '
-                        'WHERE fileid = ?', (fid,)).fetchone()
-                else:
-                    row = cur.execute(
-                        'SELECT data, compression FROM file '
-                        'WHERE rowid = ?', (fid,)).fetchone()
+                row = cur.execute(
+                    'SELECT data, compression FROM file '
+                    'WHERE fileid = ?', (fid,)).fetchone()
                 if row is None or row[0] is None:
                     continue
                 blob, compression = row
@@ -415,8 +411,8 @@ class _AcaBackend:
                     self._cache_dir, 'skeletons', ds['name'],
                     os.path.basename(ef['name']))
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
-                with open(dest, 'wb') as f:
-                    f.write(data)
+                with open(dest, 'wb') as fh:
+                    fh.write(data)
                 written.append(dest)
             if not written:
                 raise RuntimeError(
@@ -430,14 +426,10 @@ class _AcaBackend:
 
     def _remote_run(self, script, argv, what):
         """
-        Run *script* (a Python source string) on the remote host with the
-        given *argv* list passed as command-line arguments.
+        Run *script* on the remote host via SSH, passing *argv* as arguments.
 
-        stderr is inspected with ``_is_real_error()`` before deciding whether
-        to raise.  Lines that are purely Lmod/module-system noise (very common
-        on HPC systems like Perlmutter) are ignored so that a spurious module
-        load warning in the user's ``remote_setup`` string does not cause a
-        failure when the Python script itself ran successfully.
+        Lmod/module-system noise in stderr is ignored; only genuine errors
+        (Python tracebacks, h5py errors, etc.) cause a RuntimeError.
         """
         parts = []
         if self._remote_setup:
@@ -460,14 +452,10 @@ class _AcaBackend:
 
         stderr_text = proc.stderr.decode(errors='replace')
 
-        # Only raise if the process failed AND stderr contains something that
-        # is not just Lmod/module noise.
         if proc.returncode != 0 and _is_real_error(stderr_text):
             raise RuntimeError(
                 'Remote {} failed:\n{}'.format(what, stderr_text[-2000:]))
 
-        # If the process failed but stderr was only noise, log a warning and
-        # continue — the stdout may still contain valid data.
         if proc.returncode != 0:
             self._log(
                 'WARNING: remote {} exited with code {} '
@@ -477,17 +465,15 @@ class _AcaBackend:
         return proc.stdout
 
     def _var_cache_path(self, ds, variable, slc):
-        rep_mt = max((r['id'] for r in ds['replicas']), default=0)
         key = hashlib.sha1(
-            '{}:{}:{}:{}'.format(
-                ds['uuid'], rep_mt, variable, slc or '').encode()
+            '{}:{}:{}'.format(
+                ds['uuid'], variable, slc or '').encode()
         ).hexdigest()[:16]
         return os.path.join(self._cache_dir, 'vars', '{}.npy'.format(key))
 
     def _group_cache_path(self, ds, group):
-        rep_mt = max((r['id'] for r in ds['replicas']), default=0)
         key = hashlib.sha1(
-            '{}:{}:group:{}'.format(ds['uuid'], rep_mt, group).encode()
+            '{}:group:{}'.format(ds['uuid'], group).encode()
         ).hexdigest()[:16]
         return os.path.join(self._cache_dir, 'vars', '{}.npz'.format(key))
 
@@ -555,7 +541,6 @@ class _AcaBackend:
         """
         ds = self._get_dataset(basename or self._default_file)
 
-        # Check disk cache first.
         cache_file = self._group_cache_path(ds, group)
         if os.path.isfile(cache_file):
             self._log('group {}: from cache {}'.format(group, cache_file))
@@ -608,11 +593,10 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _fetch_root_attrs(self, basename=None):
-        """Fetch ALL root attributes in a single SSH call and cache them."""
+        """Fetch ALL root attributes in a single call and cache them."""
         import json
         key = basename or self._default_file
         if key not in self._root_attrs_cache:
-            # Try skeleton first (no SSH needed).
             if _have_h5py:
                 try:
                     with h5py.File(self._skeleton(basename), 'r') as f:
@@ -632,7 +616,6 @@ class _AcaBackend:
                 except Exception:
                     pass
 
-            # One SSH call for all root attributes.
             ds = self._get_dataset(key)
             rep = self._live_replica(ds)
             out = self._remote_run(
@@ -701,21 +684,15 @@ class _AcaBackend:
 
     def _ts_file_and_group(self, timeslice):
         """
-        Return (basename, hdf5_path_prefix) for a given integer timeslice.
+        Return (basename, '') for a given integer timeslice.
 
-        The M3D-C1 timeslice / filename convention is:
+          timeslice == -1  ->  equilibrium.h5
+          timeslice ==  0  ->  time_000.h5
+          timeslice ==  N  ->  time_NNN.h5
 
-          timeslice == -1  ->  equilibrium.h5   (data at file root, prefix='')
-          timeslice ==  0  ->  time_000.h5      (data at file root, prefix='')
-          timeslice ==  N  ->  time_NNN.h5      (data at file root, prefix='')
-
-        Inside each timeslice file the mesh and field data live at the file
-        root (e.g. ``mesh/elements``, ``fields/psi``).  The prefix returned
-        here is therefore always an empty string; callers should build paths
-        directly without prepending a group name.
-
-        The special value ``'last'`` is resolved upstream by
-        ``sim_data.set_timeslice`` before this method is called.
+        Data always lives at the file root inside timeslice files.
+        Falls back to the last known timeslice file if the expected file is
+        not registered in the archive.
         """
         if timeslice == -1:
             ts_file = 'equilibrium.h5'
@@ -723,7 +700,6 @@ class _AcaBackend:
             ts_file = 'time_{:03d}.h5'.format(timeslice)
 
         if ts_file not in self._files:
-            # Fall back gracefully: use the last known timeslice file.
             if self._timeslices:
                 ts_file = self._timeslices[-1][1]
             else:
@@ -733,12 +709,10 @@ class _AcaBackend:
 
     def inject_parameters(self, isrc):
         """
-        Read physical normalization parameters from the remote C1.h5 root
-        attributes and inject them into the fio_py numpy source.
-
+        Read physical normalization parameters from the C1.h5 root attributes
+        and inject them into the fio_py numpy source.
         All attributes are fetched in a single call to _fetch_root_attrs().
         """
-        # Fetch all root attributes at once (one SSH call or skeleton read).
         attrs = self._fetch_root_attrs()
 
         def _f(name, default=0.0):
@@ -759,11 +733,9 @@ class _AcaBackend:
 
     def inject_mesh(self, isrc, timeslice):
         """
-        Stream the mesh arrays from the appropriate time-slice HDF5 file on
-        the remote host and inject them into the fio_py numpy source.
-
-        The mesh is the same for all time slices in M3D-C1, so this only
-        needs to be done once. Subsequent calls are no-ops.
+        Stream the mesh arrays from the appropriate timeslice HDF5 file and
+        inject them into the fio_py numpy source.
+        Only done once; subsequent calls are no-ops.
         """
         if self._mesh_injected:
             return
@@ -771,17 +743,13 @@ class _AcaBackend:
         ts_file, _ = self._ts_file_and_group(timeslice)
         self._log('Injecting mesh from {}'.format(ts_file))
 
-        # Data lives at the file root in each timeslice file.
         elements = self.read('mesh/elements', basename=ts_file)
-
         version = int(self.get_root_attr('version') or 0)
-
         nelms = elements.shape[0]
 
         a  = np.ascontiguousarray(elements[:, 0], dtype=np.float64)
         b  = np.ascontiguousarray(elements[:, 1], dtype=np.float64)
         c  = np.ascontiguousarray(elements[:, 2], dtype=np.float64)
-        # Column 3 is the angle; C++ stores cos/sin separately.
         co = np.ascontiguousarray(np.cos(elements[:, 3]), dtype=np.float64)
         sn = np.ascontiguousarray(np.sin(elements[:, 3]), dtype=np.float64)
         x  = np.ascontiguousarray(elements[:, 4], dtype=np.float64)
@@ -821,13 +789,9 @@ class _AcaBackend:
     def inject_field(self, isrc, timeslice, hdf5_name):
         """
         Stream the field coefficient array for one field at one timeslice
-        from the remote host and inject it into the fio_py numpy source.
-
-        hdf5_name: the name of the field dataset inside the HDF5 fields group
-                   (e.g. 'psi', 'den', 'te').
+        and inject it into the fio_py numpy source.
         """
         ts_file, _ = self._ts_file_and_group(timeslice)
-        # Data lives at the file root: fields/<name>
         real_path = 'fields/{}'.format(hdf5_name)
         self._log('Injecting field {} timeslice {} from {}'.format(
             hdf5_name, timeslice, ts_file))
@@ -856,11 +820,8 @@ class _AcaBackend:
 
     def inject_scalars(self, isrc):
         """
-        Stream all scalar time series from the remote C1.h5 and inject them
-        into the fio_py numpy source. Also injects 'slice_times'.
-
-        All scalars are fetched in a single SSH call using read_group(),
-        avoiding one-connection-per-scalar overhead.
+        Stream all scalar time series from C1.h5 in a single SSH call and
+        inject them into the fio_py numpy source.
         """
         self._log('Fetching all scalars in one SSH call')
         try:
@@ -994,10 +955,10 @@ class sim_data:
 
     Timeslice convention
     --------------------
-    time=-1   -> equilibrium.h5  (equilibrium / no time advance)
-    time=0    -> time_000.h5
-    time=N    -> time_NNN.h5     (N > 0)
-    time='last' -> highest available time_NNN.h5
+    time=-1     -> equilibrium.h5
+    time=0      -> time_000.h5
+    time=N      -> time_NNN.h5   (N > 0)
+    time='last' -> highest available timeslice
 
     Field coefficient arrays and mesh data are streamed on demand from the
     remote host via SSH + h5py and injected directly into the fusion-io C++
@@ -1059,7 +1020,7 @@ class sim_data:
             Python interpreter to invoke on the remote host.
 
         **remote_setup**
-            Shell command run before the remote Python script.  Module-load
+            Shell command run before the remote Python script. Module-load
             errors in this command are automatically ignored so that HPC
             systems that print Lmod warnings do not cause failures.
         """
@@ -1084,8 +1045,6 @@ class sim_data:
                 'Unsupported filetype: {}. '
                 'Supported: m3dc1, nimrod, adios2.'.format(filetype))
 
-        # Dictionary contains the field abbreviation, the type of field,
-        # and the species
         self.typedict = {
             'j'        : ('current density',       'vector', None,       'simple'),
             'ni'       : ('density',               'scalar', 'main ion', 'simple'),
@@ -1125,10 +1084,6 @@ class sim_data:
                 print('Campaign archive: streaming from simulation '
                       '"{}" in {}'.format(campaign_simulation, self.filename))
 
-            # Open a numpy source and inject parameters + scalars.
-            # inject_parameters uses a single SSH call (or skeleton read) for
-            # all root attributes.  inject_scalars uses a single SSH call for
-            # all scalar arrays.
             self._isrc = fio_py.open_numpy_source()
             self._aca.inject_parameters(self._isrc)
             self._aca.inject_scalars(self._isrc)
@@ -1157,8 +1112,6 @@ class sim_data:
         self.hint = fio_py.allocate_hint(self._isrc)
         fio_py.get_options(self._isrc)
 
-        # For campaign mode, inject mesh before querying geometry parameters.
-        # Resolve 'last' here so inject_mesh receives an integer.
         if filetype == 'adios2':
             if isinstance(time, str) and time == 'last':
                 time_int = self.ntime - 1
@@ -1172,7 +1125,6 @@ class sim_data:
             self.fields.append(self._imag)
         self._cs = fio_py.get_int_parameter(self._isrc, fio_py.FIO_GEOMETRY)
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
-        # available fields is a dictionary from names to assigned integers
         self._available_fields = dict(zip(
             [fio_py.get_field_name(nr) for nr in self._iavailable_fields],
             self._iavailable_fields))
@@ -1270,9 +1222,8 @@ class sim_data:
 
     def _ensure_field_injected(self, hdf5_name, timeslice):
         """
-        Ensure that the named field coefficients for the given timeslice have
-        been injected into the numpy source. Called by the field class before
-        requesting field evaluation. For local files this is a no-op.
+        Ensure field coefficients for the given timeslice have been injected.
+        For local files this is a no-op.
         """
         if self._filetype != 'adios2':
             return
@@ -1311,8 +1262,6 @@ class sim_data:
             elif species == 'main ion':
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_MAIN_ION)
 
-            # For campaign mode, stream and inject the field coefficients
-            # before calling get_field so the C++ evaluator has the data.
             if sim_data._filetype == 'adios2':
                 hdf5_map = {
                     'psi'            : 'psi',
@@ -1350,15 +1299,11 @@ class sim_data:
 
         def evaluate(self, x):
             """
-            Evaluates the required field, returns a one-tuple (scalar quantity
-            required) or a three-tuple (vector) or a nine-tuple (tensor)
-            evaluated at the location x.
-
-            Arguments:
+            Evaluates the required field, returns a one-tuple (scalar),
+            three-tuple (vector) or nine-tuple (tensor) at location x.
 
             **x**
-                Three-tuple with the R, phi, z coordinate where the field is
-                to be evaluated.
+                Three-tuple (R, phi, Z).
             """
             if self.ftype == 'vector':
                 try:
@@ -1383,14 +1328,10 @@ class sim_data:
 
         def evaluate_deriv(self, x):
             """
-            Evaluates the derivative of the required field, returns a
-            three-tuple (scalar) or a nine-tuple (vector) evaluated at x.
-
-            Arguments:
+            Evaluates the derivative of the field at location x.
 
             **x**
-                Three-tuple with the R, phi, z coordinate where the field is
-                to be evaluated.
+                Three-tuple (R, phi, Z).
             """
             if self.ftype == 'vector':
                 try:
@@ -1409,9 +1350,7 @@ class sim_data:
 
     class mesh:
         """
-        Mesh class: init routine calls read_mesh() that reads the mesh from
-        the time slice file and stores the elements in an array. It also reads
-        the output version and nplanes.
+        Mesh class: reads the mesh from the timeslice file.
         """
         def __init__(self, sim_data, time=None, quiet=False):
             self.sim_data = sim_data
@@ -1454,8 +1393,7 @@ class sim_data:
 
     class signal:
         """
-        Signal class: for diagnostic signals from magnetic probes and flux
-        loops. Not available in campaign archive mode.
+        Signal class: for diagnostic signals. Not available in campaign mode.
         """
         def __init__(self, sim_data, signame):
             self.sim_data = sim_data
@@ -1469,8 +1407,7 @@ class sim_data:
 
     class time_trace:
         """
-        time_trace class: reads scalar time traces from C1.h5 (local) or
-        from the remote host via SSH + h5py (campaign archive mode).
+        time_trace class: reads scalar time traces.
         """
         def __init__(self, scalar, time=None, sim_data=None, ipellet=None):
             if (time is None) and (sim_data is None):
@@ -1667,7 +1604,6 @@ class sim_data:
         def __init__(self, sim_data, diagnostic):
             self.sim_data = sim_data
 
-            # Case corresponding to knowing the alfven times of the time slices
             if diagnostic == 'slice times':
                 self.diagnostic = np.arange(sim_data.ntime)
                 self.x_axis = np.zeros(sim_data.ntime)
@@ -1675,7 +1611,6 @@ class sim_data:
                     self.x_axis[t] = sim_data._get_attr(
                         'time_{:03d}'.format(t), 'time')
 
-            # Case corresponding to the timings of each iteration
             if diagnostic == 'timings':
                 self.diagnostic = {}
                 for timing in sim_data._list_group('timings'):
@@ -1684,7 +1619,6 @@ class sim_data:
                 self.x_axis = np.arange(
                     self.diagnostic['t_onestep'].shape[0]) + 1
 
-            # Case corresponding to the iterations of each step
             if diagnostic == 'iterations':
                 self.diagnostic = sim_data._get_dataset('kspits/kspits')
                 self.x_axis = np.arange(
