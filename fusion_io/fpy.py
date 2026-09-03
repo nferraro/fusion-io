@@ -142,15 +142,15 @@ _STDERR_NOISE_RES = [
 # ---------------------------------------------------------------------------
 # HDF5 field dependency map
 # ---------------------------------------------------------------------------
-# Maps the human-readable fpy field name (as used in typedict / hdf5_map) to
-# the list of HDF5 dataset names that must be injected into the fusion-io
-# numpy source before that field can be evaluated.
+# Maps the human-readable fpy field name (as used in typedict) to the list
+# of HDF5 dataset names that must be injected into the fusion-io numpy source
+# before that field can be evaluated.
 #
-# This is derived directly from the load() methods in fusion_io/m3dc1_field.cpp:
+# Derived directly from the load() methods in fusion_io/m3dc1_field.cpp:
 #
-#   m3dc1_magnetic_field::load()   -> psi, I, f (or fp)
+#   m3dc1_magnetic_field::load()   -> psi, I, f (or fp, chosen by ifprime)
 #   m3dc1_vector_potential::load() -> psi, f
-#   m3dc1_current_density::load()  -> psi, I, f (or fp)
+#   m3dc1_current_density::load()  -> psi, I, f (or fp, chosen by ifprime)
 #   m3dc1_fluid_velocity::load()   -> phi, V, chi
 #       (V here is a scalar HDF5 field used to build the toroidal component;
 #        it is NOT the velocity vector itself)
@@ -158,22 +158,25 @@ _STDERR_NOISE_RES = [
 #   m3dc1_pi_field::load()         -> Pe, P  (ion pressure = P - Pe)
 #   m3dc1_scalar_field::load()     -> the named field directly
 #
-# Fields that are simple scalars (psi, ne, te, ti, P, Pe, den) are injected
-# by name directly and do not appear here (they fall through to the default
-# single-field injection path).
+# IMPORTANT: The numpy source C++ backend (m3dc1_numpy_source) looks up
+# injected fields by the HDF5 dataset name passed to set_numpy_field().
+# The composite field types (magnetic field, vector potential, etc.) are
+# assembled by the C++ layer from these individual named datasets.
+# We inject each dependency under its HDF5 dataset name so the C++ layer
+# can find them.
 #
 # Note: 'f' and 'fp' are both present in the HDF5 files.  The C++ code
 # chooses between them based on source->ifprime.  We inject both so that
 # whichever the C++ layer selects is available.
 _FIELD_HDF5_DEPS = {
-    # fpy name          : tuple of HDF5 dataset names to inject
-    'magnetic field'    : ('psi', 'I', 'f', 'fp'),
-    'vector potential'  : ('psi', 'f'),
+    # fpy name             : tuple of HDF5 dataset names to inject
+    'magnetic field'       : ('psi', 'I', 'f', 'fp'),
+    'vector potential'     : ('psi', 'f'),
     'grad vector potential': ('psi', 'f'),
-    'current density'   : ('psi', 'I', 'f', 'fp'),
-    'fluid velocity'    : ('phi', 'V', 'chi'),
-    'electric field'    : ('E_R', 'E_PHI', 'E_Z'),
-    'pressure'          : ('Pe', 'P'),   # ion pressure = P - Pe
+    'current density'      : ('psi', 'I', 'f', 'fp'),
+    'fluid velocity'       : ('phi', 'V', 'chi'),
+    'electric field'       : ('E_R', 'E_PHI', 'E_Z'),
+    'pressure'             : ('Pe', 'P'),   # ion pressure = P - Pe
     # Simple scalars: injected by their own name, no entry needed here.
     # 'psi'             : ('psi',)   -- handled by default path
     # 'total pressure'  : ('P',)     -- handled by default path
@@ -195,7 +198,8 @@ _SIMPLE_FIELD_HDF5_NAME = {
 }
 
 # Known fallback names for fields whose primary HDF5 name may differ across
-# M3D-C1 output versions.  Used by resolve_field_name().
+# M3D-C1 output versions.  Used by inject_field() when the primary name is
+# not found in the timeslice file.
 _HDF5_FIELD_FALLBACKS = {
     'psi'   : ('Psi', 'flux', 'psi_n'),
     'I'     : ('i', 'Itor'),
@@ -214,6 +218,45 @@ _HDF5_FIELD_FALLBACKS = {
     'te'    : ('Te', 'T_e'),
     'ti'    : ('Ti', 'T_i'),
 }
+
+# ---------------------------------------------------------------------------
+# Mapping from fpy field name to the fio_py field-type constant.
+# This is used in adios2 mode to look up the correct FIO_* integer type
+# for fio_py.get_field(), bypassing the _available_fields dict which may
+# not be fully populated for the numpy source.
+#
+# The numpy source's get_available_fields() only returns fields that have
+# already been injected, so we cannot rely on it to find the FIO_* type
+# for composite fields like FIO_VECTOR_POTENTIAL.  Instead we look up the
+# type constant directly by name here.
+# ---------------------------------------------------------------------------
+def _get_fio_field_type(field_name):
+    """
+    Return the fio_py integer field-type constant for *field_name*, or None
+    if the name is not a known composite field type.
+
+    This is needed because the numpy source's get_available_fields() may not
+    contain all field types, so we look them up by name directly.
+    """
+    _map = {
+        'magnetic field'       : 'FIO_MAGNETIC_FIELD',
+        'vector potential'     : 'FIO_VECTOR_POTENTIAL',
+        'grad vector potential': 'FIO_GRAD_VECTOR_POTENTIAL',
+        'current density'      : 'FIO_CURRENT_DENSITY',
+        'fluid velocity'       : 'FIO_FLUID_VELOCITY',
+        'electric field'       : 'FIO_ELECTRIC_FIELD',
+        'pressure'             : 'FIO_PRESSURE',
+        'total pressure'       : 'FIO_TOTAL_PRESSURE',
+        'density'              : 'FIO_DENSITY',
+        'temperature'          : 'FIO_TEMPERATURE',
+        'psi'                  : 'FIO_POLOIDAL_FLUX',
+        'total radiation'      : 'FIO_TOTAL_RADIATION',
+        'alpha'                : 'FIO_ALPHA',
+    }
+    attr = _map.get(field_name)
+    if attr is None:
+        return None
+    return getattr(fio_py, attr, None)
 
 
 def _is_real_error(stderr_text):
@@ -703,28 +746,6 @@ class _AcaBackend:
         self._log('fields in {}: {}'.format(basename, sorted(names)))
         return names
 
-    def resolve_field_name(self, hdf5_name, basename, fallbacks=()):
-        """
-        Return the actual dataset name for a field inside the 'fields/' group
-        of *basename*, trying *hdf5_name* first and then each name in
-        *fallbacks*.  Raises KeyError if none are found.
-
-        This handles cases where the canonical name used in fpy differs from
-        the actual name in the HDF5 file.
-        """
-        available = self.list_fields(basename)
-        for candidate in (hdf5_name,) + tuple(fallbacks):
-            if candidate in available:
-                if candidate != hdf5_name:
-                    self._log(
-                        "field '{}' not found in {}; using '{}' instead".format(
-                            hdf5_name, basename, candidate))
-                return candidate
-        raise KeyError(
-            "Field '{}' (and fallbacks {}) not found in 'fields/' of {}. "
-            "Available: {}".format(
-                hdf5_name, fallbacks, basename, sorted(available)))
-
     # ------------------------------------------------------------------
     # Array reading
     # ------------------------------------------------------------------
@@ -1046,18 +1067,25 @@ class _AcaBackend:
     def inject_field(self, isrc, timeslice, hdf5_name):
         """
         Stream one HDF5 field coefficient array and inject it into the
-        fio_py numpy source.
+        fio_py numpy source under the name *hdf5_name*.
 
         *hdf5_name* is the name of a single HDF5 dataset inside the
         'fields/' group of the timeslice file (e.g. 'psi', 'I', 'f', 'phi',
         'V', 'chi', 'E_R', 'E_PHI', 'E_Z', 'Pe', 'P', 'ne', 'den', 'te',
         'ti', ...).
 
+        The C++ numpy source backend looks up injected fields by the name
+        passed to set_numpy_field(), which must match the name the C++ field
+        load() method uses when calling source->file.load_field().  These
+        names are the HDF5 dataset names (e.g. 'psi', 'I', 'f', not 'A',
+        'B', etc.).
+
         Injection is skipped if the same (ts_file, hdf5_name) pair has
         already been injected in this session.
 
-        The caller (_ensure_fields_injected) is responsible for calling this
-        method once for each HDF5 dataset that a composite field depends on.
+        If the field is not present in this timeslice file (e.g. 'chi' is
+        only in equilibrium.h5), injection is skipped gracefully with a
+        warning.  The C++ layer handles missing optional fields.
         """
         ts_file, _ = self._ts_file_and_group(timeslice)
 
@@ -1113,8 +1141,8 @@ class _AcaBackend:
 
         ntor = int(self.get_root_attr('ntor') or 0)
 
-        # Inject using the canonical HDF5 name (hdf5_name) so that the
-        # fusion-io C++ layer can find it by the name it expects.
+        # Inject under hdf5_name so the C++ layer can find it by the name
+        # it uses in load_field() calls (e.g. 'psi', 'I', 'f', 'phi', etc.)
         fio_py.set_numpy_field(
             isrc, timeslice, hdf5_name,
             real_flat.tobytes(),
@@ -1587,19 +1615,19 @@ class sim_data:
         return to you what you want. ex:
         myfield = mysim.get_field('...')
         Allowed strings are:
-        'j'   - current density  (C++: psi, I, f/fp)
-        'ni'  - ion density      (C++: den)
-        'ne'  - electron density (C++: ne)
-        'v'   - fluid velocity   (C++: phi, V, chi)
-        'B'   - magnetic field   (C++: psi, I, f/fp)
-        'p'   - total pressure   (C++: P)
-        'pi'  - ion pressure     (C++: P - Pe)
-        'pe'  - electron pressure(C++: Pe)
-        'ti'  - ion temperature  (C++: ti)
-        'te'  - electron temperature (C++: te)
-        'A'   - vector potential (C++: psi, f)
-        'E'   - electric field   (C++: E_R, E_PHI, E_Z)
-        'psi' - poloidal flux    (C++: psi)
+        'j'   - current density  (C++ loads: psi, I, f/fp)
+        'ni'  - ion density      (C++ loads: den)
+        'ne'  - electron density (C++ loads: ne)
+        'v'   - fluid velocity   (C++ loads: phi, V, chi)
+        'B'   - magnetic field   (C++ loads: psi, I, f/fp)
+        'p'   - total pressure   (C++ loads: P)
+        'pi'  - ion pressure     (C++ loads: P, Pe; computes P-Pe)
+        'pe'  - electron pressure(C++ loads: Pe)
+        'ti'  - ion temperature  (C++ loads: ti)
+        'te'  - electron temperature (C++ loads: te)
+        'A'   - vector potential (C++ loads: psi, f)
+        'E'   - electric field   (C++ loads: E_R, E_PHI, E_Z)
+        'psi' - poloidal flux    (C++ loads: psi)
         'kprad_rad' - total radiation
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
@@ -1622,11 +1650,26 @@ class sim_data:
                 sim_data._ensure_fields_injected(
                     field, species, sim_data.timeslice)
 
-            if field in sim_data._available_fields.keys():
-                itype = sim_data._available_fields[field]
-            else:
-                itype = fio_py.FIO_SCALAR_FIELD
-                fio_py.set_str_option(fio_py.FIO_FIELD_NAME, field)
+            # Determine the fio_py field type integer.
+            #
+            # For the numpy source (adios2 mode), _available_fields may not
+            # contain all field types because get_available_fields() on the
+            # numpy source only returns fields that have already been injected
+            # by name, not composite types like FIO_VECTOR_POTENTIAL.
+            # We therefore try _get_fio_field_type() first for adios2 mode
+            # to get the correct FIO_* constant directly, and fall back to
+            # _available_fields / FIO_SCALAR_FIELD for unknown names.
+            itype = None
+            if sim_data._filetype == 'adios2':
+                itype = _get_fio_field_type(field)
+
+            if itype is None:
+                if field in sim_data._available_fields:
+                    itype = sim_data._available_fields[field]
+                else:
+                    itype = fio_py.FIO_SCALAR_FIELD
+                    fio_py.set_str_option(fio_py.FIO_FIELD_NAME, field)
+
             self._ifield = fio_py.get_field(sim_data._isrc, itype)
             self.sim_data.fields.append(self._ifield)
             self.ftype = ftype
