@@ -178,6 +178,22 @@ _HDF5_FIELD_FALLBACKS = {
     'ti'    : ('Ti', 'T_i'),
 }
 
+
+def _required_attrs_for(basename):
+    """
+    Return the tuple of root attribute names that must be present in the
+    cached attrs for *basename*.
+
+    Timeslice files (equilibrium.h5, time_NNN.h5) must have 'ntimestep'.
+    C1.h5 must have 'ntime'.
+    If any are missing from the skeleton, they are fetched from the remote.
+    """
+    if basename == 'C1.h5':
+        return ('ntime', 'bzero', 'version')
+    else:
+        return ('ntimestep', 'version')
+
+
 def _get_fio_field_type(field_name):
     """
     Return the fio_py integer field-type constant for *field_name*, or None
@@ -235,20 +251,25 @@ def _split_ts_prefix(path):
 class _AcaAttrsProxy:
     """
     Proxy for h5py AttributeManager.
-    Supports: attrs[key], key in attrs, attrs.keys()
-    Routes reads through _AcaBackend.
-    """
-    def __init__(self, aca, basename, group):
-        self._aca = aca
-        self._basename = basename   # e.g. 'C1.h5' or 'equilibrium.h5'
-        self._group = group         # HDF5 group path, '' or '/' for root
 
-    def _fetch(self):
+    Supports: attrs[key], key in attrs, attrs.keys(), attrs.items()
+
+    Routes attribute reads through _AcaBackend, trying each of the provided
+    basenames in order until the attribute is found.
+    """
+    def __init__(self, aca, basenames, group):
+        self._aca = aca
+        if isinstance(basenames, str):
+            basenames = [basenames]
+        self._basenames = basenames
+        self._group = group
+
+    def _fetch_from(self, basename):
+        """Fetch attrs dict from one file."""
         if self._group in ('', '/'):
-            return self._aca._fetch_root_attrs(self._basename)
+            return self._aca._fetch_root_attrs(basename)
         else:
-            # Read all attrs of the group from the skeleton.
-            skeleton = self._aca._skeleton(self._basename)
+            skeleton = self._aca._skeleton(basename)
             if _have_h5py:
                 try:
                     with h5py.File(skeleton, 'r') as f:
@@ -267,16 +288,35 @@ class _AcaAttrsProxy:
                     pass
             return {}
 
+    def _fetch(self):
+        merged = {}
+        for basename in reversed(self._basenames):
+            try:
+                merged.update(self._fetch_from(basename))
+            except Exception:
+                pass
+        return merged
+
     def __getitem__(self, key):
-        d = self._fetch()
-        if key not in d:
-            raise KeyError(
-                "Unable to synchronously open attribute "
-                "(can't locate attribute: '{}')".format(key))
-        return d[key]
+        for basename in self._basenames:
+            try:
+                d = self._fetch_from(basename)
+                if key in d:
+                    return d[key]
+            except Exception:
+                pass
+        raise KeyError(
+            "Unable to synchronously open attribute "
+            "(can't locate attribute: '{}')".format(key))
 
     def __contains__(self, key):
-        return key in self._fetch()
+        for basename in self._basenames:
+            try:
+                if key in self._fetch_from(basename):
+                    return True
+            except Exception:
+                pass
+        return False
 
     def keys(self):
         return self._fetch().keys()
@@ -300,7 +340,7 @@ class _AcaGroupProxy:
     def __init__(self, aca, basename, path):
         self._aca = aca
         self._basename = basename
-        self._path = path.strip('/')   # HDF5 path within the file
+        self._path = path.strip('/')
 
     @property
     def filename(self):
@@ -317,18 +357,15 @@ class _AcaGroupProxy:
 
     def __getitem__(self, key):
         child_path = self._child_path(key)
-        # Try to read as a dataset first.
         try:
             data = self._aca.read(child_path, basename=self._basename)
             return data
         except Exception:
             pass
-        # Return a group proxy.
         return _AcaGroupProxy(self._aca, self._basename, child_path)
 
     def __contains__(self, key):
         child_path = self._child_path(key)
-        # Check skeleton.
         skeleton = self._aca._skeleton(self._basename)
         if _have_h5py:
             try:
@@ -365,65 +402,61 @@ class _AcaGroupProxy:
 
 class _AcaH5Proxy:
     """
-    Top-level proxy that mimics an h5py File handle for a campaign archive
-    dataset (e.g. C1.h5 or equilibrium.h5).
+    Top-level proxy that mimics an h5py File handle for a campaign archive.
 
     This allows existing analysis code that does:
         h5file = sim._all_attrs
-        h5file.attrs['version']
-        h5file['scalars/time']
+        h5file.attrs['version']        # root attribute from C1.h5
+        h5file.attrs['ntimestep']      # root attribute from equilibrium.h5
+        h5file['scalars/time']         # dataset from C1.h5
         'scalars' in h5file
         h5file.visititems(print)
 
-    to work transparently whether the data is local or remote.
+    to work transparently whether the data is local or remote, without any
+    changes to the analysis scripts.
 
-    For adios2 mode, sim._all_attrs is set to an instance of this class
-    pointing at the C1.h5 dataset (for global parameters and scalars) and
-    the equilibrium.h5 skeleton (for timeslice attributes).
+    Root attributes (.attrs) searches both the timeslice file
+    (e.g. equilibrium.h5) AND C1.h5, so that both 'ntimestep' (from
+    equilibrium.h5) and 'bzero', 'ntime', etc. (from C1.h5) are accessible
+    via sim._all_attrs.attrs[key] without any changes to calling code.
 
-    Path routing
-    ------------
-    Paths starting with 'scalars/' are routed to C1.h5 (which holds the
-    scalar time series).  All other paths are routed to the appropriate
-    timeslice file via _AcaBackend._route().
+    If the embedded skeleton is missing required attributes (e.g. 'ntimestep'),
+    _fetch_root_attrs() automatically fetches them from the remote host.
     """
 
-    def __init__(self, aca, default_basename='C1.h5'):
+    def __init__(self, aca, timeslice_basename='equilibrium.h5',
+                 scalar_basename='C1.h5'):
         self._aca = aca
-        self._default_basename = default_basename
+        self._ts_basename = timeslice_basename
+        self._sc_basename = scalar_basename
 
     def _resolve(self, path):
-        """
-        Return (basename, path_within_file) for a given logical path.
-
-        Scalars live in C1.h5; everything else is routed via _route().
-        """
         path = path.strip('/')
-        # Scalars and mag_probes live in C1.h5.
         if path.startswith('scalars') or path.startswith('mag_probes'):
-            return 'C1.h5', path
-        # Paths with a timeslice prefix are routed automatically.
+            return self._sc_basename, path
         basename, remainder = self._aca._route(path)
         return basename, remainder
 
     @property
     def filename(self):
-        return self._default_basename
+        return self._ts_basename
 
     @property
     def attrs(self):
-        # Root attrs of the default file (C1.h5 for global params).
-        return _AcaAttrsProxy(self._aca, self._default_basename, '')
+        # Search timeslice file first (for 'ntimestep', 'time', etc.),
+        # then C1.h5 (for 'bzero', 'ntime', 'version', etc.).
+        return _AcaAttrsProxy(
+            self._aca,
+            [self._ts_basename, self._sc_basename],
+            '')
 
     def __getitem__(self, path):
         basename, inner_path = self._resolve(path)
-        # Try to read as a dataset.
         try:
             data = self._aca.read(inner_path, basename=basename)
             return data
         except Exception:
             pass
-        # Return a group proxy.
         return _AcaGroupProxy(self._aca, basename, inner_path)
 
     def __contains__(self, path):
@@ -438,7 +471,7 @@ class _AcaH5Proxy:
         return False
 
     def keys(self):
-        skeleton = self._aca._skeleton(self._default_basename)
+        skeleton = self._aca._skeleton(self._ts_basename)
         if _have_h5py:
             try:
                 with h5py.File(skeleton, 'r') as f:
@@ -449,7 +482,7 @@ class _AcaH5Proxy:
 
     def visititems(self, func):
         """Mimic h5py File.visititems."""
-        skeleton = self._aca._skeleton(self._default_basename)
+        skeleton = self._aca._skeleton(self._ts_basename)
         if _have_h5py:
             try:
                 with h5py.File(skeleton, 'r') as f:
@@ -538,6 +571,16 @@ class _AcaBackend:
     select the embedded file whose basename matches the dataset basename
     (e.g. 'equilibrium.h5').  If no such file is found we fall back to any
     embedded .h5 file, then to the first embedded file.
+
+    Root attribute completeness
+    ---------------------------
+    The embedded skeleton may be missing root attributes that are present in
+    the actual remote file (e.g. 'ntimestep' in equilibrium.h5).  After
+    reading the skeleton, _fetch_root_attrs() checks whether all required
+    attributes are present.  If any are missing, it fetches the complete set
+    of root attributes from the remote host via SSH and merges them into the
+    cached dict.  This ensures that readParameter('ntimestep', h5file=sim._all_attrs)
+    always works correctly without any changes to calling code.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -943,42 +986,89 @@ class _AcaBackend:
     # Attribute reading
     # ------------------------------------------------------------------
 
+    def _fetch_root_attrs_remote(self, basename):
+        """
+        Fetch ALL root attributes directly from the remote host for *basename*.
+
+        This bypasses the skeleton cache and always contacts the remote host.
+        Used when the skeleton is missing required attributes (e.g. 'ntimestep'
+        is present in the actual equilibrium.h5 but absent from the embedded
+        skeleton in the .aca archive).
+        """
+        import json
+        ds = self._get_dataset(basename)
+        rep = self._live_replica(ds)
+        self._log(
+            'Fetching root attrs remotely for {} from {}'.format(
+                basename, rep['remote_path']))
+        out = self._remote_run(
+            _ATTRS_SCRIPT,
+            [rep['remote_path'], '/'],
+            'root attrs of {}'.format(ds['name']))
+        pos = out.find(b'###JSON###')
+        if pos < 0:
+            return {}
+        return json.loads(out[pos + len(b'###JSON###'):].decode())
+
     def _fetch_root_attrs(self, basename=None):
+        """
+        Fetch root attributes for *basename*, with automatic remote fallback
+        if the skeleton is missing required attributes.
+
+        Strategy:
+        1. Return from in-memory cache if already fetched.
+        2. Try the embedded skeleton (fast, no SSH).
+        3. Check whether all required attributes are present using
+           _required_attrs_for(basename).
+        4. If any are missing, fetch the complete attribute set from the
+           remote host and merge into the result.  This handles the common
+           case where the .aca skeleton was created without 'ntimestep'.
+        5. Cache and return the merged result.
+        """
         import json
         key = basename or self._default_file
-        if key not in self._root_attrs_cache:
-            if _have_h5py:
-                try:
-                    with h5py.File(self._skeleton(key), 'r') as f:
-                        def plain(v):
-                            try:
-                                return (v.item()
-                                        if getattr(v, 'shape', None) == ()
-                                        else v.tolist())
-                            except AttributeError:
-                                return (v.decode()
-                                        if isinstance(v, bytes) else v)
-                        self._root_attrs_cache[key] = {
-                            k: plain(v) for k, v in f.attrs.items()}
-                        self._log(
-                            'root attrs for {}: from skeleton'.format(key))
-                        return self._root_attrs_cache[key]
-                except Exception:
-                    pass
+        if key in self._root_attrs_cache:
+            return self._root_attrs_cache[key]
 
-            ds = self._get_dataset(key)
-            rep = self._live_replica(ds)
-            out = self._remote_run(
-                _ATTRS_SCRIPT,
-                [rep['remote_path'], '/'],
-                'root attrs of {}'.format(ds['name']))
-            pos = out.find(b'###JSON###')
-            if pos < 0:
-                self._root_attrs_cache[key] = {}
-            else:
-                self._root_attrs_cache[key] = json.loads(
-                    out[pos + len(b'###JSON###'):].decode())
-        return self._root_attrs_cache[key]
+        attrs = {}
+
+        # Step 1: try skeleton.
+        if _have_h5py:
+            try:
+                with h5py.File(self._skeleton(key), 'r') as f:
+                    def plain(v):
+                        try:
+                            return (v.item()
+                                    if getattr(v, 'shape', None) == ()
+                                    else v.tolist())
+                        except AttributeError:
+                            return (v.decode()
+                                    if isinstance(v, bytes) else v)
+                    attrs = {k: plain(v) for k, v in f.attrs.items()}
+                    self._log(
+                        'root attrs for {}: from skeleton'.format(key))
+            except Exception:
+                pass
+
+        # Step 2: check completeness.
+        required = _required_attrs_for(key)
+        missing = [a for a in required if a not in attrs]
+
+        if missing:
+            # Step 3: fetch from remote and merge.
+            self._log(
+                'root attrs for {}: skeleton missing {}; '
+                'fetching from remote'.format(key, missing))
+            try:
+                remote_attrs = self._fetch_root_attrs_remote(key)
+                attrs.update(remote_attrs)
+            except Exception as e:
+                self._log(
+                    'WARNING: could not fetch remote attrs for {}: {}'.format(
+                        key, e))
+
+        self._root_attrs_cache[key] = attrs
+        return attrs
 
     def get_root_attr(self, name, basename=None):
         return self._fetch_root_attrs(basename).get(name)
@@ -1246,8 +1336,15 @@ class sim_data:
 
     In adios2 mode, sim._all_attrs is an _AcaH5Proxy object that mimics
     an h5py File handle.  Code that accesses sim._all_attrs['scalars/time'],
-    sim._all_attrs.attrs['version'], 'scalars' in sim._all_attrs, etc. works
-    transparently for both local and remote data.
+    sim._all_attrs.attrs['version'], sim._all_attrs.attrs['ntimestep'],
+    'scalars' in sim._all_attrs, etc. works transparently for both local
+    and remote data without any changes to calling code.
+
+    The proxy searches both the timeslice file (equilibrium.h5) and C1.h5
+    for root attributes, so that both 'ntimestep' (from equilibrium.h5) and
+    'bzero', 'ntime', etc. (from C1.h5) are accessible via
+    sim._all_attrs.attrs[key].  If the embedded skeleton is missing required
+    attributes, they are fetched from the remote host automatically.
 
     Timeslice convention
     --------------------
@@ -1337,11 +1434,20 @@ class sim_data:
             # can find them and read attributes like 'ntimestep', 'time', etc.
             self._aca.ensure_all_skeletons_in_cwd()
 
+            # Determine the timeslice file for the requested time.
+            if isinstance(time, str) and time == 'last':
+                time_int = self.ntime - 1
+            else:
+                time_int = int(time)
+            ts_file, _ = self._aca._ts_file_and_group(time_int)
+
             # Set _all_attrs to an _AcaH5Proxy so that all existing analysis
             # code that accesses sim._all_attrs like an h5py File handle works
             # transparently for both local and remote data.
-            # The proxy routes attribute and dataset reads through _AcaBackend.
-            self._all_attrs = _AcaH5Proxy(self._aca, default_basename='C1.h5')
+            self._all_attrs = _AcaH5Proxy(
+                self._aca,
+                timeslice_basename=ts_file,
+                scalar_basename='C1.h5')
             self._all_attrs_list = self._all_attrs.keys()
             self._all_traces = self._all_attrs['scalars']
 
@@ -1363,10 +1469,6 @@ class sim_data:
         fio_py.get_options(self._isrc)
 
         if filetype == 'adios2':
-            if isinstance(time, str) and time == 'last':
-                time_int = self.ntime - 1
-            else:
-                time_int = int(time)
             self._aca.inject_mesh(self._isrc, time_int)
 
         self.set_timeslice(time)
