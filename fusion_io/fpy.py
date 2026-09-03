@@ -142,71 +142,30 @@ _STDERR_NOISE_RES = [
 # ---------------------------------------------------------------------------
 # HDF5 field dependency map
 # ---------------------------------------------------------------------------
-# Maps the human-readable fpy field name (as used in typedict) to the list
-# of HDF5 dataset names that must be injected into the fusion-io numpy source
-# before that field can be evaluated.
-#
-# Derived directly from the load() methods in fusion_io/m3dc1_field.cpp:
-#
-#   m3dc1_magnetic_field::load()   -> psi, I, f (or fp, chosen by ifprime)
-#   m3dc1_vector_potential::load() -> psi, f
-#   m3dc1_current_density::load()  -> psi, I, f (or fp, chosen by ifprime)
-#   m3dc1_fluid_velocity::load()   -> phi, V, chi
-#       (V here is a scalar HDF5 field used to build the toroidal component;
-#        it is NOT the velocity vector itself)
-#   m3dc1_electric_field::load()   -> E_R, E_PHI, E_Z
-#   m3dc1_pi_field::load()         -> Pe, P  (ion pressure = P - Pe)
-#   m3dc1_scalar_field::load()     -> the named field directly
-#
-# IMPORTANT: The numpy source C++ backend (m3dc1_numpy_source) looks up
-# injected fields by the HDF5 dataset name passed to set_numpy_field().
-# The composite field types (magnetic field, vector potential, etc.) are
-# assembled by the C++ layer from these individual named datasets.
-# We inject each dependency under its HDF5 dataset name so the C++ layer
-# can find them.
-#
-# Note: 'f' and 'fp' are both present in the HDF5 files.  The C++ code
-# chooses between them based on source->ifprime.  We inject both so that
-# whichever the C++ layer selects is available.
 _FIELD_HDF5_DEPS = {
-    # fpy name             : tuple of HDF5 dataset names to inject
     'magnetic field'       : ('psi', 'I', 'f', 'fp'),
     'vector potential'     : ('psi', 'f'),
     'grad vector potential': ('psi', 'f'),
     'current density'      : ('psi', 'I', 'f', 'fp'),
     'fluid velocity'       : ('phi', 'V', 'chi'),
     'electric field'       : ('E_R', 'E_PHI', 'E_Z'),
-    'pressure'             : ('Pe', 'P'),   # ion pressure = P - Pe
-    # Simple scalars: injected by their own name, no entry needed here.
-    # 'psi'             : ('psi',)   -- handled by default path
-    # 'total pressure'  : ('P',)     -- handled by default path
-    # 'density' (ne)    : ('ne',)    -- handled by default path
-    # 'density' (den)   : ('den',)   -- handled by default path
-    # 'temperature' (te): ('te',)    -- handled by default path
-    # 'temperature' (ti): ('ti',)    -- handled by default path
+    'pressure'             : ('Pe', 'P'),
 }
 
-# Maps the fpy human-readable field name to the single HDF5 dataset name
-# for simple scalar fields that are stored directly.  Used when a field is
-# not in _FIELD_HDF5_DEPS.
 _SIMPLE_FIELD_HDF5_NAME = {
     'psi'            : 'psi',
     'total pressure' : 'P',
     'total radiation': 'kprad_rad',
     'alpha'          : 'alpha',
-    # density and temperature are species-dependent; handled inline below.
 }
 
-# Known fallback names for fields whose primary HDF5 name may differ across
-# M3D-C1 output versions.  Used by inject_field() when the primary name is
-# not found in the timeslice file.
 _HDF5_FIELD_FALLBACKS = {
     'psi'   : ('Psi', 'flux', 'psi_n'),
     'I'     : ('i', 'Itor'),
     'f'     : ('F',),
     'fp'    : ('Fp', 'f_prime'),
     'phi'   : ('Phi', 'PHI'),
-    'V'     : ('v_tor',),          # scalar toroidal velocity component
+    'V'     : ('v_tor',),
     'chi'   : ('Chi',),
     'E_R'   : ('e_r',),
     'E_PHI' : ('e_phi', 'E_phi'),
@@ -219,9 +178,6 @@ _HDF5_FIELD_FALLBACKS = {
     'ti'    : ('Ti', 'T_i'),
 }
 
-# ---------------------------------------------------------------------------
-# Mapping from fpy field name to the fio_py field-type constant.
-# ---------------------------------------------------------------------------
 def _get_fio_field_type(field_name):
     """
     Return the fio_py integer field-type constant for *field_name*, or None
@@ -249,10 +205,6 @@ def _get_fio_field_type(field_name):
 
 
 def _is_real_error(stderr_text):
-    """
-    Return True only if *stderr_text* contains lines that are not just
-    Lmod/module-system noise.
-    """
     for line in stderr_text.splitlines():
         if not any(pat.search(line) for pat in _STDERR_NOISE_RES):
             return True
@@ -260,10 +212,6 @@ def _is_real_error(stderr_text):
 
 
 def _safe_get_field_name(nr):
-    """
-    Wrapper around fio_py.get_field_name that returns None instead of
-    raising/crashing when the field integer ID is not recognised.
-    """
     try:
         return fio_py.get_field_name(nr)
     except Exception:
@@ -271,14 +219,6 @@ def _safe_get_field_name(nr):
 
 
 def _split_ts_prefix(path):
-    """
-    If *path* starts with 'equilibrium/' or 'time_NNN/', return
-    (ts_basename, remainder) where ts_basename is the corresponding HDF5
-    filename ('equilibrium.h5' or 'time_NNN.h5') and remainder is the rest
-    of the path with the prefix stripped.
-
-    If *path* has no such prefix, return (None, path).
-    """
     m = _TS_PREFIX_RE.match(path)
     if m is None:
         return None, path
@@ -286,6 +226,236 @@ def _split_ts_prefix(path):
     remainder = path[m.end():]
     ts_basename = prefix + '.h5'
     return ts_basename, remainder
+
+
+# ---------------------------------------------------------------------------
+# _AcaH5Proxy  –  h5py-compatible proxy for campaign archive data
+# ---------------------------------------------------------------------------
+
+class _AcaAttrsProxy:
+    """
+    Proxy for h5py AttributeManager.
+    Supports: attrs[key], key in attrs, attrs.keys()
+    Routes reads through _AcaBackend.
+    """
+    def __init__(self, aca, basename, group):
+        self._aca = aca
+        self._basename = basename   # e.g. 'C1.h5' or 'equilibrium.h5'
+        self._group = group         # HDF5 group path, '' or '/' for root
+
+    def _fetch(self):
+        if self._group in ('', '/'):
+            return self._aca._fetch_root_attrs(self._basename)
+        else:
+            # Read all attrs of the group from the skeleton.
+            skeleton = self._aca._skeleton(self._basename)
+            if _have_h5py:
+                try:
+                    with h5py.File(skeleton, 'r') as f:
+                        if self._group in f:
+                            def plain(v):
+                                try:
+                                    return (v.item()
+                                            if getattr(v, 'shape', None) == ()
+                                            else v.tolist())
+                                except AttributeError:
+                                    return (v.decode()
+                                            if isinstance(v, bytes) else v)
+                            return {k: plain(v)
+                                    for k, v in f[self._group].attrs.items()}
+                except Exception:
+                    pass
+            return {}
+
+    def __getitem__(self, key):
+        d = self._fetch()
+        if key not in d:
+            raise KeyError(
+                "Unable to synchronously open attribute "
+                "(can't locate attribute: '{}')".format(key))
+        return d[key]
+
+    def __contains__(self, key):
+        return key in self._fetch()
+
+    def keys(self):
+        return self._fetch().keys()
+
+    def items(self):
+        return self._fetch().items()
+
+
+class _AcaGroupProxy:
+    """
+    Proxy for an h5py Group or Dataset inside a campaign archive.
+
+    Supports:
+      - group[key]          -> _AcaGroupProxy or numpy array
+      - key in group        -> bool
+      - group.keys()        -> list of child names
+      - group.attrs         -> _AcaAttrsProxy
+      - group.visititems()  -> like h5py Group.visititems
+      - group.filename      -> str  (for error messages)
+    """
+    def __init__(self, aca, basename, path):
+        self._aca = aca
+        self._basename = basename
+        self._path = path.strip('/')   # HDF5 path within the file
+
+    @property
+    def filename(self):
+        return self._basename
+
+    @property
+    def attrs(self):
+        return _AcaAttrsProxy(self._aca, self._basename, self._path)
+
+    def _child_path(self, key):
+        if self._path:
+            return self._path + '/' + key
+        return key
+
+    def __getitem__(self, key):
+        child_path = self._child_path(key)
+        # Try to read as a dataset first.
+        try:
+            data = self._aca.read(child_path, basename=self._basename)
+            return data
+        except Exception:
+            pass
+        # Return a group proxy.
+        return _AcaGroupProxy(self._aca, self._basename, child_path)
+
+    def __contains__(self, key):
+        child_path = self._child_path(key)
+        # Check skeleton.
+        skeleton = self._aca._skeleton(self._basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    return child_path in f
+            except Exception:
+                pass
+        return False
+
+    def keys(self):
+        skeleton = self._aca._skeleton(self._basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    if self._path in f:
+                        return list(f[self._path].keys())
+                    elif self._path == '':
+                        return list(f.keys())
+            except Exception:
+                pass
+        return []
+
+    def visititems(self, func):
+        """Mimic h5py Group.visititems — calls func(name, obj) for all items."""
+        skeleton = self._aca._skeleton(self._basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    root = f[self._path] if self._path else f
+                    root.visititems(func)
+            except Exception:
+                pass
+
+
+class _AcaH5Proxy:
+    """
+    Top-level proxy that mimics an h5py File handle for a campaign archive
+    dataset (e.g. C1.h5 or equilibrium.h5).
+
+    This allows existing analysis code that does:
+        h5file = sim._all_attrs
+        h5file.attrs['version']
+        h5file['scalars/time']
+        'scalars' in h5file
+        h5file.visititems(print)
+
+    to work transparently whether the data is local or remote.
+
+    For adios2 mode, sim._all_attrs is set to an instance of this class
+    pointing at the C1.h5 dataset (for global parameters and scalars) and
+    the equilibrium.h5 skeleton (for timeslice attributes).
+
+    Path routing
+    ------------
+    Paths starting with 'scalars/' are routed to C1.h5 (which holds the
+    scalar time series).  All other paths are routed to the appropriate
+    timeslice file via _AcaBackend._route().
+    """
+
+    def __init__(self, aca, default_basename='C1.h5'):
+        self._aca = aca
+        self._default_basename = default_basename
+
+    def _resolve(self, path):
+        """
+        Return (basename, path_within_file) for a given logical path.
+
+        Scalars live in C1.h5; everything else is routed via _route().
+        """
+        path = path.strip('/')
+        # Scalars and mag_probes live in C1.h5.
+        if path.startswith('scalars') or path.startswith('mag_probes'):
+            return 'C1.h5', path
+        # Paths with a timeslice prefix are routed automatically.
+        basename, remainder = self._aca._route(path)
+        return basename, remainder
+
+    @property
+    def filename(self):
+        return self._default_basename
+
+    @property
+    def attrs(self):
+        # Root attrs of the default file (C1.h5 for global params).
+        return _AcaAttrsProxy(self._aca, self._default_basename, '')
+
+    def __getitem__(self, path):
+        basename, inner_path = self._resolve(path)
+        # Try to read as a dataset.
+        try:
+            data = self._aca.read(inner_path, basename=basename)
+            return data
+        except Exception:
+            pass
+        # Return a group proxy.
+        return _AcaGroupProxy(self._aca, basename, inner_path)
+
+    def __contains__(self, path):
+        basename, inner_path = self._resolve(path)
+        skeleton = self._aca._skeleton(basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    return inner_path in f
+            except Exception:
+                pass
+        return False
+
+    def keys(self):
+        skeleton = self._aca._skeleton(self._default_basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    return list(f.keys())
+            except Exception:
+                pass
+        return []
+
+    def visititems(self, func):
+        """Mimic h5py File.visititems."""
+        skeleton = self._aca._skeleton(self._default_basename)
+        if _have_h5py:
+            try:
+                with h5py.File(skeleton, 'r') as f:
+                    f.visititems(func)
+            except Exception:
+                pass
 
 
 class _SshMux:
@@ -349,7 +519,6 @@ class _SshMux:
             shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def ssh_opts(self):
-        """Return extra SSH options to reuse the master connection."""
         if self._socket:
             return [
                 '-o', 'ControlMaster=no',
@@ -363,24 +532,12 @@ class _AcaBackend:
     Backend for reading M3D-C1 data from a remote cluster via an HPC campaign
     archive (.aca file).
 
-    Local skeleton symlinks
-    -----------------------
-    The embedded skeleton HDF5 files are extracted to the cache directory AND
-    also symlinked/copied into the current working directory under their bare
-    basename (e.g. 'equilibrium.h5', 'time_002.h5').
-
-    This allows third-party code in the m3dc1 repo (e.g. read_h5.py) that
-    opens timeslice files by bare filename to find the skeleton and read
-    attributes like 'ntimestep', 'time', 'version', etc.
-
     Skeleton selection
     ------------------
     Each dataset in the .aca archive may have multiple embedded files.  We
     select the embedded file whose basename matches the dataset basename
     (e.g. 'equilibrium.h5').  If no such file is found we fall back to any
-    embedded .h5 file, then to the first embedded file.  This ensures we
-    pick the actual HDF5 skeleton (which contains root attributes like
-    'ntimestep') rather than any auxiliary embedded files.
+    embedded .h5 file, then to the first embedded file.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -412,7 +569,7 @@ class _AcaBackend:
         self._datasets = self._load_datasets()
 
         prefix = self._simulation + '/' if self._simulation else ''
-        self._files = {}   # basename -> dataset dict
+        self._files = {}
         for ds in self._datasets:
             if ds['fileformat'] == 'HDF5' and ds['name'].startswith(prefix):
                 self._files[os.path.basename(ds['name'])] = ds
@@ -435,12 +592,10 @@ class _AcaBackend:
         else:
             self._default_file = next(iter(self._files))
 
-        self._skeletons = {}          # ds['name'] -> local skeleton path
-        self._root_attrs_cache = {}   # file basename -> dict of attrs
-        self._fields_cache = {}       # basename -> set of field names in 'fields/'
+        self._skeletons = {}
+        self._root_attrs_cache = {}
+        self._fields_cache = {}
         self._mesh_injected = False
-        # Track which (ts_file, hdf5_dataset_name) pairs have been injected
-        # so we never stream the same array twice.
         self._injected_fields = set()
 
         self._mux = _SshMux(login)
@@ -530,63 +685,27 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _pick_skeleton_embedded_file(self, ds, basename):
-        """
-        Choose the best embedded file to use as the skeleton for *basename*.
-
-        Strategy:
-        1. Prefer an embedded file whose basename (lowercased) matches the
-           dataset basename (lowercased) — i.e. the file named 'equilibrium.h5'
-           inside the embedded files for the 'equilibrium.h5' dataset.
-        2. Fall back to any embedded file whose name ends in '.h5'.
-        3. Fall back to the first embedded file.
-
-        This ensures we pick the actual HDF5 skeleton file (which contains
-        root attributes like 'ntimestep', 'version', etc.) rather than any
-        auxiliary embedded files that may also be present.
-        """
         ef_list = ds['embedded_files']
         if not ef_list:
             return None
-
         target = basename.lower()
-
-        # Pass 1: exact basename match
         for ef in ef_list:
             if os.path.basename(ef['name']).lower() == target:
                 return ef
-
-        # Pass 2: any .h5 file
         for ef in ef_list:
             if ef['name'].lower().endswith('.h5'):
                 return ef
-
-        # Pass 3: first file
         return ef_list[0]
 
     def _skeleton(self, basename=None):
-        """
-        Extract the embedded skeleton HDF5 file for *basename* to the cache
-        directory and also ensure a copy/symlink exists in the CWD.
-
-        The CWD copy allows third-party code (e.g. read_h5.py) that opens
-        timeslice files by bare filename to find the skeleton and read
-        attributes like 'ntimestep', 'time', 'version', etc.
-
-        The skeleton is always written to the cache under the dataset's bare
-        basename (e.g. 'equilibrium.h5') so that the file opened by
-        readParameter contains the correct root attributes.
-        """
         basename = basename or self._default_file
         ds = self._get_dataset(basename)
         if ds['name'] not in self._skeletons:
             cur = self._con.cursor()
-
-            # Pick the best embedded file to use as the skeleton.
             ef = self._pick_skeleton_embedded_file(ds, basename)
             if ef is None:
                 raise RuntimeError(
                     'No embedded metadata in .aca for {}'.format(ds['name']))
-
             fid = ef['id']
             row = cur.execute(
                 'SELECT data, compression FROM file '
@@ -595,18 +714,13 @@ class _AcaBackend:
                 raise RuntimeError(
                     'No embedded data for fileid {} in {}'.format(
                         fid, ds['name']))
-
             blob, compression = row
             data = zlib.decompress(blob) if compression else bytes(blob)
-
-            # Write to cache using the dataset's bare basename as filename
-            # so the skeleton is always named e.g. 'equilibrium.h5'.
             dest = os.path.join(
                 self._cache_dir, 'skeletons', ds['name'], basename)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             with open(dest, 'wb') as fh:
                 fh.write(data)
-
             self._skeletons[ds['name']] = dest
 
         skeleton_path = self._skeletons[ds['name']]
@@ -635,12 +749,6 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _remote_run(self, script, argv, what):
-        """
-        Run *script* on the remote host via SSH, passing *argv* as arguments.
-
-        Lmod/module-system noise in stderr is ignored; only genuine errors
-        cause a RuntimeError.
-        """
         parts = []
         if self._remote_setup:
             parts.append(self._remote_setup)
@@ -697,12 +805,6 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _route(self, path, basename=None):
-        """
-        Resolve a logical HDF5 path to (effective_basename, hdf5_path).
-
-        If *path* starts with 'equilibrium/' or 'time_NNN/', the prefix is
-        stripped and the corresponding timeslice file is used as the basename.
-        """
         ts_basename, remainder = _split_ts_prefix(path.lstrip('/'))
         if ts_basename is not None:
             if ts_basename in self._files:
@@ -715,10 +817,6 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def list_fields(self, basename):
-        """
-        Return the set of dataset names present under the 'fields/' group in
-        the given timeslice file.  Results are cached in memory.
-        """
         if basename in self._fields_cache:
             return self._fields_cache[basename]
 
@@ -755,18 +853,9 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def read(self, variable, basename=None, slc=None):
-        """
-        Return one HDF5 variable as a numpy array.
-
-        Resolution order:
-        1. Embedded value in the skeleton (small datasets, full reads only).
-        2. Per-variable disk cache from a previous streamed read.
-        3. Stream from the remote host via SSH + h5py.
-        """
         eff_basename, variable = self._route(variable, basename)
         ds = self._get_dataset(eff_basename)
 
-        # 1. Embedded skeleton (small datasets only)
         if slc is None and _have_h5py:
             try:
                 with h5py.File(self._skeleton(eff_basename), 'r') as f:
@@ -779,14 +868,12 @@ class _AcaBackend:
             except Exception:
                 pass
 
-        # 2. Per-variable disk cache
         cache_file = self._var_cache_path(ds, variable, slc)
         if os.path.isfile(cache_file):
             self._log(
                 '{}: from variable cache {}'.format(variable, cache_file))
             return np.load(cache_file, allow_pickle=False)
 
-        # 3. Stream from remote
         rep = self._live_replica(ds)
         self._log('{}: streaming from {}:{}'.format(
             variable, rep['hostname'], rep['remote_path']))
@@ -804,10 +891,6 @@ class _AcaBackend:
         return data
 
     def read_group(self, group, basename=None):
-        """
-        Fetch all datasets under *group* in a single SSH call and return them
-        as a dict {name: ndarray}.  Results are cached as a .npz file.
-        """
         eff_basename, group = self._route(group, basename)
         ds = self._get_dataset(eff_basename)
 
@@ -861,7 +944,6 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _fetch_root_attrs(self, basename=None):
-        """Fetch ALL root attributes in a single call and cache them."""
         import json
         key = basename or self._default_file
         if key not in self._root_attrs_cache:
@@ -899,16 +981,9 @@ class _AcaBackend:
         return self._root_attrs_cache[key]
 
     def get_root_attr(self, name, basename=None):
-        """Read a scalar attribute from the file root."""
         return self._fetch_root_attrs(basename).get(name)
 
     def get_group_attr(self, group, name, basename=None):
-        """
-        Read a scalar attribute from a group inside the file.
-
-        If *group* starts with 'equilibrium/' or 'time_NNN/', the path is
-        routed to the correct timeslice file automatically.
-        """
         eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
@@ -932,7 +1007,6 @@ class _AcaBackend:
         return attrs.get(name)
 
     def list_group(self, group, basename=None):
-        """Return the names of direct children of a group in the skeleton."""
         eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
@@ -944,7 +1018,6 @@ class _AcaBackend:
         return []
 
     def group_exists(self, group, basename=None):
-        """Return True if the group exists in the skeleton."""
         eff_basename, eff_group = self._route(group, basename)
         if _have_h5py:
             try:
@@ -955,24 +1028,10 @@ class _AcaBackend:
         return False
 
     def get_skeleton_path(self, basename):
-        """
-        Return the local path to the skeleton HDF5 file for *basename*,
-        extracting it from the .aca archive if necessary.
-        """
         return self._skeleton(basename)
 
     def ensure_all_skeletons_in_cwd(self):
-        """
-        Ensure skeleton files for all registered timeslice HDF5 files are
-        available in the current working directory.
-
-        This is called once during sim_data initialisation so that any
-        subsequent calls to readParameter(fname='equilibrium.h5') or
-        readParameter(fname='time_NNN.h5') by third-party m3dc1 code find
-        the skeleton files locally.
-        """
         for basename in self._files:
-            # Only extract skeletons for timeslice files (not C1.h5).
             if basename == 'C1.h5':
                 continue
             try:
@@ -987,13 +1046,6 @@ class _AcaBackend:
     # ------------------------------------------------------------------
 
     def _ts_file_and_group(self, timeslice):
-        """
-        Return (basename, '') for a given integer timeslice.
-
-          timeslice == -1  ->  equilibrium.h5
-          timeslice ==  0  ->  time_000.h5
-          timeslice ==  N  ->  time_NNN.h5
-        """
         if timeslice == -1:
             ts_file = 'equilibrium.h5'
         else:
@@ -1008,10 +1060,6 @@ class _AcaBackend:
         return ts_file, ''
 
     def inject_parameters(self, isrc):
-        """
-        Read physical normalization parameters from the C1.h5 root attributes
-        and inject them into the fio_py numpy source.
-        """
         attrs = self._fetch_root_attrs()
 
         def _f(name, default=0.0):
@@ -1031,11 +1079,6 @@ class _AcaBackend:
             _f('n0_norm'), _f('l0_norm'), _f('b0_norm'))
 
     def inject_mesh(self, isrc, timeslice):
-        """
-        Stream the mesh arrays from the appropriate timeslice HDF5 file and
-        inject them into the fio_py numpy source.
-        Only done once; subsequent calls are no-ops.
-        """
         if self._mesh_injected:
             return
 
@@ -1086,14 +1129,6 @@ class _AcaBackend:
             nelms, nplanes))
 
     def inject_field(self, isrc, timeslice, hdf5_name):
-        """
-        Stream one HDF5 field coefficient array and inject it into the
-        fio_py numpy source under the name *hdf5_name*.
-
-        Injection is skipped if the same (ts_file, hdf5_name) pair has
-        already been injected in this session, or if the field is not
-        present in the timeslice file.
-        """
         ts_file, _ = self._ts_file_and_group(timeslice)
 
         injection_key = (ts_file, hdf5_name)
@@ -1119,9 +1154,7 @@ class _AcaBackend:
         if actual_name is None:
             self._log(
                 "WARNING: field '{}' (and fallbacks {}) not found in '{}'; "
-                "skipping injection (field may not be needed or may be "
-                "optional for this timeslice)".format(
-                    hdf5_name, fallbacks, ts_file))
+                "skipping injection".format(hdf5_name, fallbacks, ts_file))
             return
 
         real_path = 'fields/{}'.format(actual_name)
@@ -1153,10 +1186,6 @@ class _AcaBackend:
         self._injected_fields.add(injection_key)
 
     def inject_scalars(self, isrc):
-        """
-        Stream all scalar time series from C1.h5 in a single SSH call and
-        inject them into the fio_py numpy source.
-        """
         self._log('Fetching all scalars in one SSH call')
         try:
             scalar_arrays = self.read_group('scalars')
@@ -1202,32 +1231,6 @@ class _AcaBackend:
 class sim_data:
     """
     Class that accesses the fusion-io functions in a more pythonic way.
-    Invoke an element of the class as follows:
-    sim = sim_data(filename='../C1.h5')
-    This creates a simulation object. This object has four attributes:
-    - Fields
-    - Time traces
-    - Mesh
-    - Diagnostics
-    - Constants
-
-    --Fields--
-    Fields objects can be created by, for example,
-    magnetic_field = sim.get_field('B',time=10)
-    This field can in turn be evaluated using
-    magnetic_field.evaluate((R,phi,Z)).
-    !! Fields are given in SI units !!
-
-    -- Time traces--
-    Time trace objects can be created by, for example,
-    dt = sim.get_time_trace('dt').
-    The object dt then has two attributes:
-    dt.time, this is an array of all the times where dt is evaluated
-    dt.values, this is an array of all values of dt.
-
-    --Mesh--
-    Mesh object can be created by, for example
-    mesh = sim.get_mesh(time=1).
 
     --Campaign Archive Mode (.aca files)--
     To stream M3D-C1 data from a remote cluster via an HPC campaign
@@ -1240,6 +1243,11 @@ class sim_data:
             time=-1,
             login='user@perlmutter.nersc.gov',
         )
+
+    In adios2 mode, sim._all_attrs is an _AcaH5Proxy object that mimics
+    an h5py File handle.  Code that accesses sim._all_attrs['scalars/time'],
+    sim._all_attrs.attrs['version'], 'scalars' in sim._all_attrs, etc. works
+    transparently for both local and remote data.
 
     Timeslice convention
     --------------------
@@ -1269,7 +1277,7 @@ class sim_data:
                 raise ValueError(
                     'fusion-io was not compiled with NIMROD support.')
         elif filetype == 'adios2':
-            ifiletype = None   # numpy source, opened below
+            ifiletype = None
         else:
             raise ValueError(
                 'Unsupported filetype: {}. '
@@ -1329,12 +1337,13 @@ class sim_data:
             # can find them and read attributes like 'ntimestep', 'time', etc.
             self._aca.ensure_all_skeletons_in_cwd()
 
-            # Set _all_attrs to the equilibrium skeleton so that code that
-            # accesses sim._all_attrs (e.g. readParameter(sim=sim)) works.
-            eq_skeleton = self._aca.get_skeleton_path('equilibrium.h5')
-            self._all_attrs = h5py.File(eq_skeleton, 'r')
-            self._all_attrs_list = list(self._all_attrs.keys())
-            self._all_traces = None
+            # Set _all_attrs to an _AcaH5Proxy so that all existing analysis
+            # code that accesses sim._all_attrs like an h5py File handle works
+            # transparently for both local and remote data.
+            # The proxy routes attribute and dataset reads through _AcaBackend.
+            self._all_attrs = _AcaH5Proxy(self._aca, default_basename='C1.h5')
+            self._all_attrs_list = self._all_attrs.keys()
+            self._all_traces = self._all_attrs['scalars']
 
         else:
             if not _have_h5py:
@@ -1366,8 +1375,6 @@ class sim_data:
             self.fields.append(self._imag)
         self._cs = fio_py.get_int_parameter(self._isrc, fio_py.FIO_GEOMETRY)
         self._iavailable_fields = fio_py.get_available_fields(self._isrc)
-        # Build _available_fields dict, skipping any field IDs whose name
-        # cannot be resolved (e.g. IDs not supported by the numpy source).
         self._available_fields = {}
         for nr in self._iavailable_fields:
             name = _safe_get_field_name(nr)
@@ -1432,9 +1439,6 @@ class sim_data:
         return self.constants(self)
 
     def _get_attr(self, group, name):
-        """
-        Read a scalar attribute, dispatching to h5py or _AcaBackend.
-        """
         if self._filetype == 'adios2':
             if group:
                 return self._aca.get_group_attr(group, name)
@@ -1447,42 +1451,31 @@ class sim_data:
                 return self._all_attrs.attrs[name]
 
     def _get_dataset(self, path):
-        """Read a dataset as a numpy array."""
         if self._filetype == 'adios2':
             return self._aca.read(path)
         else:
             return np.asarray(self._all_attrs[path])
 
     def _list_group(self, group):
-        """List the keys of a group."""
         if self._filetype == 'adios2':
             return self._aca.list_group(group)
         else:
             return list(self._all_attrs[group].keys())
 
     def _group_exists(self, group):
-        """Check whether a group exists."""
         if self._filetype == 'adios2':
             return self._aca.group_exists(group)
         else:
             return group in self._all_attrs
 
     def _ensure_fields_injected(self, field_name, species, timeslice):
-        """
-        Ensure all HDF5 field coefficient arrays needed to evaluate
-        *field_name* have been injected into the fio_py numpy source.
-
-        For local files this is a no-op.
-        """
         if self._filetype != 'adios2':
             return
 
         if field_name in _FIELD_HDF5_DEPS:
-            # Composite field: inject all its HDF5 dependencies.
             for dep in _FIELD_HDF5_DEPS[field_name]:
                 self._aca.inject_field(self._isrc, timeslice, dep)
         else:
-            # Simple scalar field: inject by its direct HDF5 name.
             if field_name == 'density':
                 hdf5_name = 'ne' if species == 'electron' else 'den'
             elif field_name == 'temperature':
@@ -1528,13 +1521,9 @@ class sim_data:
                 fio_py.set_int_option(fio_py.FIO_SPECIES, fio_py.FIO_MAIN_ION)
 
             if sim_data._filetype == 'adios2':
-                # Inject all HDF5 datasets needed to evaluate this field.
                 sim_data._ensure_fields_injected(
                     field, species, sim_data.timeslice)
 
-            # Determine the fio_py field type integer.
-            # For the numpy source (adios2 mode), try _get_fio_field_type()
-            # first to get the correct FIO_* constant directly.
             itype = None
             if sim_data._filetype == 'adios2':
                 itype = _get_fio_field_type(field)
@@ -1726,7 +1715,6 @@ class sim_data:
                     self.time = time
                     self.values = values
 
-        # Addition
         def __add__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
@@ -1749,7 +1737,6 @@ class sim_data:
                 self.values = self.values + other
             return self
 
-        # Subtraction
         def __sub__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
@@ -1780,7 +1767,6 @@ class sim_data:
                 self.values = self.values - other
             return self
 
-        # Multiplication
         def __mul__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
@@ -1803,7 +1789,6 @@ class sim_data:
                 self.values = self.values * other
             return self
 
-        # Division
         def __truediv__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
@@ -1834,11 +1819,8 @@ class sim_data:
                 self.values = self.values / other
             return self
 
-        # Exponentiation
         def __pow__(self, other):
             return sim_data.time_trace(self.values ** other, time=self.time)
-
-        # __rpow__ is intentionally NotImplemented
 
         def __ipow__(self, other):
             self.values = self.values ** other
