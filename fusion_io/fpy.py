@@ -1716,13 +1716,15 @@ class sim_data:
                 try:
                     return fio_py.eval_vector_field_deriv(
                         self._ifield, x, self.sim_data.hint)
-                except Exception:
+                except Exception as e:
+                    print('WARNING: eval_vector_field_deriv failed at {}: {}'.format(x, e))
                     return (None,) * 9
             elif self.ftype == 'scalar':
                 try:
                     return (fio_py.eval_scalar_field_deriv(
                         self._ifield, x, self.sim_data.hint),)
-                except Exception:
+                except Exception as e:
+                    print('WARNING: eval_scalar_field_deriv failed at {}: {}'.format(x, e))
                     return (None, None, None)
             else:
                 print('ftype not recognized!')
