@@ -245,6 +245,181 @@ def _split_ts_prefix(path):
 
 
 # ---------------------------------------------------------------------------
+# _LocalH5Proxy  –  h5py-compatible proxy for local M3D-C1 HDF5 files
+# ---------------------------------------------------------------------------
+
+class _LocalH5AttrsProxy:
+    """
+    Proxy for h5py AttributeManager that searches multiple HDF5 files.
+
+    For root-level access, searches the timeslice file (e.g. equilibrium.h5
+    or time_002.h5) first, then C1.h5.  This mirrors the behaviour of
+    _AcaAttrsProxy so that attributes like 'ntimestep' (which live in the
+    timeslice file, not in C1.h5) are found correctly.
+    """
+
+    def __init__(self, h5_files, group=''):
+        """
+        Parameters
+        ----------
+        h5_files : list of h5py.File
+            Open h5py file handles to search, in priority order (first wins).
+        group : str
+            HDF5 group path whose attributes to expose.  Empty string or '/'
+            means root attributes.
+        """
+        self._h5_files = h5_files
+        self._group = group.strip('/')
+
+    def _is_root(self):
+        return self._group == ''
+
+    def _get_attrs_obj(self, h5f):
+        """Return the h5py AttributeManager for the relevant group/root."""
+        if self._is_root():
+            return h5f.attrs
+        if self._group in h5f:
+            return h5f[self._group].attrs
+        return None
+
+    def _merged(self):
+        merged = {}
+        for h5f in reversed(self._h5_files):
+            try:
+                ao = self._get_attrs_obj(h5f)
+                if ao is not None:
+                    merged.update({k: v for k, v in ao.items()})
+            except Exception:
+                pass
+        return merged
+
+    def __getitem__(self, key):
+        for h5f in self._h5_files:
+            try:
+                ao = self._get_attrs_obj(h5f)
+                if ao is not None and key in ao:
+                    return ao[key]
+            except Exception:
+                pass
+        raise KeyError(
+            "Unable to synchronously open attribute "
+            "(can't locate attribute: '{}')".format(key))
+
+    def __contains__(self, key):
+        for h5f in self._h5_files:
+            try:
+                ao = self._get_attrs_obj(h5f)
+                if ao is not None and key in ao:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    def keys(self):
+        return self._merged().keys()
+
+    def items(self):
+        return self._merged().items()
+
+
+class _LocalH5Proxy:
+    """
+    Top-level proxy that mimics an h5py File handle for local M3D-C1 data.
+
+    Wraps both the main C1.h5 file and the current timeslice file
+    (e.g. equilibrium.h5 or time_002.h5).  Root attributes (.attrs) are
+    searched in the timeslice file first, then C1.h5, so that attributes
+    like 'ntimestep' (which live in the timeslice file) are found correctly.
+
+    Dataset/group access delegates to whichever open file contains the path,
+    trying the timeslice file first, then C1.h5.
+
+    This mirrors the behaviour of _AcaH5Proxy for remote/campaign data so
+    that analysis code works identically for both local and remote files.
+    """
+
+    def __init__(self, c1_file, ts_file=None):
+        """
+        Parameters
+        ----------
+        c1_file : h5py.File
+            Open handle to C1.h5.
+        ts_file : h5py.File or None
+            Open handle to the timeslice file (equilibrium.h5 / time_NNN.h5).
+            If None, only C1.h5 is used.
+        """
+        self._c1 = c1_file
+        self._ts = ts_file
+        # Priority order: timeslice first, then C1.
+        self._files = [f for f in [ts_file, c1_file] if f is not None]
+
+    @property
+    def filename(self):
+        return self._c1.filename
+
+    @property
+    def attrs(self):
+        return _LocalH5AttrsProxy(self._files, group='')
+
+    def _resolve(self, path):
+        """Return the first open file that contains *path*."""
+        path = path.strip('/')
+        for h5f in self._files:
+            try:
+                if path in h5f:
+                    return h5f, path
+            except Exception:
+                pass
+        # Fall back to C1.h5 even if path not found (will raise naturally).
+        return self._c1, path
+
+    def __getitem__(self, path):
+        h5f, inner = self._resolve(path)
+        return h5f[inner]
+
+    def __contains__(self, path):
+        path = path.strip('/')
+        for h5f in self._files:
+            try:
+                if path in h5f:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    def keys(self):
+        seen = set()
+        result = []
+        for h5f in self._files:
+            try:
+                for k in h5f.keys():
+                    if k not in seen:
+                        seen.add(k)
+                        result.append(k)
+            except Exception:
+                pass
+        return result
+
+    def visititems(self, func):
+        """Mimic h5py File.visititems — visits items in the timeslice file."""
+        primary = self._ts if self._ts is not None else self._c1
+        try:
+            primary.visititems(func)
+        except Exception:
+            pass
+
+    def update_timeslice(self, ts_file):
+        """
+        Replace the timeslice file handle.
+
+        Called by sim_data.set_timeslice() when the user switches time steps,
+        so that _all_attrs always reflects the current timeslice.
+        """
+        self._ts = ts_file
+        self._files = [f for f in [ts_file, self._c1] if f is not None]
+
+
+# ---------------------------------------------------------------------------
 # _AcaH5Proxy  –  h5py-compatible proxy for campaign archive data
 # ---------------------------------------------------------------------------
 
@@ -1349,6 +1524,24 @@ class _AcaBackend:
             pass
 
 
+# ---------------------------------------------------------------------------
+# Helper: open a local timeslice HDF5 file given a timeslice index
+# ---------------------------------------------------------------------------
+
+def _local_ts_filename(c1_dir, timeslice):
+    """
+    Return the path to the local timeslice HDF5 file for *timeslice*.
+
+    timeslice == -1  ->  equilibrium.h5
+    timeslice >= 0   ->  time_NNN.h5
+    """
+    if timeslice == -1:
+        basename = 'equilibrium.h5'
+    else:
+        basename = 'time_{:03d}.h5'.format(timeslice)
+    return os.path.join(c1_dir, basename)
+
+
 class sim_data:
     """
     Class that accesses the fusion-io functions in a more pythonic way.
@@ -1377,6 +1570,14 @@ class sim_data:
     sim._all_attrs.attrs[key].  If the embedded skeleton is missing required
     attributes, they are fetched from the remote host automatically.
 
+    --Local Mode (.h5 files)--
+    For local M3D-C1 data, sim._all_attrs is a _LocalH5Proxy object that
+    wraps both C1.h5 and the current timeslice file (equilibrium.h5 or
+    time_NNN.h5).  Root attributes are searched in the timeslice file first,
+    then C1.h5, so that attributes like 'ntimestep' are found correctly.
+    When set_timeslice() is called, the proxy is updated to reflect the new
+    timeslice file.
+
     Timeslice convention
     --------------------
     time=-1     -> equilibrium.h5
@@ -1395,6 +1596,8 @@ class sim_data:
         self.seriess = []
         self._aca = None
         self._filetype = filetype
+        self._c1_h5 = None       # open h5py.File handle for C1.h5 (local mode)
+        self._ts_h5 = None       # open h5py.File handle for timeslice (local mode)
 
         if filetype == 'm3dc1':
             ifiletype = fio_py.FIO_M3DC1_SOURCE
@@ -1487,12 +1690,35 @@ class sim_data:
                 raise ImportError(
                     'h5py is required to read local M3D-C1 files. '
                     'Install with: pip install h5py')
-            self._all_attrs      = h5py.File(self.filename, 'r')
-            self._all_attrs_list = list(self._all_attrs.keys())
-            self._all_traces     = self._all_attrs['scalars']
+
+            # Open C1.h5 and keep the handle alive for the lifetime of sim_data.
+            self._c1_h5 = h5py.File(self.filename, 'r')
+
+            # Determine the timeslice integer so we can open the timeslice file.
+            if isinstance(time, str) and time == 'last':
+                _ntime_tmp = self._c1_h5.attrs.get('ntime', 0)
+                time_int = int(_ntime_tmp) - 1
+            else:
+                time_int = int(time)
+
+            # Open the timeslice file (equilibrium.h5 / time_NNN.h5) if it
+            # exists alongside C1.h5.
+            c1_dir = os.path.dirname(self.filename)
+            ts_path = _local_ts_filename(c1_dir, time_int)
+            if os.path.isfile(ts_path):
+                self._ts_h5 = h5py.File(ts_path, 'r')
+            else:
+                self._ts_h5 = None
+
+            # Wrap both files in a _LocalH5Proxy so that attribute lookups
+            # search the timeslice file first (for 'ntimestep', etc.) and
+            # then C1.h5 (for 'bzero', 'ntime', etc.).
+            self._all_attrs = _LocalH5Proxy(self._c1_h5, self._ts_h5)
+            self._all_attrs_list = self._all_attrs.keys()
+            self._all_traces     = self._c1_h5['scalars']
             self.available_traces = list(self._all_traces.keys())
             self.available_traces.extend(['bharmonics', 'keharmonics'])
-            self.ntime = self._all_attrs.attrs['ntime']
+            self.ntime = self._c1_h5.attrs['ntime']
             self._isrc = fio_py.open_source(ifiletype, self.filename)
 
         self.available_diagnostics = ['slice times', 'timings', 'iterations']
@@ -1537,6 +1763,17 @@ class sim_data:
             fio_py.close_source(self._isrc)
         if self._aca is not None:
             self._aca.close()
+        # Close local HDF5 file handles.
+        if self._ts_h5 is not None:
+            try:
+                self._ts_h5.close()
+            except Exception:
+                pass
+        if self._c1_h5 is not None:
+            try:
+                self._c1_h5.close()
+            except Exception:
+                pass
 
     def set_timeslice(self, time):
         if isinstance(time, str):
@@ -1546,6 +1783,37 @@ class sim_data:
         time = int(time)
         self.timeslice = time
         fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
+
+        # For local mode, update the timeslice file handle in the proxy so
+        # that _all_attrs.attrs always reflects the current timeslice file.
+        if self._filetype != 'adios2' and isinstance(
+                self._all_attrs, _LocalH5Proxy):
+            c1_dir = os.path.dirname(self.filename)
+            ts_path = _local_ts_filename(c1_dir, time)
+            # Close the old timeslice handle if it is different from the new one.
+            new_ts_h5 = None
+            if os.path.isfile(ts_path):
+                # Avoid reopening the same file if it hasn't changed.
+                current_path = (
+                    self._ts_h5.filename if self._ts_h5 is not None else None)
+                if current_path != ts_path:
+                    if self._ts_h5 is not None:
+                        try:
+                            self._ts_h5.close()
+                        except Exception:
+                            pass
+                    new_ts_h5 = h5py.File(ts_path, 'r')
+                    self._ts_h5 = new_ts_h5
+                else:
+                    new_ts_h5 = self._ts_h5
+            else:
+                if self._ts_h5 is not None:
+                    try:
+                        self._ts_h5.close()
+                    except Exception:
+                        pass
+                    self._ts_h5 = None
+            self._all_attrs.update_timeslice(new_ts_h5)
 
     def get_time_trace(self, scalar, ipellet=None):
         return self.time_trace(scalar, sim_data=self, ipellet=ipellet)
