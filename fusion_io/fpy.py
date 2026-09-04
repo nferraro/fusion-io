@@ -256,6 +256,11 @@ class _AcaAttrsProxy:
 
     Routes attribute reads through _AcaBackend, trying each of the provided
     basenames in order until the attribute is found.
+
+    For root-level access (group == '' or '/'), delegates to
+    _aca._fetch_root_attrs(basename) so that the remote fallback logic is
+    triggered when required attributes (e.g. 'ntimestep') are missing from
+    the embedded skeleton.
     """
     def __init__(self, aca, basenames, group):
         self._aca = aca
@@ -264,9 +269,14 @@ class _AcaAttrsProxy:
         self._basenames = basenames
         self._group = group
 
+    def _is_root(self):
+        return self._group in ('', '/')
+
     def _fetch_from(self, basename):
         """Fetch attrs dict from one file."""
-        if self._group in ('', '/'):
+        if self._is_root():
+            # Route through _fetch_root_attrs so the remote fallback for
+            # missing required attributes (e.g. 'ntimestep') is triggered.
             return self._aca._fetch_root_attrs(basename)
         else:
             skeleton = self._aca._skeleton(basename)
@@ -298,25 +308,44 @@ class _AcaAttrsProxy:
         return merged
 
     def __getitem__(self, key):
-        for basename in self._basenames:
-            try:
-                d = self._fetch_from(basename)
-                if key in d:
-                    return d[key]
-            except Exception:
-                pass
+        if self._is_root():
+            # Use _fetch_root_attrs (with remote fallback) for each basename.
+            for basename in self._basenames:
+                try:
+                    d = self._aca._fetch_root_attrs(basename)
+                    if key in d:
+                        return d[key]
+                except Exception:
+                    pass
+        else:
+            for basename in self._basenames:
+                try:
+                    d = self._fetch_from(basename)
+                    if key in d:
+                        return d[key]
+                except Exception:
+                    pass
         raise KeyError(
             "Unable to synchronously open attribute "
             "(can't locate attribute: '{}')".format(key))
 
     def __contains__(self, key):
-        for basename in self._basenames:
-            try:
-                if key in self._fetch_from(basename):
-                    return True
-            except Exception:
-                pass
-        return False
+        if self._is_root():
+            for basename in self._basenames:
+                try:
+                    if key in self._aca._fetch_root_attrs(basename):
+                        return True
+                except Exception:
+                    pass
+            return False
+        else:
+            for basename in self._basenames:
+                try:
+                    if key in self._fetch_from(basename):
+                        return True
+                except Exception:
+                    pass
+            return False
 
     def keys(self):
         return self._fetch().keys()
@@ -445,6 +474,8 @@ class _AcaH5Proxy:
     def attrs(self):
         # Search timeslice file first (for 'ntimestep', 'time', etc.),
         # then C1.h5 (for 'bzero', 'ntime', 'version', etc.).
+        # _AcaAttrsProxy will route root-level access through
+        # _fetch_root_attrs (with remote fallback) for each basename.
         return _AcaAttrsProxy(
             self._aca,
             [self._ts_basename, self._sc_basename],
