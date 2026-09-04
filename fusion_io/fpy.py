@@ -244,6 +244,19 @@ def _split_ts_prefix(path):
     return ts_basename, remainder
 
 
+def _to_float_tuple(x):
+    """
+    Convert a coordinate tuple/sequence to a tuple of Python floats.
+
+    The fio_py C extension's PyArg_ParseTuple uses strict 'd' (double) format
+    characters for coordinate arguments.  numpy integer scalars (e.g. np.int64)
+    are not accepted by this format and cause a 'bad format char' TypeError.
+    Casting to plain Python float here ensures compatibility regardless of the
+    dtype of the input arrays.
+    """
+    return tuple(float(v) for v in x)
+
+
 # ---------------------------------------------------------------------------
 # _LocalH5Proxy  –  h5py-compatible proxy for local M3D-C1 HDF5 files
 # ---------------------------------------------------------------------------
@@ -1950,8 +1963,12 @@ class sim_data:
             three-tuple (vector) or nine-tuple (tensor) at location x.
 
             **x**
-                Three-tuple (R, phi, Z).
+                Three-tuple (R, phi, Z).  Elements are cast to Python float
+                to ensure compatibility with the fio_py C extension, which
+                requires strict double ('d') arguments and rejects numpy
+                integer scalars.
             """
+            x = _to_float_tuple(x)
             if self.ftype == 'vector':
                 try:
                     return fio_py.eval_vector_field(
@@ -1978,8 +1995,12 @@ class sim_data:
             Evaluates the derivative of the field at location x.
 
             **x**
-                Three-tuple (R, phi, Z).
+                Three-tuple (R, phi, Z).  Elements are cast to Python float
+                to ensure compatibility with the fio_py C extension, which
+                requires strict double ('d') arguments and rejects numpy
+                integer scalars.
             """
+            x = _to_float_tuple(x)
             if self.ftype == 'vector':
                 try:
                     return fio_py.eval_vector_field_deriv(
