@@ -178,7 +178,22 @@ static m3dc1_numpy_source* get_numpy_source(int handle)
 }
 
 // ---------------------------------------------------------------------------
-// Existing bindings (unchanged from original python_interface.cpp)
+// Helper: build a tuple of n Py_None objects for error returns
+// ---------------------------------------------------------------------------
+
+static PyObject* _none_tuple(int n)
+{
+    PyObject* t = PyTuple_New(n);
+    if(!t) return NULL;
+    for(int i = 0; i < n; i++) {
+        Py_INCREF(Py_None);
+        PyTuple_SET_ITEM(t, i, Py_None);
+    }
+    return t;
+}
+
+// ---------------------------------------------------------------------------
+// Existing bindings
 // ---------------------------------------------------------------------------
 
 PyObject* fio_add_field_py(PyObject* self, PyObject *args)
@@ -272,7 +287,8 @@ PyObject* fio_eval_scalar_field_deriv_py(PyObject* self, PyObject *args)
   void* hint = PyLong_AsVoidPtr(hint_py);
   double v[3];
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
-  if(ierr != FIO_SUCCESS) return Py_BuildValue("(2)", Py_None);
+  // Fixed: was Py_BuildValue("(2)", Py_None) which is an invalid format string
+  if(ierr != FIO_SUCCESS) return _none_tuple(3);
   hint_py = PyLong_FromVoidPtr(hint);
   return Py_BuildValue("(ddd)", v[0], v[1], v[2]);
 }
@@ -299,7 +315,8 @@ PyObject* fio_eval_vector_field_py(PyObject* self, PyObject *args)
   void* hint = PyLong_AsVoidPtr(hint_py);
   double v[3];
   int ierr = fio_eval_field(ifield, x, v, hint);
-  if(ierr != FIO_SUCCESS) return Py_BuildValue("(2)", Py_None);
+  // Fixed: was Py_BuildValue("(2)", Py_None) which is an invalid format string
+  if(ierr != FIO_SUCCESS) return _none_tuple(3);
   hint_py = PyLong_FromVoidPtr(hint);
   return Py_BuildValue("(ddd)", v[0], v[1], v[2]);
 }
@@ -315,7 +332,8 @@ PyObject* fio_eval_vector_field_deriv_py(PyObject* self, PyObject *args)
   void* hint = PyLong_AsVoidPtr(hint_py);
   double v[9];
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
-  if(ierr != FIO_SUCCESS) return Py_BuildValue("(8)", Py_None);
+  // Fixed: was Py_BuildValue("(8)", Py_None) which is an invalid format string
+  if(ierr != FIO_SUCCESS) return _none_tuple(9);
   hint_py = PyLong_FromVoidPtr(hint);
   return Py_BuildValue("(ddddddddd)",
                        v[0], v[1], v[2], v[3], v[4],
@@ -333,7 +351,8 @@ PyObject* fio_eval_tensor_field_py(PyObject* self, PyObject *args)
   void* hint = PyLong_AsVoidPtr(hint_py);
   double v[9];
   int ierr = fio_eval_field(ifield, x, v, hint);
-  if(ierr != FIO_SUCCESS) return Py_BuildValue("(8)", Py_None);
+  // Fixed: was Py_BuildValue("(8)", Py_None) which is an invalid format string
+  if(ierr != FIO_SUCCESS) return _none_tuple(9);
   hint_py = PyLong_FromVoidPtr(hint);
   return Py_BuildValue("(ddddddddd)",
                        v[0], v[1], v[2], v[3], v[4],
@@ -519,22 +538,6 @@ PyObject* fio_open_numpy_source_py(PyObject* self, PyObject* args)
  *                      bzero, rzero, ntime, ntor,
  *                      ion_mass, z_ion, itor, numvar, version,
  *                      n0, L0, B0) -> None
- *
- * Total: 13 arguments (handle + 12 parameters).
- * Format string: "iddiiddiiiddd"
- *   i  = handle
- *   d  = bzero
- *   d  = rzero
- *   i  = ntime
- *   i  = ntor
- *   d  = ion_mass
- *   d  = z_ion
- *   i  = itor
- *   i  = numvar
- *   i  = version
- *   d  = n0
- *   d  = L0
- *   d  = B0
  */
 PyObject* fio_set_numpy_parameters_py(PyObject* self, PyObject* args)
 {
