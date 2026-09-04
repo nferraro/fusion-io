@@ -110,17 +110,24 @@ public:
  *   A_Phi =  psi / R
  *
  * Owns the component m3dc1_field* objects.
+ *
+ * scale   = B0 * L0  (MKS)
+ * scale_L = L0       (MKS)
+ * These are stored separately so that eval_deriv can apply the correct
+ * unit conversion: spatial (R,Z) derivatives scale as B0 = scale/scale_L,
+ * while the toroidal (phi) derivative scales as B0*L0 = scale.
  */
 class m3dc1_numpy_vector_potential : public fio_field {
 public:
-    m3dc1_field* psi;   // owned
-    m3dc1_field* f;     // owned, may be nullptr
-    double scale;       // B0 * L0
-    int itor;           // 1 for cylindrical
+    m3dc1_field* psi;     // owned
+    m3dc1_field* f;       // owned, may be nullptr
+    double scale;         // B0 * L0  (MKS)
+    double scale_L;       // L0       (MKS)
+    int itor;             // 1 for cylindrical
 
     m3dc1_numpy_vector_potential(m3dc1_field* psi_, m3dc1_field* f_,
-                                  double sc, int itor_)
-        : psi(psi_), f(f_), scale(sc), itor(itor_) {}
+                                  double sc, double scL, int itor_)
+        : psi(psi_), f(f_), scale(sc), scale_L(scL), itor(itor_) {}
     virtual ~m3dc1_numpy_vector_potential()
     {
         delete psi;
@@ -130,10 +137,7 @@ public:
     virtual fio_field* clone() const { return nullptr; }
     virtual int dimension() const { return 3; }
     virtual int eval(const double* x, double* v, fio_hint hint = 0);
-    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
-    {
-        return FIO_UNSUPPORTED;
-    }
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0);
 };
 
 /*
@@ -147,21 +151,28 @@ public:
  *
  * (The f/fp correction terms apply only for 3D/complex runs.)
  * Owns the component m3dc1_field* objects.
+ *
+ * scale   = B0   (MKS)
+ * scale_L = L0   (MKS)
+ * These are stored separately so that eval_deriv can apply the correct
+ * unit conversion: spatial (R,Z) derivatives scale as B0/L0, while the
+ * toroidal (phi) derivative scales as B0 (cylindrical) or B0/L0 (slab).
  */
 class m3dc1_numpy_magnetic_field : public fio_field {
 public:
-    m3dc1_field* psi;   // owned
-    m3dc1_field* I;     // owned
-    m3dc1_field* f;     // owned, may be nullptr
-    double scale;       // B0
+    m3dc1_field* psi;     // owned
+    m3dc1_field* I;       // owned
+    m3dc1_field* f;       // owned, may be nullptr
+    double scale;         // B0   (MKS)
+    double scale_L;       // L0   (MKS)
     int itor;
-    int ifprime;        // 0 -> use f, 1 -> use fp
-    bool use_f;         // true if f is available
+    int ifprime;          // 0 -> use f, 1 -> use fp
+    bool use_f;           // true if f is available
 
     m3dc1_numpy_magnetic_field(m3dc1_field* psi_, m3dc1_field* I_,
-                                m3dc1_field* f_, double sc, int itor_,
-                                int ifprime_, bool use_f_)
-        : psi(psi_), I(I_), f(f_), scale(sc), itor(itor_),
+                                m3dc1_field* f_, double sc, double scL,
+                                int itor_, int ifprime_, bool use_f_)
+        : psi(psi_), I(I_), f(f_), scale(sc), scale_L(scL), itor(itor_),
           ifprime(ifprime_), use_f(use_f_) {}
     virtual ~m3dc1_numpy_magnetic_field()
     {
@@ -173,10 +184,7 @@ public:
     virtual fio_field* clone() const { return nullptr; }
     virtual int dimension() const { return 3; }
     virtual int eval(const double* x, double* v, fio_hint hint = 0);
-    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0)
-    {
-        return FIO_UNSUPPORTED;
-    }
+    virtual int eval_deriv(const double* x, double* v, fio_hint hint = 0);
 };
 
 /*

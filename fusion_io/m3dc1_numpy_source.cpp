@@ -90,13 +90,13 @@ int m3dc1_numpy_fio_field::eval_deriv(const double* x, double* v, fio_hint hint)
 }
 
 // ---------------------------------------------------------------------------
-// m3dc1_numpy_vector_potential
+// m3dc1_numpy_vector_potential  eval
 // ---------------------------------------------------------------------------
 // Mirrors m3dc1_vector_potential::eval() from m3dc1_field.cpp:
 //   A_R   =  R * (df/dZ)
 //   A_Z   = -R * (df/dR)
 //   A_Phi =  psi / R
-// All converted to MKS by multiplying by B0*L0.
+// All converted to MKS by multiplying by scale = B0*L0.
 
 int m3dc1_numpy_vector_potential::eval(const double* x, double* v,
                                         fio_hint hint)
@@ -128,14 +128,94 @@ int m3dc1_numpy_vector_potential::eval(const double* x, double* v,
 }
 
 // ---------------------------------------------------------------------------
-// m3dc1_numpy_magnetic_field
+// m3dc1_numpy_vector_potential  eval_deriv
+// ---------------------------------------------------------------------------
+// Mirrors m3dc1_vector_potential::eval_deriv() from m3dc1_field.cpp exactly.
+//
+// Unit conversion (from m3dc1_field.cpp):
+//   v[DR_*]   *= B0       (spatial R derivative, dimension 1/L0 cancels)
+//   v[DPHI_*] *= B0*L0    (toroidal derivative)
+//   v[DZ_*]   *= B0       (spatial Z derivative)
+// With scale = B0*L0 and scale_L = L0:
+//   B0 = scale / scale_L
+//   B0*L0 = scale
+
+int m3dc1_numpy_vector_potential::eval_deriv(const double* x, double* v,
+                                              fio_hint hint)
+{
+    int* element = (int*)hint;
+    double val[m3dc1_field::OP_NUM];
+
+    const m3dc1_field::m3dc1_get_op psiget =
+        (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_VAL |
+                                    m3dc1_field::GET_DVAL |
+                                    m3dc1_field::GET_PVAL);
+
+    const m3dc1_field::m3dc1_get_op fget =
+        (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_DVAL |
+                                    m3dc1_field::GET_PVAL |
+                                    m3dc1_field::GET_DDVAL);
+
+    // Initialise all 9 output components to zero.
+    for(int i = 0; i < 9; i++) v[i] = 0.;
+
+    if(!psi->eval(x[0], x[1], x[2], psiget, val, element))
+        return FIO_OUT_OF_BOUNDS;
+
+    // dA_Phi/dR = (dpsi/dR - psi/R) / R
+    v[FIO_DR_PHI  ] = (val[m3dc1_field::OP_DR] -
+                       val[m3dc1_field::OP_1] / x[0]) / x[0];
+    // dA_Phi/dphi = dpsi/dphi / R
+    v[FIO_DPHI_PHI] = val[m3dc1_field::OP_DP] / x[0];
+    // dA_Phi/dZ = dpsi/dZ / R
+    v[FIO_DZ_PHI  ] = val[m3dc1_field::OP_DZ] / x[0];
+
+    if(f) {
+        if(!f->eval(x[0], x[1], x[2], fget, val, element))
+            return FIO_OUT_OF_BOUNDS;
+
+        // dA_R/dR =  R * d2f/dRdZ + df/dZ
+        v[FIO_DR_R  ] =  x[0] * val[m3dc1_field::OP_DRZ] +
+                         val[m3dc1_field::OP_DZ];
+        // dA_Z/dR = -(R * d2f/dR2 + df/dR)
+        v[FIO_DR_Z  ] = -(x[0] * val[m3dc1_field::OP_DRR] +
+                          val[m3dc1_field::OP_DR]);
+        // dA_R/dphi =  R * d2f/dZdphi
+        v[FIO_DPHI_R] =  x[0] * val[m3dc1_field::OP_DZP];
+        // dA_Z/dphi = -R * d2f/dRdphi
+        v[FIO_DPHI_Z] = -x[0] * val[m3dc1_field::OP_DRP];
+        // dA_R/dZ =  R * d2f/dZ2
+        v[FIO_DZ_R  ] =  x[0] * val[m3dc1_field::OP_DZZ];
+        // dA_Z/dZ = -R * d2f/dRdZ
+        v[FIO_DZ_Z  ] = -x[0] * val[m3dc1_field::OP_DRZ];
+    }
+
+    // Unit conversion — mirrors m3dc1_vector_potential::eval_deriv():
+    //   spatial (R,Z) derivatives: *= B0  = scale / scale_L
+    //   toroidal (phi) derivatives: *= B0*L0 = scale
+    double B0 = scale / scale_L;
+    v[FIO_DR_R    ] *= B0;
+    v[FIO_DR_PHI  ] *= B0;
+    v[FIO_DR_Z    ] *= B0;
+    v[FIO_DPHI_R  ] *= scale;
+    v[FIO_DPHI_PHI] *= scale;
+    v[FIO_DPHI_Z  ] *= scale;
+    v[FIO_DZ_R    ] *= B0;
+    v[FIO_DZ_PHI  ] *= B0;
+    v[FIO_DZ_Z    ] *= B0;
+
+    return FIO_SUCCESS;
+}
+
+// ---------------------------------------------------------------------------
+// m3dc1_numpy_magnetic_field  eval
 // ---------------------------------------------------------------------------
 // Mirrors m3dc1_magnetic_field::eval() from m3dc1_field.cpp:
 //   B_R   = -(dpsi/dZ) / R
 //   B_Z   =  (dpsi/dR) / R
 //   B_Phi =  I / R
 // Plus f/fp correction for 3D/complex runs.
-// All converted to MKS by multiplying by B0.
+// All converted to MKS by multiplying by scale = B0.
 
 int m3dc1_numpy_magnetic_field::eval(const double* x, double* v,
                                       fio_hint hint)
@@ -178,13 +258,122 @@ int m3dc1_numpy_magnetic_field::eval(const double* x, double* v,
 }
 
 // ---------------------------------------------------------------------------
+// m3dc1_numpy_magnetic_field  eval_deriv
+// ---------------------------------------------------------------------------
+// Mirrors m3dc1_magnetic_field::eval_deriv() from m3dc1_field.cpp exactly.
+//
+// Unit conversion (from m3dc1_field.cpp):
+//   v[DR_*]   *= B0 / L0   (spatial R derivative)
+//   v[DPHI_*] *= B0        (toroidal derivative, cylindrical itor==1)
+//   v[DPHI_*] *= B0 / L0   (toroidal derivative, slab itor==0)
+//   v[DZ_*]   *= B0 / L0   (spatial Z derivative)
+// With scale = B0 and scale_L = L0:
+//   B0/L0 = scale / scale_L
+
+int m3dc1_numpy_magnetic_field::eval_deriv(const double* x, double* v,
+                                            fio_hint hint)
+{
+    int* element = (int*)hint;
+    double val[m3dc1_field::OP_NUM];
+    double r = (itor == 1) ? x[0] : 1.;
+
+    const m3dc1_field::m3dc1_get_op psiget =
+        (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_DVAL |
+                                    m3dc1_field::GET_PVAL |
+                                    m3dc1_field::GET_DDVAL);
+
+    const m3dc1_field::m3dc1_get_op gget =
+        (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_VAL |
+                                    m3dc1_field::GET_DVAL |
+                                    m3dc1_field::GET_PVAL);
+
+    const m3dc1_field::m3dc1_get_op fget =
+        (m3dc1_field::m3dc1_get_op)(m3dc1_field::GET_DVAL |
+                                    m3dc1_field::GET_PVAL |
+                                    m3dc1_field::GET_DDVAL |
+                                    m3dc1_field::GET_PPVAL);
+
+    // Initialise all 9 output components to zero.
+    for(int i = 0; i < 9; i++) v[i] = 0.;
+
+    // --- psi contribution ---
+    if(!psi->eval(x[0], x[1], x[2], psiget, val, element))
+        return FIO_OUT_OF_BOUNDS;
+
+    v[FIO_DR_R  ] = -val[m3dc1_field::OP_DRZ] / r;
+    if(itor == 1)
+        v[FIO_DR_R] += val[m3dc1_field::OP_DZ] / (r * r);
+    v[FIO_DPHI_R] = -val[m3dc1_field::OP_DZP] / r;
+    v[FIO_DZ_R  ] = -val[m3dc1_field::OP_DZZ] / r;
+
+    v[FIO_DR_Z  ] =  val[m3dc1_field::OP_DRR] / r;
+    if(itor == 1)
+        v[FIO_DR_Z] -= val[m3dc1_field::OP_DR] / (r * r);
+    v[FIO_DPHI_Z] =  val[m3dc1_field::OP_DRP] / r;
+    v[FIO_DZ_Z  ] =  val[m3dc1_field::OP_DRZ] / r;
+
+    // --- I contribution ---
+    if(!I->eval(x[0], x[1], x[2], gget, val, element))
+        return FIO_OUT_OF_BOUNDS;
+
+    v[FIO_DR_PHI  ] =  val[m3dc1_field::OP_DR] / r;
+    if(itor == 1)
+        v[FIO_DR_PHI] -= val[m3dc1_field::OP_1] / (r * r);
+    v[FIO_DPHI_PHI] =  val[m3dc1_field::OP_DP] / r;
+    v[FIO_DZ_PHI  ] =  val[m3dc1_field::OP_DZ] / r;
+
+    // --- f/fp contribution ---
+    if(use_f && f) {
+        if(!f->eval(x[0], x[1], x[2], fget, val, element))
+            return FIO_OUT_OF_BOUNDS;
+
+        if(ifprime == 0) {
+            v[FIO_DR_R  ] -= val[m3dc1_field::OP_DRRP];
+            v[FIO_DPHI_R] -= val[m3dc1_field::OP_DRPP];
+            v[FIO_DZ_R  ] -= val[m3dc1_field::OP_DRZP];
+
+            v[FIO_DR_Z  ] -= val[m3dc1_field::OP_DRZP];
+            v[FIO_DPHI_Z] -= val[m3dc1_field::OP_DZPP];
+            v[FIO_DZ_Z  ] -= val[m3dc1_field::OP_DZZP];
+        } else {
+            v[FIO_DR_R  ] -= val[m3dc1_field::OP_DRR];
+            v[FIO_DPHI_R] -= val[m3dc1_field::OP_DRP];
+            v[FIO_DZ_R  ] -= val[m3dc1_field::OP_DRZ];
+
+            v[FIO_DR_Z  ] -= val[m3dc1_field::OP_DRZ];
+            v[FIO_DPHI_Z] -= val[m3dc1_field::OP_DZP];
+            v[FIO_DZ_Z  ] -= val[m3dc1_field::OP_DZZ];
+        }
+    }
+
+    // --- Unit conversion ---
+    // Mirrors m3dc1_magnetic_field::eval_deriv() in m3dc1_field.cpp:
+    //   spatial (R,Z) derivatives: *= B0 / L0  = scale / scale_L
+    //   toroidal (phi) derivatives: *= B0       (itor==1)
+    //                            or *= B0 / L0  (itor==0)
+    double B0overL0 = scale / scale_L;
+    v[FIO_DR_R    ] *= B0overL0;
+    v[FIO_DR_PHI  ] *= B0overL0;
+    v[FIO_DR_Z    ] *= B0overL0;
+    if(itor == 1) {
+        v[FIO_DPHI_R  ] *= scale;
+        v[FIO_DPHI_PHI] *= scale;
+        v[FIO_DPHI_Z  ] *= scale;
+    } else {
+        v[FIO_DPHI_R  ] *= B0overL0;
+        v[FIO_DPHI_PHI] *= B0overL0;
+        v[FIO_DPHI_Z  ] *= B0overL0;
+    }
+    v[FIO_DZ_R    ] *= B0overL0;
+    v[FIO_DZ_PHI  ] *= B0overL0;
+    v[FIO_DZ_Z    ] *= B0overL0;
+
+    return FIO_SUCCESS;
+}
+
+// ---------------------------------------------------------------------------
 // m3dc1_numpy_current_density
 // ---------------------------------------------------------------------------
-// Mirrors m3dc1_current_density::eval() from m3dc1_field.cpp:
-//   J_R   =  (d(psi')/dR) / R^2  -  (dI/dZ) / R
-//   J_Z   =  (d(psi')/dZ) / R^2  +  (dI/dR) / R
-//   J_Phi = -Del*[psi] / R
-// All converted to MKS by multiplying by J0.
 
 int m3dc1_numpy_current_density::eval(const double* x, double* v,
                                        fio_hint hint)
@@ -236,11 +425,6 @@ int m3dc1_numpy_current_density::eval(const double* x, double* v,
 // ---------------------------------------------------------------------------
 // m3dc1_numpy_fluid_velocity
 // ---------------------------------------------------------------------------
-// Mirrors m3dc1_fluid_velocity::eval() from m3dc1_field.cpp:
-//   V_R   = -(dphi/dZ)*R + dchi/dR / R^2
-//   V_Z   =  (dphi/dR)*R + dchi/dZ / R^2
-//   V_Phi =  V * R
-// All converted to MKS by multiplying by v0.
 
 int m3dc1_numpy_fluid_velocity::eval(const double* x, double* v,
                                       fio_hint hint)
@@ -272,8 +456,6 @@ int m3dc1_numpy_fluid_velocity::eval(const double* x, double* v,
 // ---------------------------------------------------------------------------
 // m3dc1_numpy_electric_field
 // ---------------------------------------------------------------------------
-// Mirrors m3dc1_electric_field::eval() from m3dc1_field.cpp.
-// Each component is stored as a separate scalar field.
 
 int m3dc1_numpy_electric_field::eval(const double* x, double* v,
                                       fio_hint hint)
@@ -414,14 +596,6 @@ int m3dc1_numpy_source::get_slice_time(int slice, double* time) const
     return FIO_SUCCESS;
 }
 
-/*
- * make_field
- * ~~~~~~~~~~
- * Create an m3dc1_field (or m3dc1_complex_field) from the injected data
- * for the given field name and timeslice.
- * Returns nullptr if the data has not been injected yet.
- * The caller takes ownership of the returned pointer.
- */
 m3dc1_field* m3dc1_numpy_source::make_field(const std::string& name,
                                              int timeslice) const
 {
@@ -448,22 +622,6 @@ m3dc1_field* m3dc1_numpy_source::make_field(const std::string& name,
     }
 }
 
-/*
- * get_field
- * ~~~~~~~~~
- * Assembles composite fio_field objects from injected component datasets.
- *
- * For composite field types (FIO_VECTOR_POTENTIAL, FIO_MAGNETIC_FIELD,
- * FIO_CURRENT_DENSITY, FIO_FLUID_VELOCITY, FIO_ELECTRIC_FIELD,
- * FIO_PRESSURE), the component HDF5 datasets (e.g. 'psi', 'I', 'f') must
- * have been injected via set_numpy_field() before calling get_field().
- * The composite field is then assembled here from those components, exactly
- * mirroring what the HDF5 backend's load() methods do.
- *
- * This means the Python layer must inject the component datasets (not a
- * pre-assembled 'A', 'B', etc.) and the C++ layer assembles the composite
- * field from them here.
- */
 int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
                                    const fio_option_list* opt)
 {
@@ -481,15 +639,10 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
     opt->get_option(FIO_SPECIES, &s);
     if(s == FIO_MAIN_ION) s = (int)ion_species;
 
-    // Whether 3D/complex fields are available (determines use_f).
-    // For the equilibrium timeslice (-1) we treat as axisymmetric (use_f=false).
     bool use_f = (timeslice != -1);
 
     switch(t) {
 
-    // ------------------------------------------------------------------
-    // Simple scalar fields: injected directly under their HDF5 name.
-    // ------------------------------------------------------------------
     case FIO_DENSITY: {
         std::string nm = (s == (int)fio_electron) ? "ne" : "den";
         m3dc1_field* mf = make_field(nm, timeslice);
@@ -553,12 +706,8 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Ion pressure: pi = P - Pe
-    // ------------------------------------------------------------------
     case FIO_PRESSURE: {
         if(s == (int)fio_electron) {
-            // Electron pressure: simple scalar
             m3dc1_field* mf = make_field("Pe", timeslice);
             if(!mf) {
                 std::cerr << "m3dc1_numpy_source::get_field: field 'Pe'"
@@ -568,7 +717,6 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
             }
             *f = new m3dc1_numpy_fio_field(mf, p0, 1);
         } else {
-            // Ion pressure: pi = P - Pe
             m3dc1_field* mP  = make_field("P",  timeslice);
             m3dc1_field* mPe = make_field("Pe", timeslice);
             if(!mP || !mPe) {
@@ -584,10 +732,6 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Vector potential A: assembled from 'psi' and 'f'.
-    // Mirrors m3dc1_vector_potential::load() / eval().
-    // ------------------------------------------------------------------
     case FIO_VECTOR_POTENTIAL: {
         m3dc1_field* mPsi = make_field("psi", timeslice);
         if(!mPsi) {
@@ -599,16 +743,12 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         m3dc1_field* mF = nullptr;
         if(use_f) {
             mF = make_field("f", timeslice);
-            // f is optional; if not found, A_R and A_Z will be zero.
         }
-        *f = new m3dc1_numpy_vector_potential(mPsi, mF, B0 * L0, itor);
+        // Pass B0*L0 as scale and L0 as scale_L.
+        *f = new m3dc1_numpy_vector_potential(mPsi, mF, B0 * L0, L0, itor);
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Magnetic field B: assembled from 'psi', 'I', and 'f'/'fp'.
-    // Mirrors m3dc1_magnetic_field::load() / eval().
-    // ------------------------------------------------------------------
     case FIO_MAGNETIC_FIELD: {
         m3dc1_field* mPsi = make_field("psi", timeslice);
         m3dc1_field* mI   = make_field("I",   timeslice);
@@ -624,15 +764,12 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         if(use_f) {
             mF = make_field(ifprime ? "fp" : "f", timeslice);
         }
-        *f = new m3dc1_numpy_magnetic_field(mPsi, mI, mF, B0, itor,
+        // Pass B0 as scale and L0 as scale_L.
+        *f = new m3dc1_numpy_magnetic_field(mPsi, mI, mF, B0, L0, itor,
                                              ifprime, use_f && mF != nullptr);
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Current density J: assembled from 'psi', 'I', and 'f'/'fp'.
-    // Mirrors m3dc1_current_density::load() / eval().
-    // ------------------------------------------------------------------
     case FIO_CURRENT_DENSITY: {
         m3dc1_field* mPsi = make_field("psi", timeslice);
         m3dc1_field* mI   = make_field("I",   timeslice);
@@ -653,10 +790,6 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Fluid velocity v: assembled from 'phi', 'V', 'chi'.
-    // Mirrors m3dc1_fluid_velocity::load() / eval().
-    // ------------------------------------------------------------------
     case FIO_FLUID_VELOCITY: {
         m3dc1_field* mPhi = make_field("phi", timeslice);
         m3dc1_field* mV   = make_field("V",   timeslice);
@@ -674,10 +807,6 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Electric field E: assembled from 'E_R', 'E_PHI', 'E_Z'.
-    // Mirrors m3dc1_electric_field::load() / eval().
-    // ------------------------------------------------------------------
     case FIO_ELECTRIC_FIELD: {
         m3dc1_field* mER   = make_field("E_R",   timeslice);
         m3dc1_field* mEPHI = make_field("E_PHI", timeslice);
@@ -696,9 +825,6 @@ int m3dc1_numpy_source::get_field(const field_type t, fio_field** f,
         return FIO_SUCCESS;
     }
 
-    // ------------------------------------------------------------------
-    // Generic named scalar field (FIO_SCALAR_FIELD).
-    // ------------------------------------------------------------------
     case FIO_SCALAR_FIELD: {
         std::string field_name;
         opt->get_option(FIO_FIELD_NAME, &field_name);
@@ -723,16 +849,16 @@ int m3dc1_numpy_source::get_series(const series_type t, fio_series** s)
     *s = nullptr;
     switch(t) {
     case FIO_MAGAXIS_PSI:
-        *s = new m3dc1_numpy_series(this, "psimin",    B0 * L0 * L0);
+        *s = new m3dc1_numpy_series(this, "psimin",   B0 * L0 * L0);
         return FIO_SUCCESS;
     case FIO_LCFS_PSI:
-        *s = new m3dc1_numpy_series(this, "psi_lcfs",  B0 * L0 * L0);
+        *s = new m3dc1_numpy_series(this, "psi_lcfs", B0 * L0 * L0);
         return FIO_SUCCESS;
     case FIO_MAGAXIS_R:
-        *s = new m3dc1_numpy_series(this, "xmag",      L0);
+        *s = new m3dc1_numpy_series(this, "xmag",     L0);
         return FIO_SUCCESS;
     case FIO_MAGAXIS_Z:
-        *s = new m3dc1_numpy_series(this, "zmag",      L0);
+        *s = new m3dc1_numpy_series(this, "zmag",     L0);
         return FIO_SUCCESS;
     default:
         return FIO_UNSUPPORTED;
