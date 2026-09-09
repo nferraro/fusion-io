@@ -18,8 +18,6 @@ include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
 # --- ADDED FOR PARALLELIZATION ---
 # Appending OpenMP flags to existing CFLAGS and LDFLAGS
-CXX := mpiicpc
-
 CFLAGS   += -qopenmp -O3
 CXXFLAGS += -qopenmp -O3 -xHost -fp-model fast
 LDFLAGS  += -qopenmp
