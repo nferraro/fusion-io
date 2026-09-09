@@ -2,10 +2,10 @@ CC = cc
 CXX = CC
 CFLAGS = -O3 -fPIC -std=c++17
 
-F90 = mpif90
+F90 = ftn
 F90FLAGS = -O3 -Wall -fdefault-real-8 -fimplicit-none -fPIC
 
-LD = $(CXX) #-qopenmp
+LD = $(CXX)
 LDFLAGS =
 
 ARCH = ar cr
@@ -15,9 +15,11 @@ PYTHON = python3
 
 LAPACK = -llapack
 
-HDF5_LIBS = -L$(HDF5_DIR)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
+HDF5_LIBS = -L$(HDF5_DIR)/lib -lhdf5 -Wl,-rpath,$(HDF5_DIR)/lib
 HDF5_INCLUDE = -I$(HDF5_DIR)/include
 NETCDF_INCLUDE = -I$(NETCDF_DIR)/include
 NETCDF_LIBS = -L$(NETCDF_DIR)/lib -lnetcdf
 
-LIBS = -lstdc++
+LIBS = -lstdc++ \
+       -Wl,-rpath,$(FIO_ROOT)/fusion_io/_perlmutter_gcc \
+       -Wl,-rpath,$(FIO_ROOT)/m3dc1_lib/_perlmutter_gcc

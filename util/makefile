@@ -16,14 +16,6 @@ VPATH=$(SRCDIR)
 # include platform-specific options
 include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 
-# --- ADDED FOR PARALLELIZATION ---
-# Appending OpenMP flags to existing CFLAGS and LDFLAGS
-CFLAGS   += -qopenmp -O3
-CXXFLAGS += -qopenmp -O3 -xHost -fp-model fast
-LDFLAGS  += -qopenmp
-F90FLAGS += -qopenmp
-# ---------------------------------
-
 CLIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
     -L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \
     $(HDF5_LIBS) $(NETCDF_LIBS) $(LIBS) 
@@ -40,7 +32,6 @@ INCLUDE :=-I$(FIO_ROOT)/fusion_io -I$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) \
 
 all : write_neo_input write_lp_input
 
-# Added $(LDFLAGS) to ensure -fopenmp is used during the linking stage
 write_neo_input : write_neo_input.o
 	$(CXX) $(LDFLAGS) -o $@ $< $(CLIBS) $(CFLAGS)
 

@@ -1,12 +1,13 @@
 CC = mpicc
 CXX = mpicxx
-CFLAGS = -O3 -fPIC -std=c++17 -fvisibility=default -frtti
+CFLAGS = -O3 -fPIC -std=c++17 -fvisibility=default -frtti -qopenmp
+CXXFLAGS = -qopenmp -O3 -xHost -fp-model fast
 
 F90 = mpif90
-F90FLAGS = -O3 -r8 -fPIC
+F90FLAGS = -O3 -r8 -fPIC -qopenmp
 
 LD = $(CC)
-LDFLAGS = -Wl,--export-dynamic
+LDFLAGS = -Wl,--export-dynamic -qopenmp
 
 ARCH = ar cr
 LDD = $(CC) --shared
