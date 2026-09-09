@@ -68,7 +68,7 @@ fio_module = Extension('fio_py',
 
 setup (name = 'fio_py',
        author = 'N.M. Ferraro', 
-       version = '1.0',
+       version = '1.1',
        description = 'Fusion IO Package',
        ext_modules = [fio_module],
        py_modules = ['fpy'])

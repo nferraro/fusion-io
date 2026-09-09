@@ -9,10 +9,11 @@
  *
  * This allows the Python layer to stream only the field coefficient arrays
  * it needs from a remote host (via SSH + h5py), inject them here, and then
- * use the full fusion-io finite element evaluation machinery without
- * transferring complete HDF5 files.
+ * use the full fusion-io finite element evaluation capability without
+ * transferring complete HDF5 files. This is the primary advantage of using
+ * ADIOS2 campaign management here.
  *
- * Workflow from Python:
+ * Sketch of workflow from Python:
  *   handle = fio_py.open_numpy_source()
  *   fio_py.set_numpy_parameters(handle, bzero, rzero, ntime, ntor,
  *                               ion_mass, z_ion, itor, numvar, version,

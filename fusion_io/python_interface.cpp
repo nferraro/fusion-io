@@ -200,8 +200,10 @@ PyObject* fio_add_field_py(PyObject* self, PyObject *args)
 {
   int icfield, ifield, op;
   double fac;
+
   if(!PyArg_ParseTuple(args, "iiid", &icfield, &ifield, &op, &fac))
     return NULL;
+
   int ierr = fio_add_field(icfield, ifield, op, fac);
   if(ierr != FIO_SUCCESS) return NULL;
   Py_RETURN_NONE;
@@ -255,6 +257,7 @@ PyObject* fio_close_series_py(PyObject* self, PyObject *args)
 PyObject* fio_create_compound_field_py(PyObject* self, PyObject *args)
 {
   int ifield;
+
   int ierr = fio_create_compound_field(&ifield);
   if(ierr != FIO_SUCCESS) return NULL;
   return Py_BuildValue("i", ifield);
@@ -268,11 +271,14 @@ PyObject* fio_eval_scalar_field_py(PyObject* self, PyObject *args)
   if(!PyArg_ParseTuple(args, "i(ddd)O",
                        &ifield, &x[0], &x[1], &x[2], &hint_py))
     return NULL;
+
   void* hint = PyLong_AsVoidPtr(hint_py);
+
   double v;
   int ierr = fio_eval_field(ifield, x, &v, hint);
   if(ierr != FIO_SUCCESS) return Py_BuildValue("");
   hint_py = PyLong_FromVoidPtr(hint);
+
   return Py_BuildValue("d", v);
 }
 
@@ -284,12 +290,16 @@ PyObject* fio_eval_scalar_field_deriv_py(PyObject* self, PyObject *args)
   if(!PyArg_ParseTuple(args, "i(ddd)O",
                        &ifield, &x[0], &x[1], &x[2], &hint_py))
     return NULL;
+
   void* hint = PyLong_AsVoidPtr(hint_py);
+
   double v[3];
+  /*int ierr = fio_eval_field(ifield, x, &v, hint);*/
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
   // Fixed: was Py_BuildValue("(2)", Py_None) which is an invalid format string
   if(ierr != FIO_SUCCESS) return _none_tuple(3);
   hint_py = PyLong_FromVoidPtr(hint);
+
   return Py_BuildValue("(ddd)", v[0], v[1], v[2]);
 }
 
@@ -312,12 +322,16 @@ PyObject* fio_eval_vector_field_py(PyObject* self, PyObject *args)
   if(!PyArg_ParseTuple(args, "i(ddd)O",
                        &ifield, &x[0], &x[1], &x[2], &hint_py))
     return NULL;
+
   void* hint = PyLong_AsVoidPtr(hint_py);
+
   double v[3];
+  /* Do the evaluation!*/
   int ierr = fio_eval_field(ifield, x, v, hint);
   // Fixed: was Py_BuildValue("(2)", Py_None) which is an invalid format string
   if(ierr != FIO_SUCCESS) return _none_tuple(3);
   hint_py = PyLong_FromVoidPtr(hint);
+
   return Py_BuildValue("(ddd)", v[0], v[1], v[2]);
 }
 
@@ -329,8 +343,11 @@ PyObject* fio_eval_vector_field_deriv_py(PyObject* self, PyObject *args)
   if(!PyArg_ParseTuple(args, "i(ddd)O",
                        &ifield, &x[0], &x[1], &x[2], &hint_py))
     return NULL;
+
   void* hint = PyLong_AsVoidPtr(hint_py);
+
   double v[9];
+  /* Do the evaluation!*/
   int ierr = fio_eval_field_deriv(ifield, x, v, hint);
   // Fixed: was Py_BuildValue("(8)", Py_None) which is an invalid format string
   if(ierr != FIO_SUCCESS) return _none_tuple(9);
@@ -348,8 +365,11 @@ PyObject* fio_eval_tensor_field_py(PyObject* self, PyObject *args)
   if(!PyArg_ParseTuple(args, "i(ddd)O",
                        &ifield, &x[0], &x[1], &x[2], &hint_py))
     return NULL;
+
   void* hint = PyLong_AsVoidPtr(hint_py);
+
   double v[9];
+  /* Do the evaluation!*/
   int ierr = fio_eval_field(ifield, x, v, hint);
   // Fixed: was Py_BuildValue("(8)", Py_None) which is an invalid format string
   if(ierr != FIO_SUCCESS) return _none_tuple(9);
@@ -486,6 +506,7 @@ PyObject* fio_set_int_option_py(PyObject* self, PyObject *args)
 PyObject* fio_set_str_option_py(PyObject* self, PyObject *args)
 {
   int iopt;
+  /*char v[256];*/
   char* v;
   if(!PyArg_ParseTuple(args, "is", &iopt, &v)) return NULL;
   int ierr = fio_set_str_option(iopt, v);

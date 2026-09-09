@@ -1244,7 +1244,6 @@ class _AcaBackend:
            case where the .aca skeleton was created without 'ntimestep'.
         5. Cache and return the merged result.
         """
-        import json
         key = basename or self._default_file
         if key in self._root_attrs_cache:
             return self._root_attrs_cache[key]
@@ -1558,6 +1557,80 @@ def _local_ts_filename(c1_dir, timeslice):
 class sim_data:
     """
     Class that accesses the fusion-io functions in a more pythonic way.
+    Invoke an element of the class as follows:
+    sim = sim_data(filename='../C1.h5')
+    This creates a simulation object. This object has four attributes:
+    - Fields
+    - Time traces
+    - Mesh
+    - Diagnostics
+    - Constants
+
+    --Fields--
+    Fields objects can be created by, for example,
+      magnetic_field = sim.get_field('B',time=10)
+    This field can in turn be evaluated using
+      magnetic_field.evaluate((R,phi,Z)).
+    !! Note: Fields are given in SI units !!
+
+    Technical info:
+    A list of all strings allowed to call on fields can be
+    found in sim.available_fields. This dictionary is made so that
+    one string contains all information on the type of field
+    (scalar/vector), and the species.
+
+
+    -- Time traces--
+    Time trace objects can be created by, for example,
+      dt = sim.get_time_trace('dt').
+    The object dt then has two attributes:
+    dt.time: array of all the times where dt is evaluated
+    dt.values: array of all values of dt.
+    To plot some arbitrary time trace plt.plot(dt.time,dt.values) is enough.
+    A list of all callable traces can be found by invoking
+    sim.available_traces.
+    !! Note: Time series are given in M3D-C1 units. More control of units is possible
+    with the M3DC1 Python routines !!
+
+
+    --Mesh--
+    Mesh object can be created for example like so:
+      mesh = sim.get_mesh(time=1).
+    This object has a few attributes:
+    mesh.nplanes shows how many toroidal planes were used
+    mesh.elements contains info on the actual locations. The specifics
+    of this are explained in S. Jardin's 2004 paper. But useful info is:
+    mesh.elements[:,4] are the R locations of the mesh-points
+    mesh.elements[:,5] are the Z locations of the mesh-points
+
+    Technical info:
+    The mesh is read directly from the time_xxx.h5 files.
+
+
+    --Diagnostics--
+    The diagnostic object can be created for example like so:
+      diagnostic = sim.get_diagnostics(diagnostic)
+    The diagnostic object is meant for non-physical parameters such as
+    number of iterations, timings for each solve, and time_slice - time correspondensies.
+    The diagnostic object has two attributes:
+    !! Diagnostic are given in M3D-C1 units !!
+    diagnostic.diagnostic - contains the value of the diagnostic. Can be a simple array (i.e. for
+                            'time slices', or several objects i.e. to see a breakdown for timings)
+    diagnostic.x_axis     - contains the values of the x-axis of the diagnostic. This is alfven times
+                            for 'time slices' and iteration number for 'timings'
+    To see all available diagnostics, check sim.available_diagnostics
+
+    Technical info:
+    The diagnostic object is a bit of a hodge-podge of different methods. They all call on the
+    C1.h5 file, and some make use of string manipulations.
+
+
+    --Constants--
+    A subclass containing the constants can be created, for example, like so:
+      constants = sim.get_constants()
+    In this subclass, quantities like gamma, R0, and the version
+    number of the M3DC1 simulation are stored.
+
 
     --Campaign Archive Mode (.aca files)--
     To stream M3D-C1 data from a remote cluster via an HPC campaign
@@ -1627,6 +1700,7 @@ class sim_data:
                 'Unsupported filetype: {}. '
                 'Supported: m3dc1, nimrod, adios2.'.format(filetype))
 
+        # Dictionary contains the field abbreviation, the type of field, and the species
         self.typedict = {
             'j'        : ('current density',       'vector', None,       'simple'),
             'ni'       : ('density',               'scalar', 'main ion', 'simple'),
@@ -1754,7 +1828,7 @@ class sim_data:
                 self._available_fields[name] = nr
         self.ntor = fio_py.get_int_parameter(self._isrc, fio_py.FIO_TOROIDAL_MODE)
         self.period = fio_py.get_real_parameter(self._isrc, fio_py.FIO_PERIOD)
-        self.fc = None
+        self.fc = None # later used to store flux coodinate object upon calculation of flux coordinates (see class definition below and flux_coordinates.py)
 
         if verbose:
             print('Available fields:')
@@ -1829,12 +1903,41 @@ class sim_data:
             self._all_attrs.update_timeslice(new_ts_h5)
 
     def get_time_trace(self, scalar, ipellet=None):
+        """
+        Creates an object containing a time-array, and an array with the corresponding
+        values of the scalar quantity:
+        trace.time
+        trace.values
+        """
         return self.time_trace(scalar, sim_data=self, ipellet=ipellet)
 
     def get_diagnostic(self, diagnostic):
+        """
+        Returns a diagnostics object.
+
+        Available diagnostics:
+        *slice times*
+            relation between slice numbers and time in M3DC1 Alfven units
+        *timings*
+            Clock time needed per iteration of the sim
+        *iterations*
+            Number of iterations needed per time advance
+        """
         return self.diagnostic(self, diagnostic)
 
     def get_field(self, field, time=None):
+        """
+        Returns a field object.
+
+        Keyworded arguments:
+
+        **field**
+            Contains field name. Allowed fieldnames mysim.typedict
+
+        **time**
+            Timeslice for field to be read out
+            If none, it will read for self.timeslice
+        """
         if field in self.typedict.keys():
             return self.field(self, field=self.typedict[field][0], time=time,
                               species=self.typedict[field][2],
@@ -1844,9 +1947,24 @@ class sim_data:
                               ftype='scalar')
 
     def get_mesh(self, time=None, quiet=False):
+        """
+        Returns a mesh object.
+
+        Keyworded arguments:
+
+        **time**
+            Timeslice for field to be read out
+            If none, it will read for self.timeslice
+            
+        **quiet**
+        If True, suppress output to terminal.
+        """
         return self.mesh(self, time, quiet=quiet)
 
     def get_signal(self, signame):
+        """
+        Return a signal object
+        """
         return self.signal(self, signame)
 
     def get_constants(self):
@@ -1923,8 +2041,7 @@ class sim_data:
         Fields are evaluated using:
         myfield.evaluate((r,phi,theta))
         """
-        def __init__(self, sim_data, field, time=None, species=None,
-                     ftype='scalar'):
+        def __init__(self, sim_data, field, time=None, species=None, ftype='scalar'):
             self.sim_data = sim_data
             self.field = field
             if time is not None:
@@ -1971,20 +2088,17 @@ class sim_data:
             x = _to_float_tuple(x)
             if self.ftype == 'vector':
                 try:
-                    return fio_py.eval_vector_field(
-                        self._ifield, x, self.sim_data.hint)
+                    return fio_py.eval_vector_field(self._ifield, x, self.sim_data.hint)
                 except Exception:
                     return (None, None, None)
             if self.ftype == 'tensor':
                 try:
-                    return fio_py.eval_tensor_field(
-                        self._ifield, x, self.sim_data.hint)
+                    return fio_py.eval_tensor_field(self._ifield, x, self.sim_data.hint)
                 except Exception:
                     return (None,) * 9
             elif self.ftype == 'scalar':
                 try:
-                    return (fio_py.eval_scalar_field(
-                        self._ifield, x, self.sim_data.hint),)
+                    return (fio_py.eval_scalar_field(self._ifield, x, self.sim_data.hint),)
                 except Exception:
                     return (None,)
             else:
@@ -2003,15 +2117,13 @@ class sim_data:
             x = _to_float_tuple(x)
             if self.ftype == 'vector':
                 try:
-                    return fio_py.eval_vector_field_deriv(
-                        self._ifield, x, self.sim_data.hint)
+                    return fio_py.eval_vector_field_deriv(self._ifield, x, self.sim_data.hint)
                 except Exception as e:
                     print('WARNING: eval_vector_field_deriv failed at {}: {}'.format(x, e))
                     return (None,) * 9
             elif self.ftype == 'scalar':
                 try:
-                    return (fio_py.eval_scalar_field_deriv(
-                        self._ifield, x, self.sim_data.hint),)
+                    return (fio_py.eval_scalar_field_deriv(self._ifield, x, self.sim_data.hint),)
                 except Exception as e:
                     print('WARNING: eval_scalar_field_deriv failed at {}: {}'.format(x, e))
                     return (None, None, None)
@@ -2020,7 +2132,9 @@ class sim_data:
 
     class mesh:
         """
-        Mesh class: reads the mesh from the timeslice file.
+        Mesh class: reads the mesh from the timeslice file. It also reads the output
+        version and nplanes.
+        nplanes is needed for plotting 3D meshes.
         """
         def __init__(self, sim_data, time=None, quiet=False):
             self.sim_data = sim_data
@@ -2063,7 +2177,7 @@ class sim_data:
 
     class signal:
         """
-        Signal class: for diagnostic signals. Not available in campaign mode.
+        Signal class: for diagnostic signals (magnetic probes and flux loops). Not available in campaign mode.
         """
         def __init__(self, sim_data, signame):
             self.sim_data = sim_data
@@ -2139,11 +2253,11 @@ class sim_data:
                     self.time = time
                     self.values = values
 
+        # Addition
         def __add__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = self.values + other.values
             else:
                 values = self.values + other
@@ -2154,18 +2268,17 @@ class sim_data:
         def __iadd__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 self.values = self.values + other.values
             else:
                 self.values = self.values + other
             return self
 
+        # Subtraction
         def __sub__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = self.values - other.values
             else:
                 values = self.values - other
@@ -2174,8 +2287,7 @@ class sim_data:
         def __rsub__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = other.values - self.values
             else:
                 values = other - self.values
@@ -2184,18 +2296,17 @@ class sim_data:
         def __isub__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 self.values = self.values - other.values
             else:
                 self.values = self.values - other
             return self
 
+        # Multiplication
         def __mul__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = self.values * other.values
             else:
                 values = self.values * other
@@ -2206,18 +2317,17 @@ class sim_data:
         def __imul__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 self.values = self.values * other.values
             else:
                 self.values = self.values * other
             return self
 
+        # Division
         def __truediv__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = self.values / other.values
             else:
                 values = self.values / other
@@ -2226,8 +2336,7 @@ class sim_data:
         def __rtruediv__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 values = other.values / self.values
             else:
                 values = other / self.values
@@ -2236,15 +2345,17 @@ class sim_data:
         def __itruediv__(self, other):
             if isinstance(other, type(self)):
                 if not np.array_equal(self.time, other.time):
-                    raise ValueError(
-                        'operands share different .time attributes')
+                    raise ValueError('operands share different .time attributes')
                 self.values = self.values / other.values
             else:
                 self.values = self.values / other
             return self
 
+        # Exponetiation
         def __pow__(self, other):
             return sim_data.time_trace(self.values ** other, time=self.time)
+
+        #__rpow__ is intentionally NotImplemented
 
         def __ipow__(self, other):
             self.values = self.values ** other
@@ -2266,14 +2377,20 @@ class sim_data:
     class diagnostic:
         def __init__(self, sim_data, diagnostic):
             self.sim_data = sim_data
+            # Multiple cases depending on the diagnostic
 
+            # Case corresponding to knowing the alfven times of the time slices
             if diagnostic == 'slice times':
                 self.diagnostic = np.arange(sim_data.ntime)
                 self.x_axis = np.zeros(sim_data.ntime)
                 for t in self.diagnostic:
-                    self.x_axis[t] = sim_data._get_attr(
-                        'time_{:03d}'.format(t), 'time')
+                    # Retrieve the time attribute
+                    self.x_axis[t] = sim_data._get_attr('time_{:03d}'.format(t), 'time')
 
+            # Case corresponding to the timings of each iteration
+            # self.diagnostic holds several objects, so you can see a breakdown of the
+            # timings as well.
+            # x_axis contains the total time step length
             if diagnostic == 'timings':
                 self.diagnostic = {}
                 for timing in sim_data._list_group('timings'):
@@ -2282,10 +2399,12 @@ class sim_data:
                 self.x_axis = np.arange(
                     self.diagnostic['t_onestep'].shape[0]) + 1
 
+            # Case corresponding to the iterations of each step
+            # self.diagnostic is a set of arrays for different iterations
+            # x_axis contains iteration number
             if diagnostic == 'iterations':
                 self.diagnostic = sim_data._get_dataset('kspits/kspits')
-                self.x_axis = np.arange(
-                    np.shape(self.diagnostic[:, 0])[0]) + 1
+                self.x_axis = np.arange(np.shape(self.diagnostic[:, 0])[0]) + 1
 
     class constants:
         def __init__(self, sim_data):
@@ -2302,8 +2421,7 @@ class sim_data:
 
 class flux_coordinates:
     """
-    Class that represents a flux surface coordinate system, e.g. PEST, Boozer
-    or Hamada coordinates.
+    Class that represents a flux surface coordinate system, e.g. PEST, Boozer or Hamada coordinates.
     """
     def __init__(self, m, n, rpath, zpath, axis, omega, psi, psin, period,
                  theta, jac, q, area, polarea, dV, fcoords, V, phi, itor,
@@ -2328,6 +2446,9 @@ class flux_coordinates:
         self.polarea = polarea
         self.dV_dchi = dV
         self.fcoords = fcoords
+        #self.pest = 
+        #self.boozer = 
+        #self.hamada = 
         self.V = V
         self.flux_tor = phi
         self.phi_norm = phi / phi[n - 1]
