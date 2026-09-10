@@ -25,14 +25,14 @@ Option 1: Use Make
    You will need an installation of HDF5, MPI, and LAPACK
 
    * If compiling on flux:
-     Recommended modules to compile fusion-io:
-       anaconda3/2023.09-0-gcc-13.2.0-ajty2
-       glib/2.78.0-gcc-11.3.1-d4yec
-       gcc/13.2.0-gcc-11.3.1-tjrkt
-       openmpi-4.1.5/gcc-13.2.0/netcdf-c/4.9.2-ntznx
-       openmpi/4.1.5-gcc-13.2.0-a27lm
-       openmpi-4.1.5/gcc-13.2.0/hdf5/1.14.1-2-evfpn
-       netlib-lapack/3.11.0-gcc-13.2.0-72t2p
+     Recommended modules:
+       gcc/13.2.0
+       glib/2.78.3-gcc-13.2.0-m3up6vr
+       openmpi/4.1.6-gcc-13.2.0
+       openmpi-4.1.6/gcc-13.2.0/hdf5/1.14.3-m4yv4
+       openmpi-4.1.6/gcc-13.2.0/netcdf-c/main-4adke
+       netlib-lapack/3.11.0-gcc-13.2.0-gkyva
+       python/3.11.7-gcc-13.2.0-4shimqj
      In addition, to use the Python interface version 13 of libstdcxx must be
      installed, e.g. conda install -c conda-forge libstdcxx-ng=13
 
@@ -42,18 +42,14 @@ Option 1: Use Make
      CentOS 7:
        Use make.inc.centos7, ACML is replaced by lapack
 
-   * If compiling on eddy:
-     The INCLUDE path might be incorrectly set (missing an -I 
-     in front of the first entry. export INCLUDE=-I$INCLUDE should fix it.
-
-     The standard python version on eddy is 2.7. As of Jan 2020 it is recommended
-     to work with Python 3 only. In order to get the python version right, do
-     'module load anaconda' and create/activate a conda environment before
-     compiling fusion-io.
-     Recommended modules to compile fusion-io:
-       1) hdf5/intel-17.0/openmpi-1.10.2/1.10.0   4) openmpi/intel-17.0/3.0.0/64
-       2) intel-mkl/2017.4/5/64                   5) anaconda/2019.10
-       3) intel/17.0/64/17.0.5.239
+   * If compiling on stellar:
+     Recommended modules:
+       anaconda3/2026.7
+       intel-oneapi/2024.2
+       intel-mpi/oneapi/2021.13
+       hdf5/oneapi-2024.2/intel-mpi/1.14.4
+       netcdf/oneapi-2024.2/hdf5-1.14.4/intel-mpi/4.9.2
+       intel-mkl/2024.2
 
    * If compiling on perlmutter:
      It is recommended to use the GNU compiler and Python >= 3.9.
