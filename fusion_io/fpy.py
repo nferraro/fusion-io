@@ -800,6 +800,19 @@ class _AcaBackend:
     of root attributes from the remote host via SSH and merges them into the
     cached dict.  This ensures that readParameter('ntimestep', h5file=sim._all_attrs)
     always works correctly without any changes to calling code.
+
+    Scalar batch caching
+    --------------------
+    inject_scalars() fetches all scalars in a single SSH call and saves them
+    as a group .npz cache.  It also saves each individual scalar as its own
+    .npy cache file so that subsequent read('scalars/X') calls are served
+    from the local cache without any additional SSH connections.
+
+    Group attribute caching
+    -----------------------
+    get_group_attr() results are cached in-memory in _group_attr_cache so
+    that repeated calls (e.g. for 'nplanes' during mesh reads across multiple
+    timeslices) do not trigger additional SSH connections.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -859,6 +872,8 @@ class _AcaBackend:
         self._fields_cache = {}
         self._mesh_injected = False
         self._injected_fields = set()
+        # In-memory cache for group attributes: (basename, group, name) -> value
+        self._group_attr_cache = {}
 
         self._mux = _SshMux(login)
         self._mux.__enter__()
@@ -1292,15 +1307,34 @@ class _AcaBackend:
         return self._fetch_root_attrs(basename).get(name)
 
     def get_group_attr(self, group, name, basename=None):
+        """
+        Fetch a single attribute from a group, with in-memory caching.
+
+        Results are cached in self._group_attr_cache so that repeated calls
+        for the same (basename, group, name) triple — e.g. 'nplanes' from
+        the mesh group across multiple timeslices — do not trigger additional
+        SSH connections.
+        """
         eff_basename, eff_group = self._route(group, basename)
+
+        cache_key = (eff_basename, eff_group, name)
+        if cache_key in self._group_attr_cache:
+            self._log(
+                'group attr ({}, {}, {}): from in-memory cache'.format(
+                    eff_basename, eff_group, name))
+            return self._group_attr_cache[cache_key]
+
         if _have_h5py:
             try:
                 with h5py.File(self._skeleton(eff_basename), 'r') as f:
                     if eff_group in f and name in f[eff_group].attrs:
                         v = f[eff_group].attrs[name]
-                        return v.item() if hasattr(v, 'item') else v
+                        result = v.item() if hasattr(v, 'item') else v
+                        self._group_attr_cache[cache_key] = result
+                        return result
             except Exception:
                 pass
+
         import json
         ds = self._get_dataset(eff_basename)
         rep = self._live_replica(ds)
@@ -1310,9 +1344,15 @@ class _AcaBackend:
             'attrs of {} in {}'.format(eff_group, ds['name']))
         pos = out.find(b'###JSON###')
         if pos < 0:
+            self._group_attr_cache[cache_key] = None
             return None
         attrs = json.loads(out[pos + len(b'###JSON###'):].decode())
-        return attrs.get(name)
+        result = attrs.get(name)
+        # Cache all fetched attrs for this group to avoid future SSH calls
+        # for other attributes of the same group.
+        for k, v in attrs.items():
+            self._group_attr_cache[(eff_basename, eff_group, k)] = v
+        return result
 
     def list_group(self, group, basename=None):
         eff_basename, eff_group = self._route(group, basename)
@@ -1415,6 +1455,19 @@ class _AcaBackend:
         nplanes_attr = self.get_group_attr('mesh', 'nplanes', basename=ts_file)
         nplanes = int(nplanes_attr) if nplanes_attr is not None else 1
 
+        # Cache nplanes for all timeslice files so that subsequent calls to
+        # get_group_attr('mesh', 'nplanes', basename=ts_file) for other
+        # timeslices are served from the in-memory cache without SSH.
+        for ts_bn, _ in self._timeslices:
+            ts_bn_name = 'time_{:03d}.h5'.format(ts_bn)
+            cache_key = (ts_bn_name, 'mesh', 'nplanes')
+            if cache_key not in self._group_attr_cache:
+                self._group_attr_cache[cache_key] = nplanes
+        # Also cache for equilibrium.h5
+        eq_cache_key = ('equilibrium.h5', 'mesh', 'nplanes')
+        if eq_cache_key not in self._group_attr_cache:
+            self._group_attr_cache[eq_cache_key] = nplanes
+
         itor = int(self.get_root_attr('itor') or 1)
         if itor == 1:
             period = 2.0 * np.pi
@@ -1500,6 +1553,30 @@ class _AcaBackend:
         except Exception as e:
             self._log('Could not batch-read scalars: {}'.format(e))
             scalar_arrays = {}
+
+        # ------------------------------------------------------------------
+        # Save each individual scalar as its own .npy cache file so that
+        # subsequent read('scalars/X') calls are served from the local cache
+        # without any additional SSH connections.
+        # ------------------------------------------------------------------
+        if scalar_arrays:
+            ds = self._get_dataset(self._default_file)
+            os.makedirs(os.path.join(self._cache_dir, 'vars'), exist_ok=True)
+            for name, arr in scalar_arrays.items():
+                var_path = 'scalars/{}'.format(name)
+                cache_file = self._var_cache_path(ds, var_path, None)
+                if not os.path.isfile(cache_file):
+                    try:
+                        np.save(cache_file,
+                                np.ascontiguousarray(arr, dtype=np.float64),
+                                allow_pickle=False)
+                        self._log(
+                            'scalar {}: saved to individual cache {}'.format(
+                                name, cache_file))
+                    except Exception as e:
+                        self._log(
+                            'WARNING: could not cache scalar {}: {}'.format(
+                                name, e))
 
         for name, arr in scalar_arrays.items():
             try:
