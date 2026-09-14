@@ -813,6 +813,21 @@ class _AcaBackend:
     get_group_attr() results are cached in-memory in _group_attr_cache so
     that repeated calls (e.g. for 'nplanes' during mesh reads across multiple
     timeslices) do not trigger additional SSH connections.
+
+    eqsubtract handling
+    --------------------
+    When the M3D-C1 run was performed with eqsubtract=1, the field data
+    stored in each timeslice HDF5 file (time_NNN.h5) represents only the
+    perturbation relative to the equilibrium; the equilibrium contribution
+    is stored separately in equilibrium.h5.  The native M3D-C1 fio plugin
+    (used for local files) automatically adds the two together whenever a
+    field is evaluated for a non-equilibrium timeslice, so that the TOTAL
+    field is always returned.  Since inject_field() populates a lightweight
+    hand-rolled numpy field source rather than going through the native
+    plugin, it must replicate this behaviour explicitly: it reads the
+    equilibrium field from equilibrium.h5 and adds it to the perturbation
+    before injecting the result, ensuring that campaign-archive (adios2)
+    mode returns the same TOTAL field as local mode.
     """
 
     def __init__(self, aca_filename, campaign_simulation='', login='',
@@ -874,6 +889,8 @@ class _AcaBackend:
         self._injected_fields = set()
         # In-memory cache for group attributes: (basename, group, name) -> value
         self._group_attr_cache = {}
+        # In-memory cache for the eqsubtract flag (None = not yet fetched).
+        self._eqsubtract_cache = None
 
         self._mux = _SshMux(login)
         self._mux.__enter__()
@@ -1306,6 +1323,32 @@ class _AcaBackend:
     def get_root_attr(self, name, basename=None):
         return self._fetch_root_attrs(basename).get(name)
 
+    def _get_eqsubtract(self):
+        """
+        Return True if this M3D-C1 run was performed with eqsubtract=1,
+        i.e. field data stored in time_NNN.h5 represents only the
+        perturbation relative to the equilibrium (stored separately in
+        equilibrium.h5), rather than the total field.
+
+        The result is cached in memory after the first lookup.  Defaults to
+        False if the attribute is absent (matching M3D-C1's own default of
+        eqsubtract=0), so that runs without this attribute are treated as
+        storing the total field, as before.
+        """
+        if self._eqsubtract_cache is not None:
+            return self._eqsubtract_cache
+
+        value = False
+        try:
+            v = self.get_root_attr('eqsubtract')
+            value = bool(int(v)) if v is not None else False
+        except Exception:
+            value = False
+
+        self._eqsubtract_cache = value
+        self._log('eqsubtract = {}'.format(value))
+        return value
+
     def get_group_attr(self, group, name, basename=None):
         """
         Fetch a single attribute from a group, with in-memory caching.
@@ -1523,18 +1566,103 @@ class _AcaBackend:
                   "from {}".format(actual_name, hdf5_name, timeslice, ts_file))
 
         real_data = self.read(real_path, basename=ts_file)
-        real_flat = np.ascontiguousarray(real_data.ravel(), dtype=np.float64)
+        real_data = np.asarray(real_data, dtype=np.float64)
 
         is_complex = bool(int(self.get_root_attr('icomplex') or 0))
-        imag_flat = None
+        imag_data = None
         if is_complex:
             imag_path = 'fields/{}_i'.format(actual_name)
             try:
                 imag_data = self.read(imag_path, basename=ts_file)
-                imag_flat = np.ascontiguousarray(
-                    imag_data.ravel(), dtype=np.float64)
+                imag_data = np.asarray(imag_data, dtype=np.float64)
             except Exception:
-                imag_flat = None
+                imag_data = None
+
+        # --------------------------------------------------------------
+        # eqsubtract handling: when the M3D-C1 run was performed with
+        # eqsubtract=1, the field data stored in the timeslice file
+        # (time_NNN.h5) is only the perturbation relative to the
+        # equilibrium; the equilibrium part is stored separately in
+        # equilibrium.h5.  The native M3D-C1 fio plugin (used in local/
+        # m3dc1 mode) automatically adds the equilibrium contribution
+        # when evaluating fields for any timeslice other than the
+        # equilibrium itself.  We replicate that behaviour here so that
+        # campaign-archive (adios2) mode returns the TOTAL field, matching
+        # local-mode results (and so that quantities such as flux-surface
+        # averages remain physically meaningful).
+        # --------------------------------------------------------------
+        if (self._get_eqsubtract() and ts_file != 'equilibrium.h5'
+                and timeslice != -1):
+            try:
+                eq_available = self.list_fields('equilibrium.h5')
+            except Exception:
+                eq_available = set()
+
+            eq_actual_name = None
+            for candidate in (actual_name, hdf5_name) + tuple(fallbacks):
+                if candidate in eq_available:
+                    eq_actual_name = candidate
+                    break
+
+            if eq_actual_name is None:
+                self._log(
+                    "eqsubtract=1 but no matching equilibrium field found "
+                    "for '{}' in equilibrium.h5; using perturbation "
+                    "as-is (this may be physically incorrect)".format(
+                        hdf5_name))
+            else:
+                try:
+                    eq_real_data = self.read(
+                        'fields/{}'.format(eq_actual_name),
+                        basename='equilibrium.h5')
+                    eq_real_data = np.asarray(eq_real_data, dtype=np.float64)
+                    if eq_real_data.shape == real_data.shape:
+                        real_data = real_data + eq_real_data
+                        self._log(
+                            "eqsubtract=1: added equilibrium field '{}' to "
+                            "perturbation for '{}' (timeslice {}) to "
+                            "obtain the total field".format(
+                                eq_actual_name, hdf5_name, timeslice))
+                    else:
+                        self._log(
+                            "WARNING: eqsubtract=1 but shape mismatch "
+                            "between perturbation {} and equilibrium {} "
+                            "for field '{}'; using perturbation as-is "
+                            "(this may be physically incorrect)".format(
+                                real_data.shape, eq_real_data.shape,
+                                hdf5_name))
+                except Exception as e:
+                    self._log(
+                        "WARNING: eqsubtract=1 but could not read "
+                        "equilibrium field '{}' from equilibrium.h5: {}; "
+                        "using perturbation as-is (this may be physically "
+                        "incorrect)".format(eq_actual_name, e))
+
+                if imag_data is not None:
+                    try:
+                        eq_imag_data = self.read(
+                            'fields/{}_i'.format(eq_actual_name),
+                            basename='equilibrium.h5')
+                        eq_imag_data = np.asarray(
+                            eq_imag_data, dtype=np.float64)
+                        if eq_imag_data.shape == imag_data.shape:
+                            imag_data = imag_data + eq_imag_data
+                            self._log(
+                                "eqsubtract=1: added equilibrium imaginary "
+                                "field '{}_i' to perturbation for '{}' "
+                                "(timeslice {})".format(
+                                    eq_actual_name, hdf5_name, timeslice))
+                    except Exception:
+                        # Equilibria are generally axisymmetric (n=0) and
+                        # typically have no imaginary component; absence of
+                        # an equilibrium imaginary part is expected and is
+                        # not treated as an error.
+                        pass
+
+        real_flat = np.ascontiguousarray(real_data.ravel(), dtype=np.float64)
+        imag_flat = (
+            np.ascontiguousarray(imag_data.ravel(), dtype=np.float64)
+            if imag_data is not None else None)
 
         ntor = int(self.get_root_attr('ntor') or 0)
 
@@ -1726,6 +1854,12 @@ class sim_data:
     sim._all_attrs.attrs['version'], sim._all_attrs.attrs['ntimestep'],
     'scalars' in sim._all_attrs, etc. works transparently for both local
     and remote data without any changes to calling code.
+
+    If the run was performed with eqsubtract=1, field data injected for any
+    timeslice other than the equilibrium is automatically combined with the
+    corresponding equilibrium field (read from equilibrium.h5) so that
+    evaluated fields always represent the TOTAL field, matching the
+    behaviour of local (m3dc1) mode.
 
     The proxy searches both the timeslice file (equilibrium.h5) and C1.h5
     for root attributes, so that both 'ntimestep' (from equilibrium.h5) and
@@ -1949,7 +2083,7 @@ class sim_data:
         fio_py.set_int_option(fio_py.FIO_TIMESLICE, time)
 
         # For local mode, update the timeslice file handle in the proxy so
-        # that _all_attrs.attrs always reflects the current timeslice file.
+        # that _all_attrs.attrs always reflects the current timeslice.
         if self._filetype != 'adios2' and isinstance(
                 self._all_attrs, _LocalH5Proxy):
             c1_dir = os.path.dirname(self.filename)
