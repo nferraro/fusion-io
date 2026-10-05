@@ -1,3 +1,14 @@
+% *********************************************************************
+% Script for Calculating M3D-C1 Variables on 3D Eulerian Grid nR x nPhi x nZ
+% *********************************************************************
+% Example command to run the write_neo_input_3D_Eulerian code that outputs M3DC1 variables on a 3D grid nR x nPhi x nZ bounded by Rmin,Rmax and Zmin,Zmax
+% srun -n 700 ~/src/fusion-io/util/_stellar/write_neo_input_3D_Eulerian 
+            -m3dc1 ../C1.h5 0               #filename and time step 
+            -nR 200 -nZ 200 -nphi 180       #Resolution
+            -Rmin 1 -Rmax 5              #R range
+            -Zmin -2 -Zmax 2                #Z Range
+            -bootstrap 3                    #bootstrap variables
+            -vecpot 1                       # vector potenital variable outpu
 
 % *********************************************************************
 % Script for Calculating Bootstrap Current Coefficients

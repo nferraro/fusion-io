@@ -194,6 +194,11 @@ int main(int argc, char* argv[])
     if(pout)  {
       sprintf(outfile, "out%d", s);
       tracer.open_file(outfile);
+
+      // Open a separate file for the 3D path reconstruction
+      char pathfile_name[256];
+      sprintf(pathfile_name, "path%d.dat", s);
+      tracer.open_path_file(pathfile_name);
     }
 
     if(ds==0.) {
@@ -262,6 +267,7 @@ int main(int argc, char* argv[])
     std::cerr << tt << " tor. transits, q = " << my_q_mean[j] << std::endl;
 
     tracer.close_file();
+    tracer.close_path_file();
 
     delete[] rr;
     delete[] zz;
