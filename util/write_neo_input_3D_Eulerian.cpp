@@ -34,6 +34,7 @@ fio_compound_field electron_density, electron_temperature, pressure;
 fio_compound_field current_density, vector_potential, mag;
 fio_compound_field ion_density, ion_temperature, JpdotB;
 fio_compound_field JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
+fio_compound_field JBS_r, JBS_phi, JBS_z;
 
 // MPI Globals
 int world_rank = 0;
@@ -122,6 +123,9 @@ int main(int argc, char* argv[])
   double* loc_JpdotB_dn = new double[my_pts_count]();
   double* loc_JpdotB_dte = new double[my_pts_count]();
   double* loc_JpdotB_dti = new double[my_pts_count]();
+  double* loc_JBSR   = new double[my_pts_count]();
+  double* loc_JBSPhi = new double[my_pts_count]();
+  double* loc_JBSZ   = new double[my_pts_count]();
 
   double dR = (nR > 1) ? (Rmax - Rmin) / (nR - 1) : 0;
   double dZ = (nZ > 1) ? (Zmax - Zmin) / (nZ - 1) : 0;
@@ -210,6 +214,10 @@ int main(int argc, char* argv[])
               JpdotB_dndpsi.eval(p, &v_dn, h);   loc_JpdotB_dn[loc_idx] = v_dn;
               JpdotB_dtedpsi.eval(p, &v_dte, h); loc_JpdotB_dte[loc_idx] = v_dte;
               JpdotB_dtidpsi.eval(p, &v_dti, h); loc_JpdotB_dti[loc_idx] = v_dti;
+              double v_r=0., v_ph=0., v_zz=0.;
+              JBS_r.eval(p,&v_r,h);    loc_JBSR[loc_idx]=v_r;
+              JBS_phi.eval(p,&v_ph,h); loc_JBSPhi[loc_idx]=v_ph;
+              JBS_z.eval(p,&v_zz,h);   loc_JBSZ[loc_idx]=v_zz;
           }
       }
       count_processed++;
@@ -237,6 +245,7 @@ int main(int argc, char* argv[])
   double *out_VecPot_R=nullptr, *out_VecPot_Phi=nullptr, *out_VecPot_Z=nullptr;
   double *out_Te=nullptr, *out_Ti=nullptr, *out_Ne=nullptr, *out_Ni=nullptr, *out_P=nullptr;
   double *out_JpdotB=nullptr, *out_JpdotB_dn=nullptr, *out_JpdotB_dte=nullptr, *out_JpdotB_dti=nullptr;
+  double *out_JBSR=nullptr,*out_JBSPhi=nullptr,*out_JBSZ=nullptr;
 
   if(world_rank == 0) {
       out_Jac = new double[total_work]; out_Mask = new double[total_work];
@@ -245,6 +254,7 @@ int main(int argc, char* argv[])
       if(ivecpot) { out_VecPot_R = new double[total_work]; out_VecPot_Phi = new double[total_work]; out_VecPot_Z = new double[total_work]; }
       out_Te = new double[total_work]; out_Ti = new double[total_work]; out_Ne = new double[total_work]; out_Ni = new double[total_work]; out_P = new double[total_work];
       if(ibootstrap >= 1) { out_JpdotB = new double[total_work]; out_JpdotB_dn = new double[total_work]; out_JpdotB_dte = new double[total_work]; out_JpdotB_dti = new double[total_work]; }
+      if(ibootstrap >= 1) { out_JBSR=new double[total_work]; out_JBSPhi=new double[total_work]; out_JBSZ=new double[total_work]; }
   }
 
   int my_pts = (int)my_pts_count;
@@ -264,6 +274,7 @@ int main(int argc, char* argv[])
   if(ibootstrap >= 1) {
       OPT_GATHER(loc_JpdotB, out_JpdotB); OPT_GATHER(loc_JpdotB_dn, out_JpdotB_dn);
       OPT_GATHER(loc_JpdotB_dte, out_JpdotB_dte); OPT_GATHER(loc_JpdotB_dti, out_JpdotB_dti);
+      OPT_GATHER(loc_JBSR,out_JBSR); OPT_GATHER(loc_JBSPhi,out_JBSPhi); OPT_GATHER(loc_JBSZ,out_JBSZ);
   }
 
   // -------------------------------------------------------------------------
@@ -316,6 +327,7 @@ int main(int argc, char* argv[])
       if(ibootstrap >= 1) {
           write_vtk_scalar("JpdotB_3d", out_JpdotB); write_vtk_scalar("JpdotB_dndpsi_3d", out_JpdotB_dn);
           write_vtk_scalar("JpdotB_dtedpsi_3d", out_JpdotB_dte); write_vtk_scalar("JpdotB_dtidpsi_3d", out_JpdotB_dti);
+          write_vtk_scalar("JBS_R",out_JBSR); write_vtk_scalar("JBS_Phi",out_JBSPhi); write_vtk_scalar("JBS_Z",out_JBSZ);
       }
       vtk.close();
 
@@ -345,6 +357,8 @@ int main(int argc, char* argv[])
       NC_CHECK(nc_def_var(ncid, "J_R", NC_FLOAT, 3, dims, &jr_id));
       NC_CHECK(nc_def_var(ncid, "J_Phi", NC_FLOAT, 3, dims, &jphi_id));
       NC_CHECK(nc_def_var(ncid, "J_Z", NC_FLOAT, 3, dims, &jz_id));
+      
+
       if(ivecpot == 1) {  
           NC_CHECK(nc_def_var(ncid, "VecPot_R", NC_FLOAT, 3, dims, &vecpot_r_id));
           NC_CHECK(nc_def_var(ncid, "VecPot_Phi", NC_FLOAT, 3, dims, &vecpot_phi_id));
@@ -353,6 +367,7 @@ int main(int argc, char* argv[])
       
       int te3d_id, ti3d_id, ne3d_id, ni3d_id, p3d_id;
       int JpdotB3d_id, JpdotB_dn_id, JpdotB_dte_id, JpdotB_dti_id;
+      int jbsr_id,jbsphi_id,jbsz_id;
       NC_CHECK(nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id));
       NC_CHECK(nc_def_var(ncid, "ti_3d", NC_FLOAT, 3, dims, &ti3d_id));
       NC_CHECK(nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id));
@@ -364,6 +379,9 @@ int main(int argc, char* argv[])
           NC_CHECK(nc_def_var(ncid, "JpdotB_dndpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dn_id));
           NC_CHECK(nc_def_var(ncid, "JpdotB_dtedpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dte_id));
           NC_CHECK(nc_def_var(ncid, "JpdotB_dtidpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dti_id));
+          NC_CHECK(nc_def_var(ncid,"JBS_R",NC_FLOAT,3,dims,&jbsr_id));
+          NC_CHECK(nc_def_var(ncid,"JBS_Phi",NC_FLOAT,3,dims,&jbsphi_id));
+          NC_CHECK(nc_def_var(ncid,"JBS_Z",NC_FLOAT,3,dims,&jbsz_id));
       }
       
       NC_CHECK(nc_enddef(ncid));
@@ -398,6 +416,9 @@ int main(int argc, char* argv[])
           NC_CHECK(nc_put_var_double(ncid, JpdotB_dn_id, out_JpdotB_dn));
           NC_CHECK(nc_put_var_double(ncid, JpdotB_dte_id, out_JpdotB_dte));
           NC_CHECK(nc_put_var_double(ncid, JpdotB_dti_id, out_JpdotB_dti));
+          NC_CHECK(nc_put_var_double(ncid, jbsr_id,out_JBSR));
+          NC_CHECK(nc_put_var_double(ncid, jbsphi_id,out_JBSPhi));
+          NC_CHECK(nc_put_var_double(ncid, jbsz_id,out_JBSZ));
       }
       NC_CHECK(nc_close(ncid));
       
@@ -413,6 +434,7 @@ int main(int argc, char* argv[])
   delete[] loc_VecPot_R; delete[] loc_VecPot_Phi; delete[] loc_VecPot_Z;
   delete[] loc_Te; delete[] loc_Ti; delete[] loc_Ne; delete[] loc_Ni; delete[] loc_P; 
   delete[] loc_JpdotB; delete[] loc_JpdotB_dn; delete[] loc_JpdotB_dte; delete[] loc_JpdotB_dti;
+  delete[] loc_JBSR; delete[] loc_JBSPhi; delete[] loc_JBSZ;
 
   if(world_rank == 0) {
       delete[] out_Jac; delete[] out_Mask; delete[] out_BR; delete[] out_BPhi; delete[] out_BZ;
@@ -420,6 +442,7 @@ int main(int argc, char* argv[])
       if(ivecpot) { delete[] out_VecPot_R; delete[] out_VecPot_Phi; delete[] out_VecPot_Z; }
       delete[] out_Te; delete[] out_Ti; delete[] out_Ne; delete[] out_Ni; delete[] out_P; 
       if(ibootstrap >= 1) { delete[] out_JpdotB; delete[] out_JpdotB_dn; delete[] out_JpdotB_dte; delete[] out_JpdotB_dti; }
+      if(ibootstrap >= 1) {delete[] out_JBSR; delete[] out_JBSPhi; delete[] out_JBSZ;}
   }
 
   sources[0]->deallocate_search_hint(&h);
@@ -477,6 +500,10 @@ bool create_source(const int type, const int argc, const std::string argv[])
       
   if(src->get_field(FIO_JBS_dtidpsi, &field, &fopt) == FIO_SUCCESS)
       JpdotB_dtidpsi.add_field(field, FIO_ADD, 1., hint);
+  
+  if(src->get_field(FIO_JBS_R,   &field, &fopt) == FIO_SUCCESS) JBS_r.add_field(field, FIO_ADD, 1., hint);
+  if(src->get_field(FIO_JBS_PHI, &field, &fopt) == FIO_SUCCESS) JBS_phi.add_field(field, FIO_ADD, 1., hint);
+  if(src->get_field(FIO_JBS_Z,   &field, &fopt) == FIO_SUCCESS) JBS_z.add_field(field, FIO_ADD, 1., hint);
 
   // Load everything else
   if(src->get_field(FIO_MAGNETIC_FIELD, &field, &fopt) == FIO_SUCCESS) mag.add_field(field, FIO_ADD, 1., hint);

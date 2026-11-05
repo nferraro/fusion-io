@@ -25,13 +25,22 @@ include $(FIO_ROOT)/install/make.inc.$(FIO_ARCH)
 #LDFLAGS  += -qopenmp
 #F90FLAGS += -qopenmp
 # --- ADDED FOR PARALLELIZATION PERLMUTTER---
-CXX := CC
+#CXX := CC
+
+#CFLAGS   += -fopenmp -O3
+#CXXFLAGS += -fopenmp -O3 -ffast-math
+#LDFLAGS  += -fopenmp
+#F90FLAGS += -fopenmp
+# ---------------------------------
+
+# --- FOR STELLARAI ---
+CXX := mpicxx
 
 CFLAGS   += -fopenmp -O3
-CXXFLAGS += -fopenmp -O3 -ffast-math
+CXXFLAGS += -fopenmp -O3
 LDFLAGS  += -fopenmp
 F90FLAGS += -fopenmp
-# ---------------------------------
+# -----------------
 
 CLIBS := -L$(FIO_ROOT)/fusion_io/_$(FIO_ARCH) -lfusionio \
     -L$(FIO_ROOT)/m3dc1_lib/_$(FIO_ARCH) -lm3dc1 \

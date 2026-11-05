@@ -133,6 +133,9 @@ int m3dc1_source::get_available_fields(fio_field_list* fields) const
   fields->push_back(FIO_JBS_L32);
   fields->push_back(FIO_JBS_L34);
   fields->push_back(FIO_JBS_alpha);
+  fields->push_back(FIO_JBS_R);
+  fields->push_back(FIO_JBS_PHI);
+  fields->push_back(FIO_JBS_Z);
 
   return FIO_SUCCESS;
 }
@@ -343,6 +346,18 @@ int m3dc1_source::get_field(const field_type t, fio_field** f,
     break;
   case(FIO_JBS_alpha):
     mf = new m3dc1_scalar_field(this, "Jbs_alpha", 1);
+    if(s!=0) unneeded_species = true;
+    break;
+  case(FIO_JBS_R):
+    mf = new m3dc1_scalar_field(this, "Jp_BS_r", J0);
+    if(s!=0) unneeded_species = true;
+    break;
+  case(FIO_JBS_PHI):
+    mf = new m3dc1_scalar_field(this, "Jp_BS_phi", J0);
+    if(s!=0) unneeded_species = true;
+    break;
+  case(FIO_JBS_Z):
+    mf = new m3dc1_scalar_field(this, "Jp_BS_z", J0);
     if(s!=0) unneeded_species = true;
     break;
   case(FIO_SCALAR_FIELD):
