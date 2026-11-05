@@ -35,6 +35,7 @@ fio_compound_field current_density, vector_potential, mag;
 fio_compound_field ion_density, ion_temperature, JpdotB;
 fio_compound_field JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
 fio_compound_field JBS_r, JBS_phi, JBS_z;
+fio_compound_field eta_fld;
 
 // MPI Globals
 int world_rank = 0;
@@ -126,6 +127,7 @@ int main(int argc, char* argv[])
   double* loc_JBSR   = new double[my_pts_count]();
   double* loc_JBSPhi = new double[my_pts_count]();
   double* loc_JBSZ   = new double[my_pts_count]();
+  double* loc_Eta = new double[my_pts_count]();
 
   double dR = (nR > 1) ? (Rmax - Rmin) / (nR - 1) : 0;
   double dZ = (nZ > 1) ? (Zmax - Zmin) / (nZ - 1) : 0;
@@ -207,6 +209,8 @@ int main(int argc, char* argv[])
           ion_temperature.eval(p, &v_ti, h);       loc_Ti[loc_idx] = v_ti;
           electron_temperature.eval(p, &v_te, h);  loc_Te[loc_idx] = v_te;
           pressure.eval(p, &v_p, h);               loc_P[loc_idx] = v_p;
+          double v_eta = 0.0;
+          eta_fld.eval(p, &v_eta, h);              loc_Eta[loc_idx] = v_eta;
           
           if(ibootstrap >= 1) {
               double v_jb = 0.0, v_dn = 0.0, v_dte = 0.0, v_dti = 0.0;
@@ -243,7 +247,7 @@ int main(int argc, char* argv[])
   double *out_BR=nullptr, *out_BPhi=nullptr, *out_BZ=nullptr;
   double *out_JR=nullptr, *out_JPhi=nullptr, *out_JZ=nullptr;
   double *out_VecPot_R=nullptr, *out_VecPot_Phi=nullptr, *out_VecPot_Z=nullptr;
-  double *out_Te=nullptr, *out_Ti=nullptr, *out_Ne=nullptr, *out_Ni=nullptr, *out_P=nullptr;
+  double *out_Te=nullptr, *out_Ti=nullptr, *out_Ne=nullptr, *out_Ni=nullptr, *out_P=nullptr; double *out_Eta=nullptr;
   double *out_JpdotB=nullptr, *out_JpdotB_dn=nullptr, *out_JpdotB_dte=nullptr, *out_JpdotB_dti=nullptr;
   double *out_JBSR=nullptr,*out_JBSPhi=nullptr,*out_JBSZ=nullptr;
 
@@ -253,8 +257,10 @@ int main(int argc, char* argv[])
       out_JR = new double[total_work]; out_JPhi = new double[total_work]; out_JZ = new double[total_work];
       if(ivecpot) { out_VecPot_R = new double[total_work]; out_VecPot_Phi = new double[total_work]; out_VecPot_Z = new double[total_work]; }
       out_Te = new double[total_work]; out_Ti = new double[total_work]; out_Ne = new double[total_work]; out_Ni = new double[total_work]; out_P = new double[total_work];
+      out_Eta = new double[total_work];
       if(ibootstrap >= 1) { out_JpdotB = new double[total_work]; out_JpdotB_dn = new double[total_work]; out_JpdotB_dte = new double[total_work]; out_JpdotB_dti = new double[total_work]; }
       if(ibootstrap >= 1) { out_JBSR=new double[total_work]; out_JBSPhi=new double[total_work]; out_JBSZ=new double[total_work]; }
+      
   }
 
   int my_pts = (int)my_pts_count;
@@ -270,7 +276,8 @@ int main(int argc, char* argv[])
   if(ivecpot) { OPT_GATHER(loc_VecPot_R, out_VecPot_R); OPT_GATHER(loc_VecPot_Phi, out_VecPot_Phi); OPT_GATHER(loc_VecPot_Z, out_VecPot_Z); }
 
   OPT_GATHER(loc_Te, out_Te); OPT_GATHER(loc_Ti, out_Ti); OPT_GATHER(loc_Ne, out_Ne); OPT_GATHER(loc_Ni, out_Ni); OPT_GATHER(loc_P, out_P);
-  
+  OPT_GATHER(loc_Eta, out_Eta);
+
   if(ibootstrap >= 1) {
       OPT_GATHER(loc_JpdotB, out_JpdotB); OPT_GATHER(loc_JpdotB_dn, out_JpdotB_dn);
       OPT_GATHER(loc_JpdotB_dte, out_JpdotB_dte); OPT_GATHER(loc_JpdotB_dti, out_JpdotB_dti);
@@ -324,6 +331,7 @@ int main(int argc, char* argv[])
       }
       write_vtk_scalar("te_3d", out_Te); write_vtk_scalar("ti_3d", out_Ti); 
       write_vtk_scalar("ne_3d", out_Ne); write_vtk_scalar("ni_3d", out_Ni); write_vtk_scalar("p_3d", out_P);
+      write_vtk_scalar("eta_3d", out_Eta);
       if(ibootstrap >= 1) {
           write_vtk_scalar("JpdotB_3d", out_JpdotB); write_vtk_scalar("JpdotB_dndpsi_3d", out_JpdotB_dn);
           write_vtk_scalar("JpdotB_dtedpsi_3d", out_JpdotB_dte); write_vtk_scalar("JpdotB_dtidpsi_3d", out_JpdotB_dti);
@@ -365,7 +373,7 @@ int main(int argc, char* argv[])
           NC_CHECK(nc_def_var(ncid, "VecPot_Z", NC_FLOAT, 3, dims, &vecpot_z_id));
       }
       
-      int te3d_id, ti3d_id, ne3d_id, ni3d_id, p3d_id;
+      int te3d_id, ti3d_id, ne3d_id, ni3d_id, p3d_id, eta3d_id;
       int JpdotB3d_id, JpdotB_dn_id, JpdotB_dte_id, JpdotB_dti_id;
       int jbsr_id,jbsphi_id,jbsz_id;
       NC_CHECK(nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id));
@@ -373,6 +381,7 @@ int main(int argc, char* argv[])
       NC_CHECK(nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id));
       NC_CHECK(nc_def_var(ncid, "ni_3d", NC_FLOAT, 3, dims, &ni3d_id));
       NC_CHECK(nc_def_var(ncid, "p_3d", NC_FLOAT, 3, dims, &p3d_id));
+      NC_CHECK(nc_def_var(ncid, "eta_3d", NC_FLOAT, 3, dims, &eta3d_id));
       
       if (ibootstrap >= 1){
           NC_CHECK(nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id));
@@ -411,6 +420,7 @@ int main(int argc, char* argv[])
       NC_CHECK(nc_put_var_double(ncid, ne3d_id, out_Ne));
       NC_CHECK(nc_put_var_double(ncid, ni3d_id, out_Ni));
       NC_CHECK(nc_put_var_double(ncid, p3d_id, out_P));
+      NC_CHECK(nc_put_var_double(ncid, eta3d_id, out_Eta));
       if(ibootstrap >= 1) {
           NC_CHECK(nc_put_var_double(ncid, JpdotB3d_id, out_JpdotB));
           NC_CHECK(nc_put_var_double(ncid, JpdotB_dn_id, out_JpdotB_dn));
@@ -432,7 +442,7 @@ int main(int argc, char* argv[])
   delete[] loc_Jac; delete[] loc_Mask; delete[] loc_BR; delete[] loc_BPhi; delete[] loc_BZ;
   delete[] loc_JR; delete[] loc_JPhi; delete[] loc_JZ;
   delete[] loc_VecPot_R; delete[] loc_VecPot_Phi; delete[] loc_VecPot_Z;
-  delete[] loc_Te; delete[] loc_Ti; delete[] loc_Ne; delete[] loc_Ni; delete[] loc_P; 
+  delete[] loc_Te; delete[] loc_Ti; delete[] loc_Ne; delete[] loc_Ni; delete[] loc_P; delete[] loc_Eta;
   delete[] loc_JpdotB; delete[] loc_JpdotB_dn; delete[] loc_JpdotB_dte; delete[] loc_JpdotB_dti;
   delete[] loc_JBSR; delete[] loc_JBSPhi; delete[] loc_JBSZ;
 
@@ -440,7 +450,7 @@ int main(int argc, char* argv[])
       delete[] out_Jac; delete[] out_Mask; delete[] out_BR; delete[] out_BPhi; delete[] out_BZ;
       delete[] out_JR; delete[] out_JPhi; delete[] out_JZ;
       if(ivecpot) { delete[] out_VecPot_R; delete[] out_VecPot_Phi; delete[] out_VecPot_Z; }
-      delete[] out_Te; delete[] out_Ti; delete[] out_Ne; delete[] out_Ni; delete[] out_P; 
+      delete[] out_Te; delete[] out_Ti; delete[] out_Ne; delete[] out_Ni; delete[] out_P; delete[] out_Eta;
       if(ibootstrap >= 1) { delete[] out_JpdotB; delete[] out_JpdotB_dn; delete[] out_JpdotB_dte; delete[] out_JpdotB_dti; }
       if(ibootstrap >= 1) {delete[] out_JBSR; delete[] out_JBSPhi; delete[] out_JBSZ;}
   }
@@ -456,6 +466,21 @@ int main(int argc, char* argv[])
 // ========================================================
 // Source Handlers
 // ========================================================
+// Load a field into a compound field; warn on rank 0 if it can't be loaded.
+static bool load_field(fio_source* src, int type, fio_option_list& fopt,
+                       fio_compound_field& dst, fio_hint hint, const char* name)
+{
+  fio_field* f = nullptr;
+  if(src->get_field(type, &f, &fopt) == FIO_SUCCESS) {
+    dst.add_field(f, FIO_ADD, 1., hint);
+    return true;
+  }
+  if(world_rank == 0)
+    std::cerr << "WARNING: could not load field '" << name
+              << "' (output will be zeros)" << std::endl;
+  return false;
+}
+
 
 bool create_source(const int type, const int argc, const std::string argv[]) 
 {
@@ -486,38 +511,31 @@ bool create_source(const int type, const int argc, const std::string argv[])
   fio_hint hint;
   src->allocate_search_hint(&hint);
 
-  fio_field* field;
+    // species-independent fields
+  load_field(src, FIO_MAGNETIC_FIELD,   fopt, mag,              hint, "B");
+  load_field(src, FIO_CURRENT_DENSITY,  fopt, current_density,  hint, "J");
+  load_field(src, FIO_VECTOR_POTENTIAL, fopt, vector_potential, hint, "A");
+  load_field(src, FIO_TOTAL_PRESSURE,   fopt, pressure,         hint, "P");
+  load_field(src, FIO_RESISTIVITY,      fopt, eta_fld,          hint, "eta");
 
-  // Unconditionally load bootstrap fields so arg-parsing order doesn't break initialization.
-  if(src->get_field(FIO_JBS, &field, &fopt) == FIO_SUCCESS)
-      JpdotB.add_field(field, FIO_ADD, 1., hint);
-      
-  if(src->get_field(FIO_JBS_dndpsi, &field, &fopt) == FIO_SUCCESS)
-      JpdotB_dndpsi.add_field(field, FIO_ADD, 1., hint);
-      
-  if(src->get_field(FIO_JBS_dtedpsi, &field, &fopt) == FIO_SUCCESS)
-      JpdotB_dtedpsi.add_field(field, FIO_ADD, 1., hint);
-      
-  if(src->get_field(FIO_JBS_dtidpsi, &field, &fopt) == FIO_SUCCESS)
-      JpdotB_dtidpsi.add_field(field, FIO_ADD, 1., hint);
-  
-  if(src->get_field(FIO_JBS_R,   &field, &fopt) == FIO_SUCCESS) JBS_r.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_JBS_PHI, &field, &fopt) == FIO_SUCCESS) JBS_phi.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_JBS_Z,   &field, &fopt) == FIO_SUCCESS) JBS_z.add_field(field, FIO_ADD, 1., hint);
+  // bootstrap fields
+  load_field(src, FIO_JBS,         fopt, JpdotB,         hint, "JpdotB");
+  load_field(src, FIO_JBS_dndpsi,  fopt, JpdotB_dndpsi,  hint, "JpdotB_dndpsi");
+  load_field(src, FIO_JBS_dtedpsi, fopt, JpdotB_dtedpsi, hint, "JpdotB_dtedpsi");
+  load_field(src, FIO_JBS_dtidpsi, fopt, JpdotB_dtidpsi, hint, "JpdotB_dtidpsi");
+  load_field(src, FIO_JBS_R,       fopt, JBS_r,          hint, "Jp_BS_r");
+  load_field(src, FIO_JBS_PHI,     fopt, JBS_phi,        hint, "Jp_BS_phi");
+  load_field(src, FIO_JBS_Z,       fopt, JBS_z,          hint, "Jp_BS_z");
 
-  // Load everything else
-  if(src->get_field(FIO_MAGNETIC_FIELD, &field, &fopt) == FIO_SUCCESS) mag.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_CURRENT_DENSITY, &field, &fopt) == FIO_SUCCESS) current_density.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_VECTOR_POTENTIAL, &field, &fopt) == FIO_SUCCESS) vector_potential.add_field(field, FIO_ADD, 1., hint);
-
+  // electron species
   fopt.set_option(FIO_SPECIES, FIO_ELECTRON);
-  if(src->get_field(FIO_TEMPERATURE, &field, &fopt) == FIO_SUCCESS) electron_temperature.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_DENSITY, &field, &fopt) == FIO_SUCCESS) electron_density.add_field(field, FIO_ADD, 1., hint);
+  load_field(src, FIO_TEMPERATURE, fopt, electron_temperature, hint, "te");
+  load_field(src, FIO_DENSITY,     fopt, electron_density,     hint, "ne");
 
+  // main ion species
   fopt.set_option(FIO_SPECIES, FIO_MAIN_ION);
-  if(src->get_field(FIO_DENSITY, &field, &fopt) == FIO_SUCCESS) ion_density.add_field(field, FIO_ADD, 1., hint);
-  if(src->get_field(FIO_TEMPERATURE, &field, &fopt) == FIO_SUCCESS) ion_temperature.add_field(field, FIO_ADD, 1., hint);  
-  if(src->get_field(FIO_TOTAL_PRESSURE, &field, &fopt) == FIO_SUCCESS) pressure.add_field(field, FIO_ADD, 1., hint);
+  load_field(src, FIO_DENSITY,     fopt, ion_density,     hint, "den");
+  load_field(src, FIO_TEMPERATURE, fopt, ion_temperature, hint, "ti");
 
   sources.push_back(src);
   return FIO_SUCCESS;
