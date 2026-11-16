@@ -229,236 +229,129 @@ int main(int argc, char* argv[])
   
   MPI_Barrier(MPI_COMM_WORLD);
   if(world_rank == 0) std::cerr << "Eval done. Gathering data..." << std::endl;
-
   // -------------------------------------------------------------------------
-  // GATHER DATA TO RANK 0
+  // PER-FIELD GATHER + WRITE (NetCDF and binary VTK), rank 0 holds ONE array
   // -------------------------------------------------------------------------
-  std::vector<int> flat_counts(world_size);
-  std::vector<int> flat_displs(world_size);
-  long long disp = 0;
-  for(int r=0; r<world_size; r++) {
-      long long r_cnt = pts_per_rank + (r < rem_pts ? 1 : 0);
-      flat_counts[r] = (int)r_cnt; 
-      flat_displs[r] = (int)disp;
-      disp += r_cnt;
+  struct Fld { const char* name; double* loc; int ncvar; };
+  std::vector<Fld> flds = {
+    {"Comp_Boundary", loc_Mask}, {"Jac", loc_Jac},
+    {"B_R", loc_BR}, {"B_Phi", loc_BPhi}, {"B_Z", loc_BZ},
+    {"J_R", loc_JR}, {"J_Phi", loc_JPhi}, {"J_Z", loc_JZ}
+  };
+  if(ivecpot) {
+    flds.push_back({"VecPot_R", loc_VecPot_R});
+    flds.push_back({"VecPot_Phi", loc_VecPot_Phi});
+    flds.push_back({"VecPot_Z", loc_VecPot_Z});
+  }
+  flds.push_back({"te_3d", loc_Te}); flds.push_back({"ti_3d", loc_Ti});
+  flds.push_back({"ne_3d", loc_Ne}); flds.push_back({"ni_3d", loc_Ni});
+  flds.push_back({"p_3d", loc_P});   flds.push_back({"eta_3d", loc_Eta});
+  if(ibootstrap >= 1) {
+    flds.push_back({"JpdotB_3d", loc_JpdotB});
+    flds.push_back({"JpdotB_dndpsi_3d", loc_JpdotB_dn});
+    flds.push_back({"JpdotB_dtedpsi_3d", loc_JpdotB_dte});
+    flds.push_back({"JpdotB_dtidpsi_3d", loc_JpdotB_dti});
+    flds.push_back({"JBS_R", loc_JBSR});
+    flds.push_back({"JBS_Phi", loc_JBSPhi});
+    flds.push_back({"JBS_Z", loc_JBSZ});
   }
 
-  double *out_Jac=nullptr, *out_Mask=nullptr;
-  double *out_BR=nullptr, *out_BPhi=nullptr, *out_BZ=nullptr;
-  double *out_JR=nullptr, *out_JPhi=nullptr, *out_JZ=nullptr;
-  double *out_VecPot_R=nullptr, *out_VecPot_Phi=nullptr, *out_VecPot_Z=nullptr;
-  double *out_Te=nullptr, *out_Ti=nullptr, *out_Ne=nullptr, *out_Ni=nullptr, *out_P=nullptr; double *out_Eta=nullptr;
-  double *out_JpdotB=nullptr, *out_JpdotB_dn=nullptr, *out_JpdotB_dte=nullptr, *out_JpdotB_dti=nullptr;
-  double *out_JBSR=nullptr,*out_JBSPhi=nullptr,*out_JBSZ=nullptr;
-
-  if(world_rank == 0) {
-      out_Jac = new double[total_work]; out_Mask = new double[total_work];
-      out_BR = new double[total_work]; out_BPhi = new double[total_work]; out_BZ = new double[total_work];
-      out_JR = new double[total_work]; out_JPhi = new double[total_work]; out_JZ = new double[total_work];
-      if(ivecpot) { out_VecPot_R = new double[total_work]; out_VecPot_Phi = new double[total_work]; out_VecPot_Z = new double[total_work]; }
-      out_Te = new double[total_work]; out_Ti = new double[total_work]; out_Ne = new double[total_work]; out_Ni = new double[total_work]; out_P = new double[total_work];
-      out_Eta = new double[total_work];
-      if(ibootstrap >= 1) { out_JpdotB = new double[total_work]; out_JpdotB_dn = new double[total_work]; out_JpdotB_dte = new double[total_work]; out_JpdotB_dti = new double[total_work]; }
-      if(ibootstrap >= 1) { out_JBSR=new double[total_work]; out_JBSPhi=new double[total_work]; out_JBSZ=new double[total_work]; }
-      
-  }
-
+  std::vector<int> flat_counts(world_size), flat_displs(world_size);
+  { long long d = 0;
+    for(int r=0; r<world_size; r++) {
+      long long c = pts_per_rank + (r < rem_pts ? 1 : 0);
+      flat_counts[r] = (int)c; flat_displs[r] = (int)d; d += c;
+    } }
   int my_pts = (int)my_pts_count;
 
-  #define OPT_GATHER(loc_arr, global_arr) \
-      MPI_Gatherv(loc_arr, my_pts, MPI_DOUBLE, global_arr, flat_counts.data(), flat_displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  // big-endian float writer for legacy binary VTK
+  auto write_be_float = [](std::ofstream& f, float v) {
+    uint32_t u; std::memcpy(&u, &v, 4);
+    u = __builtin_bswap32(u);
+    f.write(reinterpret_cast<const char*>(&u), 4);
+  };
 
-  OPT_GATHER(loc_Jac, out_Jac);
-  OPT_GATHER(loc_Mask, out_Mask);
-  OPT_GATHER(loc_BR, out_BR); OPT_GATHER(loc_BPhi, out_BPhi); OPT_GATHER(loc_BZ, out_BZ);
-  OPT_GATHER(loc_JR, out_JR); OPT_GATHER(loc_JPhi, out_JPhi); OPT_GATHER(loc_JZ, out_JZ);
-  
-  if(ivecpot) { OPT_GATHER(loc_VecPot_R, out_VecPot_R); OPT_GATHER(loc_VecPot_Phi, out_VecPot_Phi); OPT_GATHER(loc_VecPot_Z, out_VecPot_Z); }
+  std::ofstream vtk; int ncid = -1;
+  double* buf = nullptr;
+  long long vtk_points = (long long)nR * (nphi + 1) * nZ;
 
-  OPT_GATHER(loc_Te, out_Te); OPT_GATHER(loc_Ti, out_Ti); OPT_GATHER(loc_Ne, out_Ne); OPT_GATHER(loc_Ni, out_Ni); OPT_GATHER(loc_P, out_P);
-  OPT_GATHER(loc_Eta, out_Eta);
-
-  if(ibootstrap >= 1) {
-      OPT_GATHER(loc_JpdotB, out_JpdotB); OPT_GATHER(loc_JpdotB_dn, out_JpdotB_dn);
-      OPT_GATHER(loc_JpdotB_dte, out_JpdotB_dte); OPT_GATHER(loc_JpdotB_dti, out_JpdotB_dti);
-      OPT_GATHER(loc_JBSR,out_JBSR); OPT_GATHER(loc_JBSPhi,out_JBSPhi); OPT_GATHER(loc_JBSZ,out_JBSZ);
-  }
-
-  // -------------------------------------------------------------------------
-  // VTK AND NETCDF FILE OUTPUT (Rank 0 Only) 
-  // -------------------------------------------------------------------------
   if(world_rank == 0) {
-      // 1. VTK OUTPUT (For ParaView, explicitly closes torus)
-      std::cerr << "Writing VTK file for ParaView..." << std::endl;
-      std::ofstream vtk("neo_eulerian.vtk");
-      
-      long long vtk_points = (long long)nR * (nphi + 1) * nZ;
-      vtk << "# vtk DataFile Version 3.0\nEulerian 3D fields\nASCII\nDATASET STRUCTURED_GRID\n";
-      vtk << "DIMENSIONS " << nR << " " << nphi + 1 << " " << nZ << "\n";
-      vtk << "POINTS " << vtk_points << " float\n";
-      
-      for(int k = 0; k < nZ; k++) {
-          for(int j = 0; j <= nphi; j++) {
-              for(int i = 0; i < nR; i++) {
-                  double r = Rmin + i * dR;
-                  double p = j * dPhi;
-                  double z = Zmin + k * dZ;
-                  vtk << r * cos(p) << " " << r * sin(p) << " " << z << "\n";
-              }
-          }
-      }
+    buf = new double[total_work];
 
-      vtk << "POINT_DATA " << vtk_points << "\n";
-      auto write_vtk_scalar = [&](const char* name, double* data) {
-          vtk << "SCALARS " << name << " float 1\nLOOKUP_TABLE default\n";
-          for(int k = 0; k < nZ; k++) {
-              for(int j = 0; j <= nphi; j++) {
-                  int read_j = (j == nphi) ? 0 : j; 
-                  for(int i = 0; i < nR; i++) {
-                      long long idx = i + read_j * nR + k * nR * nphi;
-                      vtk << data[idx] << "\n";
-                  }
-              }
-          }
-      };
+    // ---- NetCDF definitions ----
+    NC_CHECK(nc_create("neo_eulerian.nc", NC_CLOBBER | NC_NETCDF4, &ncid));
+    int nr_d, nphi_d, nz_d;
+    NC_CHECK(nc_def_dim(ncid, "Z", nZ, &nz_d));
+    NC_CHECK(nc_def_dim(ncid, "Phi", nphi, &nphi_d));
+    NC_CHECK(nc_def_dim(ncid, "R", nR, &nr_d));
+    int rid, phid, zid;
+    NC_CHECK(nc_def_var(ncid, "R", NC_FLOAT, 1, &nr_d, &rid));
+    NC_CHECK(nc_def_var(ncid, "Phi", NC_FLOAT, 1, &nphi_d, &phid));
+    NC_CHECK(nc_def_var(ncid, "Z", NC_FLOAT, 1, &nz_d, &zid));
+    int dims[3] = {nz_d, nphi_d, nr_d};
+    for(auto& f : flds) {
+      NC_CHECK(nc_def_var(ncid, f.name, NC_FLOAT, 3, dims, &f.ncvar));
+      NC_CHECK(nc_def_var_deflate(ncid, f.ncvar, 1, 1, 1)); // shuffle+zlib level 1
+    }
+    NC_CHECK(nc_enddef(ncid));
 
-      write_vtk_scalar("Comp_Boundary", out_Mask);
-      write_vtk_scalar("Jac", out_Jac);
-      write_vtk_scalar("B_R", out_BR); write_vtk_scalar("B_Phi", out_BPhi); write_vtk_scalar("B_Z", out_BZ);
-      write_vtk_scalar("J_R", out_JR); write_vtk_scalar("J_Phi", out_JPhi); write_vtk_scalar("J_Z", out_JZ);
-      if(ivecpot == 1) {
-          write_vtk_scalar("VecPot_R", out_VecPot_R); write_vtk_scalar("VecPot_Phi", out_VecPot_Phi); write_vtk_scalar("VecPot_Z", out_VecPot_Z);
-      }
-      write_vtk_scalar("te_3d", out_Te); write_vtk_scalar("ti_3d", out_Ti); 
-      write_vtk_scalar("ne_3d", out_Ne); write_vtk_scalar("ni_3d", out_Ni); write_vtk_scalar("p_3d", out_P);
-      write_vtk_scalar("eta_3d", out_Eta);
-      if(ibootstrap >= 1) {
-          write_vtk_scalar("JpdotB_3d", out_JpdotB); write_vtk_scalar("JpdotB_dndpsi_3d", out_JpdotB_dn);
-          write_vtk_scalar("JpdotB_dtedpsi_3d", out_JpdotB_dte); write_vtk_scalar("JpdotB_dtidpsi_3d", out_JpdotB_dti);
-          write_vtk_scalar("JBS_R",out_JBSR); write_vtk_scalar("JBS_Phi",out_JBSPhi); write_vtk_scalar("JBS_Z",out_JBSZ);
-      }
-      vtk.close();
+    std::vector<double> rax(nR), phax(nphi), zax(nZ);
+    for(int i=0;i<nR;i++)   rax[i]  = Rmin + i*dR;
+    for(int j=0;j<nphi;j++) phax[j] = j*dPhi;
+    for(int k=0;k<nZ;k++)   zax[k]  = Zmin + k*dZ;
+    NC_CHECK(nc_put_var_double(ncid, rid, rax.data()));
+    NC_CHECK(nc_put_var_double(ncid, phid, phax.data()));
+    NC_CHECK(nc_put_var_double(ncid, zid, zax.data()));
 
-      // 2. NETCDF OUTPUT (For Python/Xarray, strict array mapping)
-      std::cerr << "Writing NetCDF file for Python..." << std::endl;
-      int ncid;
-      NC_CHECK(nc_create("neo_eulerian.nc", NC_CLOBBER | NC_NETCDF4, &ncid));
-
-      int nr_dimid, nphi_dimid, nz_dimid;
-      NC_CHECK(nc_def_dim(ncid, "Z", nZ, &nz_dimid));
-      NC_CHECK(nc_def_dim(ncid, "Phi", nphi, &nphi_dimid)); 
-      NC_CHECK(nc_def_dim(ncid, "R", nR, &nr_dimid));
-      
-      int r_coord_id, phi_coord_id, z_coord_id;
-      NC_CHECK(nc_def_var(ncid, "R", NC_FLOAT, 1, &nr_dimid, &r_coord_id));
-      NC_CHECK(nc_def_var(ncid, "Phi", NC_FLOAT, 1, &nphi_dimid, &phi_coord_id));
-      NC_CHECK(nc_def_var(ncid, "Z", NC_FLOAT, 1, &nz_dimid, &z_coord_id));
-
-      int dims[3] = {nz_dimid, nphi_dimid, nr_dimid};
-
-      int jac_id, mask_id, br_id, bphi_id, bz_id, jr_id, jphi_id, jz_id, vecpot_r_id, vecpot_phi_id, vecpot_z_id;
-      NC_CHECK(nc_def_var(ncid, "Jac", NC_FLOAT, 3, dims, &jac_id));
-      NC_CHECK(nc_def_var(ncid, "Comp_Boundary", NC_FLOAT, 3, dims, &mask_id));
-      NC_CHECK(nc_def_var(ncid, "B_R", NC_FLOAT, 3, dims, &br_id));
-      NC_CHECK(nc_def_var(ncid, "B_Phi", NC_FLOAT, 3, dims, &bphi_id));
-      NC_CHECK(nc_def_var(ncid, "B_Z", NC_FLOAT, 3, dims, &bz_id));
-      NC_CHECK(nc_def_var(ncid, "J_R", NC_FLOAT, 3, dims, &jr_id));
-      NC_CHECK(nc_def_var(ncid, "J_Phi", NC_FLOAT, 3, dims, &jphi_id));
-      NC_CHECK(nc_def_var(ncid, "J_Z", NC_FLOAT, 3, dims, &jz_id));
-      
-
-      if(ivecpot == 1) {  
-          NC_CHECK(nc_def_var(ncid, "VecPot_R", NC_FLOAT, 3, dims, &vecpot_r_id));
-          NC_CHECK(nc_def_var(ncid, "VecPot_Phi", NC_FLOAT, 3, dims, &vecpot_phi_id));
-          NC_CHECK(nc_def_var(ncid, "VecPot_Z", NC_FLOAT, 3, dims, &vecpot_z_id));
-      }
-      
-      int te3d_id, ti3d_id, ne3d_id, ni3d_id, p3d_id, eta3d_id;
-      int JpdotB3d_id, JpdotB_dn_id, JpdotB_dte_id, JpdotB_dti_id;
-      int jbsr_id,jbsphi_id,jbsz_id;
-      NC_CHECK(nc_def_var(ncid, "te_3d", NC_FLOAT, 3, dims, &te3d_id));
-      NC_CHECK(nc_def_var(ncid, "ti_3d", NC_FLOAT, 3, dims, &ti3d_id));
-      NC_CHECK(nc_def_var(ncid, "ne_3d", NC_FLOAT, 3, dims, &ne3d_id));
-      NC_CHECK(nc_def_var(ncid, "ni_3d", NC_FLOAT, 3, dims, &ni3d_id));
-      NC_CHECK(nc_def_var(ncid, "p_3d", NC_FLOAT, 3, dims, &p3d_id));
-      NC_CHECK(nc_def_var(ncid, "eta_3d", NC_FLOAT, 3, dims, &eta3d_id));
-      
-      if (ibootstrap >= 1){
-          NC_CHECK(nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id));
-          NC_CHECK(nc_def_var(ncid, "JpdotB_dndpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dn_id));
-          NC_CHECK(nc_def_var(ncid, "JpdotB_dtedpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dte_id));
-          NC_CHECK(nc_def_var(ncid, "JpdotB_dtidpsi_3d", NC_FLOAT, 3, dims, &JpdotB_dti_id));
-          NC_CHECK(nc_def_var(ncid,"JBS_R",NC_FLOAT,3,dims,&jbsr_id));
-          NC_CHECK(nc_def_var(ncid,"JBS_Phi",NC_FLOAT,3,dims,&jbsphi_id));
-          NC_CHECK(nc_def_var(ncid,"JBS_Z",NC_FLOAT,3,dims,&jbsz_id));
-      }
-      
-      NC_CHECK(nc_enddef(ncid));
-
-      double* r_ax = new double[nR];   for(int i=0; i<nR; i++) r_ax[i] = Rmin + i * dR;
-      double* phi_ax = new double[nphi]; for(int j=0; j<nphi; j++) phi_ax[j] = j * dPhi; 
-      double* z_ax = new double[nZ];   for(int k=0; k<nZ; k++) z_ax[k] = Zmin + k * dZ;
-      NC_CHECK(nc_put_var_double(ncid, r_coord_id, r_ax));
-      NC_CHECK(nc_put_var_double(ncid, phi_coord_id, phi_ax));
-      NC_CHECK(nc_put_var_double(ncid, z_coord_id, z_ax));
-
-      NC_CHECK(nc_put_var_double(ncid, jac_id, out_Jac));
-      NC_CHECK(nc_put_var_double(ncid, mask_id, out_Mask));
-      NC_CHECK(nc_put_var_double(ncid, br_id, out_BR));
-      NC_CHECK(nc_put_var_double(ncid, bphi_id, out_BPhi));
-      NC_CHECK(nc_put_var_double(ncid, bz_id, out_BZ));
-      NC_CHECK(nc_put_var_double(ncid, jr_id, out_JR));
-      NC_CHECK(nc_put_var_double(ncid, jphi_id, out_JPhi));
-      NC_CHECK(nc_put_var_double(ncid, jz_id, out_JZ));
-      if(ivecpot == 1) {
-          NC_CHECK(nc_put_var_double(ncid, vecpot_r_id, out_VecPot_R));
-          NC_CHECK(nc_put_var_double(ncid, vecpot_phi_id, out_VecPot_Phi));
-          NC_CHECK(nc_put_var_double(ncid, vecpot_z_id, out_VecPot_Z));
-      }
-      NC_CHECK(nc_put_var_double(ncid, te3d_id, out_Te));
-      NC_CHECK(nc_put_var_double(ncid, ti3d_id, out_Ti));
-      NC_CHECK(nc_put_var_double(ncid, ne3d_id, out_Ne));
-      NC_CHECK(nc_put_var_double(ncid, ni3d_id, out_Ni));
-      NC_CHECK(nc_put_var_double(ncid, p3d_id, out_P));
-      NC_CHECK(nc_put_var_double(ncid, eta3d_id, out_Eta));
-      if(ibootstrap >= 1) {
-          NC_CHECK(nc_put_var_double(ncid, JpdotB3d_id, out_JpdotB));
-          NC_CHECK(nc_put_var_double(ncid, JpdotB_dn_id, out_JpdotB_dn));
-          NC_CHECK(nc_put_var_double(ncid, JpdotB_dte_id, out_JpdotB_dte));
-          NC_CHECK(nc_put_var_double(ncid, JpdotB_dti_id, out_JpdotB_dti));
-          NC_CHECK(nc_put_var_double(ncid, jbsr_id,out_JBSR));
-          NC_CHECK(nc_put_var_double(ncid, jbsphi_id,out_JBSPhi));
-          NC_CHECK(nc_put_var_double(ncid, jbsz_id,out_JBSZ));
-      }
-      NC_CHECK(nc_close(ncid));
-      
-      delete[] r_ax; delete[] phi_ax; delete[] z_ax;
-      std::cerr << "Successfully wrote output files!" << std::endl;
+    // ---- VTK header + points (BINARY) ----
+    std::cerr << "Opening VTK (binary)..." << std::endl;
+    vtk.open("neo_eulerian.vtk", std::ios::binary);
+    vtk << "# vtk DataFile Version 3.0\nEulerian 3D fields\nBINARY\nDATASET STRUCTURED_GRID\n";
+    vtk << "DIMENSIONS " << nR << " " << nphi + 1 << " " << nZ << "\n";
+    vtk << "POINTS " << vtk_points << " float\n";
+    for(int k=0;k<nZ;k++) for(int j=0;j<=nphi;j++) for(int i=0;i<nR;i++) {
+      double r = Rmin + i*dR, p = j*dPhi, z = Zmin + k*dZ;
+      write_be_float(vtk, (float)(r*cos(p)));
+      write_be_float(vtk, (float)(r*sin(p)));
+      write_be_float(vtk, (float)z);
+    }
+    vtk << "\nPOINT_DATA " << vtk_points << "\n";
   }
 
-  // -------------------------------------------------------------------------
-  // CLEANUP MEMORY ON ALL RANKS
-  // -------------------------------------------------------------------------
+  for(auto& f : flds) {
+    // all ranks participate; only rank 0 has a valid recv buffer
+    MPI_Gatherv(f.loc, my_pts, MPI_DOUBLE, buf, flat_counts.data(),
+                flat_displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    if(world_rank == 0) {
+      NC_CHECK(nc_put_var_double(ncid, f.ncvar, buf));
+      vtk << "SCALARS " << f.name << " float 1\nLOOKUP_TABLE default\n";
+      for(int k=0;k<nZ;k++) for(int j=0;j<=nphi;j++) {
+        int rj = (j == nphi) ? 0 : j;
+        for(int i=0;i<nR;i++)
+          write_be_float(vtk, (float)buf[i + rj*nR + (long long)k*nR*nphi]);
+      }
+      vtk << "\n";
+      std::cerr << "Wrote " << f.name << std::endl;
+    }
+  }
+
+  if(world_rank == 0) {
+    vtk.close();
+    NC_CHECK(nc_close(ncid));
+    delete[] buf;
+    std::cerr << "Successfully wrote output files!" << std::endl;
+  }
+  MPI_Barrier(MPI_COMM_WORLD);   // all ranks leave together
+  if(world_rank == 0) std::cerr << "Done." << std::endl;
+
   delete[] loc_Jac; delete[] loc_Mask; delete[] loc_BR; delete[] loc_BPhi; delete[] loc_BZ;
   delete[] loc_JR; delete[] loc_JPhi; delete[] loc_JZ;
   delete[] loc_VecPot_R; delete[] loc_VecPot_Phi; delete[] loc_VecPot_Z;
   delete[] loc_Te; delete[] loc_Ti; delete[] loc_Ne; delete[] loc_Ni; delete[] loc_P; delete[] loc_Eta;
   delete[] loc_JpdotB; delete[] loc_JpdotB_dn; delete[] loc_JpdotB_dte; delete[] loc_JpdotB_dti;
   delete[] loc_JBSR; delete[] loc_JBSPhi; delete[] loc_JBSZ;
-
-  if(world_rank == 0) {
-      delete[] out_Jac; delete[] out_Mask; delete[] out_BR; delete[] out_BPhi; delete[] out_BZ;
-      delete[] out_JR; delete[] out_JPhi; delete[] out_JZ;
-      if(ivecpot) { delete[] out_VecPot_R; delete[] out_VecPot_Phi; delete[] out_VecPot_Z; }
-      delete[] out_Te; delete[] out_Ti; delete[] out_Ne; delete[] out_Ni; delete[] out_P; delete[] out_Eta;
-      if(ibootstrap >= 1) { delete[] out_JpdotB; delete[] out_JpdotB_dn; delete[] out_JpdotB_dte; delete[] out_JpdotB_dti; }
-      if(ibootstrap >= 1) {delete[] out_JBSR; delete[] out_JBSPhi; delete[] out_JBSZ;}
-  }
-
   sources[0]->deallocate_search_hint(&h);
   delete_sources();
-
-  if(world_rank == 0) std::cerr << "Done." << std::endl;
   MPI_Finalize();
   return 0;
 }
