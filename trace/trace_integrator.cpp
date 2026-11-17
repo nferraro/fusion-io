@@ -28,6 +28,17 @@ trace_integrator::trace_integrator()
   tpts = 1;
 }
 
+bool trace_integrator::open_path_file(const char* filename) {
+  if(path_file.is_open()) close_path_file();
+  path_file.open(filename, std::fstream::out | std::fstream::trunc);
+  return path_file.is_open();
+}
+
+bool trace_integrator::close_path_file() {
+  if(path_file.is_open()) path_file.close();
+  return true;
+}
+
 bool trace_integrator::integrate_adaptive(int transits, int steps_per_transit, integrator_data* data)
 {
     double h = (reverse ? -period : period) / (double)steps_per_transit;
@@ -51,6 +62,13 @@ bool trace_integrator::integrate_adaptive(int transits, int steps_per_transit, i
         }
 
         if (!step_rk54(h_actual, tol)) return false;
+        
+        // NEW: Log the 3D trajectory regardless of whether we hit a puncture plane
+        // Format: Phi, R, Z (Full 3D coordinate set)
+        if (path_file.is_open()) {
+            path_file << std::setiosflags(std::ios::scientific) << std::setw(20) 
+                      << Phi << std::setw(20) << R << std::setw(20) << Z << std::endl;
+        }
 
         if (landing_on_plane) {
             save_puncture(next_puncture, R, Z, Z0_mag, R0_mag);
@@ -107,14 +125,21 @@ bool trace_integrator::step_rk54(double& h, double tol)
     }
 }
 
-void trace_integrator::save_puncture(double pl, double R_p, double Z_p, double Z0, double R0) {
+void trace_integrator::save_puncture(double pl, double R_p, double Z_p, double Z0, double R0, double lyap) {
     double theta_plot = std::atan2(Z_p - Z0, R_p - R0) * 180.0 / M_PI;
     double psi_plot;
     if (!eval_psi(R_p, pl, Z_p, &psi_plot)) psi_plot = 0;
 
     file << std::setiosflags(std::ios::scientific) << std::setw(20) << std::setprecision(12) 
          << pl * 180.0 / M_PI << std::setw(20) << R_p << std::setw(20) << Z_p 
-         << std::setw(20) << theta_plot << std::setw(20) << psi_plot << std::endl;
+         << std::setw(20) << theta_plot << std::setw(20) << psi_plot;
+    
+    // --- NEW: Add the 6th column if it's a Lyapunov run ---
+    if (!std::isnan(lyap)) {
+         file << std::setw(20) << lyap;
+    }
+    
+    file << std::endl;
 }
 
 trace_integrator::~trace_integrator()
@@ -507,3 +532,4 @@ bool trace_integrator::step_predcorr(double dphi)
 
   return true;
 }
+

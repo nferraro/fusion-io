@@ -37,7 +37,8 @@ std::deque<fio_source*> sources;
 fio_compound_field electron_density, electron_temperature, pressure;
 fio_compound_field current_density, vector_potential;
 fio_compound_field ion_density, ion_temperature, psin, mag, JpdotB, JpdotB_dndpsi, JpdotB_dtedpsi, JpdotB_dtidpsi;
-fio_compound_field JpdotB_L31, JpdotB_L32, JpdotB_L34, JpdotB_alpha;
+fio_compound_field JpdotB_L31, JpdotB_L32, JpdotB_L34, JpdotB_alpha, JBS_R, JBS_Phi, JBS_Z;   
+
 double axis[3];
 double psi0, psi1;
 
@@ -211,6 +212,9 @@ int main(int argc, char* argv[])
   currden[0] = new double[nr*nphi*ntheta];
   currden[1] = new double[nr*nphi*ntheta];
   currden[2] = new double[nr*nphi*ntheta];
+
+  double** jbsvec = new double*[3];
+  for(int c=0;c<3;c++) jbsvec[c] = new double[nr*nphi*ntheta];
 
   double** vecpot = new double*[3];
   vecpot[0] = new double[nr*nphi*ntheta];
@@ -618,6 +622,9 @@ int main(int argc, char* argv[])
           JpdotB_dndpsi.eval(p, &v1, h);  part_jb_dn[s] += v1 * J;
           JpdotB_dtedpsi.eval(p, &v1, h); part_jb_dte[s] += v1 * J;
           JpdotB_dtidpsi.eval(p, &v1, h); part_jb_dti[s] += v1 * J;
+          JBS_R.eval(p,   &v1, h); jbsvec[0][idx] = v1;
+          JBS_Phi.eval(p, &v1, h); jbsvec[1][idx] = v1;
+          JBS_Z.eval(p,   &v1, h); jbsvec[2][idx] = v1;
       }
       if(ibootstrap == 3) {
           JpdotB_L31.eval(p, &v1, h);   jdotB_L31[idx] = v1; part_L31[s] += v1 * J;
@@ -670,8 +677,10 @@ int main(int argc, char* argv[])
   SAFE_GATHER_3D(tion); 
   SAFE_GATHER_3D(nion); 
   SAFE_GATHER_3D(press);
+
   
   if(ibootstrap >= 1) SAFE_GATHER_3D(jdotb);
+  if(ibootstrap >= 1) { SAFE_GATHER_3D(jbsvec[0]); SAFE_GATHER_3D(jbsvec[1]); SAFE_GATHER_3D(jbsvec[2]); }
 
 
   // Reduce 1D Flux Averages (Sum partials from all ranks)
@@ -751,6 +760,12 @@ int main(int argc, char* argv[])
     double* VecPot_R = new double[nr*nphi*ntheta];
     double* VecPot_Phi = new double[nr*nphi*ntheta];
     double* VecPot_Z = new double[nr*nphi*ntheta];
+    double* J_R   = new double[nr*nphi*ntheta];
+    double* J_Phi = new double[nr*nphi*ntheta];
+    double* J_Z   = new double[nr*nphi*ntheta];
+    double* JBS_R_3d   = new double[nr*nphi*ntheta];
+    double* JBS_Phi_3d = new double[nr*nphi*ntheta];
+    double* JBS_Z_3d   = new double[nr*nphi*ntheta];
   
     for(int i=0; i<nr; i++) {
       for(int j=0; j<nphi; j++) {
@@ -761,6 +776,9 @@ int main(int argc, char* argv[])
           BR  [i + j*nr + k*nr*nphi] = b[0][k + j*ntheta + i*ntheta*nphi];
           BPhi[i + j*nr + k*nr*nphi] = b[1][k + j*ntheta + i*ntheta*nphi];
           BZ  [i + j*nr + k*nr*nphi] = b[2][k + j*ntheta + i*ntheta*nphi];
+          J_R  [i + j*nr + k*nr*nphi] = currden[0][k + j*ntheta + i*ntheta*nphi];
+          J_Phi[i + j*nr + k*nr*nphi] = currden[1][k + j*ntheta + i*ntheta*nphi];
+          J_Z  [i + j*nr + k*nr*nphi] = currden[2][k + j*ntheta + i*ntheta*nphi];
           Te_3d  [i + j*nr + k*nr*nphi] = telec[k + j*ntheta + i*ntheta*nphi];
           Ti_3d  [i + j*nr + k*nr*nphi] = tion[k + j*ntheta + i*ntheta*nphi];
           Ne_3d  [i + j*nr + k*nr*nphi] = nelec[k + j*ntheta + i*ntheta*nphi];
@@ -773,6 +791,9 @@ int main(int argc, char* argv[])
           }
           if (ibootstrap==1 || ibootstrap==2 || ibootstrap==3){
             JpdotB_3d  [i + j*nr + k*nr*nphi] = jdotb[k + j*ntheta + i*ntheta*nphi];
+            JBS_R_3d  [i + j*nr + k*nr*nphi] = jbsvec[0][k + j*ntheta + i*ntheta*nphi];
+            JBS_Phi_3d[i + j*nr + k*nr*nphi] = jbsvec[1][k + j*ntheta + i*ntheta*nphi];
+            JBS_Z_3d  [i + j*nr + k*nr*nphi] = jbsvec[2][k + j*ntheta + i*ntheta*nphi];
           }
         }
       }
@@ -966,7 +987,7 @@ int main(int argc, char* argv[])
     std::cerr << "Writing netcdf file" << std::endl;
 
     int ncid;
-    result = nc_create("neo_input.nc", NC_CLOBBER, &ncid);
+    result = nc_create("neo_input.nc", NC_CLOBBER | NC_NETCDF4, &ncid);
     if(result != 0) {
       std::cerr << "Error opening netcdf file\n" << nc_strerror(result)
           << std::endl;
@@ -1033,6 +1054,7 @@ int main(int argc, char* argv[])
     nc_def_var(ncid, "temax",  NC_FLOAT, 0, &single_value_dimid, &temax_id); 
 
     int r_id, z_id, jac_id, br_id, bphi_id, bz_id,vecpot_r_id,vecpot_phi_id,vecpot_z_id;
+    int jr_id, jphi_id, jz_id, jbsr_id, jbsphi_id, jbsz_id;
     int dims[3];
     dims[2] = nr_dimid;
     dims[1] = nt_dimid;
@@ -1043,6 +1065,9 @@ int main(int argc, char* argv[])
     nc_def_var(ncid, "B_R",   NC_FLOAT, 3, dims, &br_id);   // added in version 3
     nc_def_var(ncid, "B_Phi", NC_FLOAT, 3, dims, &bphi_id); // added in version 3
     nc_def_var(ncid, "B_Z",   NC_FLOAT, 3, dims, &bz_id);   // added in version 3
+    nc_def_var(ncid, "J_R",   NC_FLOAT, 3, dims, &jr_id);
+    nc_def_var(ncid, "J_Phi", NC_FLOAT, 3, dims, &jphi_id);
+    nc_def_var(ncid, "J_Z",   NC_FLOAT, 3, dims, &jz_id);
     if(ivecpot==1){  
       nc_def_var(ncid, "VecPot_R",   NC_FLOAT, 3, dims, &vecpot_r_id);   // added in version 3
       nc_def_var(ncid, "VecPot_Phi", NC_FLOAT, 3, dims, &vecpot_phi_id); // added in version 3
@@ -1057,6 +1082,15 @@ int main(int argc, char* argv[])
     nc_def_var(ncid, "p_3d", NC_FLOAT, 3, dims, &p3d_id);
     if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
     nc_def_var(ncid, "JpdotB_3d", NC_FLOAT, 3, dims, &JpdotB3d_id); // added in version 3
+    nc_def_var(ncid, "Jp_BS_R",   NC_FLOAT, 3, dims, &jbsr_id);
+    nc_def_var(ncid, "Jp_BS_Phi", NC_FLOAT, 3, dims, &jbsphi_id);
+    nc_def_var(ncid, "Jp_BS_Z",   NC_FLOAT, 3, dims, &jbsz_id);
+    }
+    // compress all 3D variables (lossless)
+    int nvars; nc_inq_nvars(ncid, &nvars);
+    for(int v=0; v<nvars; v++) {
+      int ndims; nc_inq_varndims(ncid, v, &ndims);
+      if(ndims == 3) nc_def_var_deflate(ncid, v, 1 /*shuffle*/, 1 /*deflate*/, 4 /*level 1-9*/);
     }
     nc_enddef(ncid);
 
@@ -1098,6 +1132,9 @@ int main(int argc, char* argv[])
     nc_put_var_double(ncid, br_id, BR);
     nc_put_var_double(ncid, bphi_id, BPhi);
     nc_put_var_double(ncid, bz_id, BZ);
+    nc_put_var_double(ncid, jr_id,   J_R);
+    nc_put_var_double(ncid, jphi_id, J_Phi);
+    nc_put_var_double(ncid, jz_id,   J_Z);
 
     if(ivecpot==1){
       nc_put_var_double(ncid, vecpot_r_id, VecPot_R);
@@ -1111,6 +1148,9 @@ int main(int argc, char* argv[])
     nc_put_var_double(ncid, p3d_id, P_3d);
     if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
       nc_put_var_double(ncid, JpdotB3d_id, JpdotB_3d);
+      nc_put_var_double(ncid, jbsr_id,   JBS_R_3d);
+      nc_put_var_double(ncid, jbsphi_id, JBS_Phi_3d);
+      nc_put_var_double(ncid, jbsz_id,   JBS_Z_3d);
     }
 
     nc_put_var_double(ncid, psi_t_id, psi_t);
@@ -1348,6 +1388,7 @@ int main(int argc, char* argv[])
   delete[] tion;
   delete[] nelec;
   delete[] nion;
+  delete[] jbsvec[0]; delete[] jbsvec[1]; delete[] jbsvec[2]; delete[] jbsvec;
   if (ibootstrap==1 || ibootstrap ==2 ||ibootstrap ==3){
     delete[] jdotb;
   }
@@ -1572,7 +1613,30 @@ bool create_source(const int type, const int argc, const std::string argv[])
    }
    JpdotB_dtidpsi.add_field(field, FIO_ADD, 1., hint);
 
-  } 
+   result = src->get_field(FIO_JBS_R, &field, &fopt);
+   if(result != FIO_SUCCESS) { 
+    std::cerr << "Error opening Jp_BS_r" << std::endl; 
+    delete(src); 
+    return result; 
+  }
+   JBS_R.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_PHI, &field, &fopt);
+   if(result != FIO_SUCCESS) { 
+    std::cerr << "Error opening Jp_BS_phi" << std::endl; 
+    delete(src); 
+    return result; 
+  }
+   JBS_Phi.add_field(field, FIO_ADD, 1., hint);
+
+   result = src->get_field(FIO_JBS_Z, &field, &fopt);
+   if(result != FIO_SUCCESS) { 
+    std::cerr << "Error opening Jp_BS_z" << std::endl; 
+    delete(src); 
+    return result; 
+  }
+   JBS_Z.add_field(field, FIO_ADD, 1., hint);
+   } 
 
   if (ibootstrap ==3){
    result = src->get_field(FIO_JBS_L31, &field, &fopt);
@@ -1609,8 +1673,8 @@ bool create_source(const int type, const int argc, const std::string argv[])
 
   } 
 
-  if(ibootstrap !=1 ||ibootstrap!=2 ||ibootstrap!=3) {
-    std::cerr << "With bootstrap model, ibootstrap=" 
+  if(ibootstrap < 1 || ibootstrap > 3) {
+    std::cerr << "No bootstrap model, ibootstrap=" 
           << ibootstrap
           << std::endl;
   }

@@ -603,7 +603,7 @@ int m3dc1_magnetic_field::eval(const double* x, double* v, fio_hint s)
 
   const m3dc1_field::m3dc1_get_op fget =
     (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
+    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL);
 
   double val[m3dc1_field::OP_NUM];
   double r = (source->itor==1) ? x[0] : 1.;
@@ -688,10 +688,13 @@ int m3dc1_magnetic_field::eval_deriv(const double* x, double* v, fio_hint s)
     (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_VAL | m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL);
 
-  const m3dc1_field::m3dc1_get_op fget =
+const m3dc1_field::m3dc1_get_op fget =
     (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | 
-     m3dc1_field::GET_DDVAL | m3dc1_field::GET_PPVAL);
+    ((source->ifprime==0)
+       ? (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL |
+          m3dc1_field::GET_DDVAL | m3dc1_field::GET_PPVAL)
+       : (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL |
+          m3dc1_field::GET_DDVAL));
 
   double val[m3dc1_field::OP_NUM];
   double r = (source->itor==1) ? x[0] : 1.;
@@ -891,9 +894,13 @@ int m3dc1_current_density::eval(const double* x, double* v, fio_hint s)
     (m3dc1_field::m3dc1_get_op)
     (m3dc1_field::GET_DVAL);
 
+// ifprime==1 uses OP_DRP/OP_DZP; in stellarator geometry these need
+  // GET_DDVAL. ifprime==0 uses OP_DRPP/OP_DZPP, which need GET_PPVAL.
   const m3dc1_field::m3dc1_get_op fget =
     (m3dc1_field::m3dc1_get_op)
-    (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_PPVAL);
+    ((source->ifprime==0)
+       ? (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_PPVAL)
+       : (m3dc1_field::GET_DVAL | m3dc1_field::GET_PVAL | m3dc1_field::GET_DDVAL));
 
   double val[m3dc1_field::OP_NUM];
   double r = (source->itor==1) ? x[0] : 1.;
